@@ -1,15 +1,6 @@
 # circuit-json-to-step
 
-To install dependencies:
+IN PROGRESS
 
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.2.19. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+This repo helps convert circuit boards into a STEP representation suitable for import
+into CAD tools. This can help you align your circuit board in larger mechanical projects
