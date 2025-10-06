@@ -3,6 +3,9 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "pull-reference": "git clone https://github.com/tscircuit/circuit-json.git && find circuit-json/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\; && git clone https://github.com/tscircuit/stepts.git && find stepts/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\;"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
