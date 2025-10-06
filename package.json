@@ -7,7 +7,9 @@
     "pull-reference": "git clone https://github.com/tscircuit/circuit-json.git && find circuit-json/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\; && git clone https://github.com/tscircuit/stepts.git && find stepts/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\;"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "circuit-json": "^0.0.272",
+    "stepts": "^0.0.1"
   },
   "peerDependencies": {
     "typescript": "^5"

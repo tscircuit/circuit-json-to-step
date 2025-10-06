@@ -3,3 +3,4 @@
 - One test per file
 - Create example circuit json in separate files, named after the test e.g. `test/basics/basics01/basics01.json`
 - All tests should be enumerated in the name `basics01`, `basics02`, etc.
+- There are references you can explore in `circuit-json` and `stepts`
