@@ -1,10 +1,12 @@
 {
   "name": "circuit-json-to-step",
-  "module": "index.ts",
+  "main": "dist/index.js",
   "type": "module",
-  "private": true,
   "scripts": {
-    "pull-reference": "git clone https://github.com/tscircuit/circuit-json.git && find circuit-json/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\; && git clone https://github.com/tscircuit/stepts.git && find stepts/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\;"
+    "pull-reference": "git clone https://github.com/tscircuit/circuit-json.git && find circuit-json/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\; && git clone https://github.com/tscircuit/stepts.git && find stepts/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\;",
+    "build": "tsup-node ./lib/index.ts --format esm --dts",
+    "format": "biome format --write .",
+    "format:check": "biome format ."
   },
   "devDependencies": {
     "@types/bun": "latest",
