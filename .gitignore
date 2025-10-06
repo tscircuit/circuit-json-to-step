@@ -37,3 +37,4 @@ bun.lock
 circuit-json
 stepts
 .vscode
+debug-output

@@ -1,0 +1,26 @@
+[
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_1",
+    "hole_shape": "circle",
+    "hole_diameter": 1.0,
+    "x": 5,
+    "y": 5
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_2",
+    "hole_shape": "circle",
+    "hole_diameter": 1.5,
+    "x": 15,
+    "y": 5
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_3",
+    "hole_shape": "circle",
+    "hole_diameter": 2.0,
+    "x": 10,
+    "y": 10
+  }
+]
