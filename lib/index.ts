@@ -41,11 +41,11 @@ import {
 } from "stepts"
 
 export interface CircuitJsonToStepOptions {
-  /** Board width in mm */
-  boardWidth: number
-  /** Board height in mm */
-  boardHeight: number
-  /** Board thickness in mm (default: 1.6mm) */
+  /** Board width in mm (optional if pcb_board is present) */
+  boardWidth?: number
+  /** Board height in mm (optional if pcb_board is present) */
+  boardHeight?: number
+  /** Board thickness in mm (default: 1.6mm or from pcb_board) */
   boardThickness?: number
   /** Product name (default: "PCB") */
   productName?: string
@@ -56,19 +56,25 @@ export interface CircuitJsonToStepOptions {
  */
 export function circuitJsonToStep(
   circuitJson: any[],
-  options: CircuitJsonToStepOptions,
+  options: CircuitJsonToStepOptions = {},
 ): string {
-  const {
-    boardWidth,
-    boardHeight,
-    boardThickness = 1.6,
-    productName = "PCB",
-  } = options
-
   const repo = new Repository()
 
-  // Extract holes from circuit JSON
+  // Extract pcb_board and holes from circuit JSON
+  const pcbBoard = circuitJson.find((item) => item.type === "pcb_board")
   const holes: PcbHole[] = circuitJson.filter((item) => item.type === "pcb_hole")
+
+  // Get dimensions from pcb_board or options
+  const boardWidth = options.boardWidth ?? pcbBoard?.width
+  const boardHeight = options.boardHeight ?? pcbBoard?.height
+  const boardThickness = options.boardThickness ?? pcbBoard?.thickness ?? 1.6
+  const productName = options.productName ?? "PCB"
+
+  if (!boardWidth || !boardHeight) {
+    throw new Error(
+      "Board dimensions not found. Either provide boardWidth and boardHeight in options, or include a pcb_board in the circuit JSON with width and height properties."
+    )
+  }
 
   // Product structure (required for STEP validation)
   const appContext = repo.add(
