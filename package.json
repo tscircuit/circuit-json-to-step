@@ -22,7 +22,7 @@
   "dependencies": {
     "@tscircuit/circuit-json-util": "^0.0.72",
     "circuit-json-to-connectivity-map": "^0.0.22",
-    "circuit-json-to-gltf": "^0.0.17",
+    "circuit-json-to-gltf": "^0.0.19",
     "circuit-to-svg": "^0.0.226",
     "schematic-symbols": "^0.0.202"
   }
