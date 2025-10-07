@@ -56,7 +56,7 @@ export interface CircuitJsonToStepOptions {
  * Converts circuit JSON to STEP format, creating holes in a PCB board
  */
 export async function circuitJsonToStep(
-  circuitJson: any[],
+  circuitJson: CircuitJson,
   options: CircuitJsonToStepOptions = {},
 ): Promise<string> {
   const repo = new Repository()
@@ -64,7 +64,7 @@ export async function circuitJsonToStep(
   // Extract pcb_board and holes from circuit JSON
   const pcbBoard = circuitJson.find((item) => item.type === "pcb_board")
   const holes: any[] = circuitJson.filter(
-    (item) => item.type === "pcb_hole" || item.type === "pcb_plated_hole"
+    (item) => item.type === "pcb_hole" || item.type === "pcb_plated_hole",
   )
 
   // Get dimensions from pcb_board or options
@@ -75,13 +75,15 @@ export async function circuitJsonToStep(
 
   if (!boardWidth || !boardHeight) {
     throw new Error(
-      "Board dimensions not found. Either provide boardWidth and boardHeight in options, or include a pcb_board in the circuit JSON with width and height properties."
+      "Board dimensions not found. Either provide boardWidth and boardHeight in options, or include a pcb_board in the circuit JSON with width and height properties.",
     )
   }
 
   // Product structure (required for STEP validation)
   const appContext = repo.add(
-    new ApplicationContext("core data for automotive mechanical design processes"),
+    new ApplicationContext(
+      "core data for automotive mechanical design processes",
+    ),
   )
   repo.add(
     new ApplicationProtocolDefinition(
@@ -91,7 +93,9 @@ export async function circuitJsonToStep(
       appContext,
     ),
   )
-  const productContext = repo.add(new ProductContext("", appContext, "mechanical"))
+  const productContext = repo.add(
+    new ProductContext("", appContext, "mechanical"),
+  )
   const product = repo.add(
     new Product(productName, productName, "", [productContext]),
   )
@@ -104,17 +108,25 @@ export async function circuitJsonToStep(
   const productDef = repo.add(
     new ProductDefinition("", "", productDefFormation, productDefContext),
   )
-  const productDefShape = repo.add(new ProductDefinitionShape("", "", productDef))
+  const productDefShape = repo.add(
+    new ProductDefinitionShape("", "", productDef),
+  )
 
   // Representation context
   const lengthUnit = repo.add(
-    new Unknown("", ["( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) )"]),
+    new Unknown("", [
+      "( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) )",
+    ]),
   )
   const angleUnit = repo.add(
-    new Unknown("", ["( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) )"]),
+    new Unknown("", [
+      "( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) )",
+    ]),
   )
   const solidAngleUnit = repo.add(
-    new Unknown("", ["( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() )"]),
+    new Unknown("", [
+      "( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() )",
+    ]),
   )
   const uncertainty = repo.add(
     new Unknown("UNCERTAINTY_MEASURE_WITH_UNIT", [
@@ -138,10 +150,20 @@ export async function circuitJsonToStep(
   if (outline && Array.isArray(outline) && outline.length >= 3) {
     // Use custom outline
     bottomVertices = outline.map((point) =>
-      repo.add(new VertexPoint("", repo.add(new CartesianPoint("", point.x, point.y, 0)))),
+      repo.add(
+        new VertexPoint(
+          "",
+          repo.add(new CartesianPoint("", point.x, point.y, 0)),
+        ),
+      ),
     )
     topVertices = outline.map((point) =>
-      repo.add(new VertexPoint("", repo.add(new CartesianPoint("", point.x, point.y, boardThickness)))),
+      repo.add(
+        new VertexPoint(
+          "",
+          repo.add(new CartesianPoint("", point.x, point.y, boardThickness)),
+        ),
+      ),
     )
   } else {
     // Fall back to rectangular shape (8 corners of rectangular prism)
@@ -156,14 +178,19 @@ export async function circuitJsonToStep(
       [0, boardHeight, boardThickness],
     ]
     const vertices = corners.map(([x, y, z]) =>
-      repo.add(new VertexPoint("", repo.add(new CartesianPoint("", x!, y!, z!)))),
+      repo.add(
+        new VertexPoint("", repo.add(new CartesianPoint("", x!, y!, z!))),
+      ),
     )
     bottomVertices = [vertices[0]!, vertices[1]!, vertices[2]!, vertices[3]!]
     topVertices = [vertices[4]!, vertices[5]!, vertices[6]!, vertices[7]!]
   }
 
   // Helper to create edge between vertices
-  function createEdge(v1: Ref<VertexPoint>, v2: Ref<VertexPoint>): Ref<EdgeCurve> {
+  function createEdge(
+    v1: Ref<VertexPoint>,
+    v2: Ref<VertexPoint>,
+  ): Ref<EdgeCurve> {
     const p1 = v1.resolve(repo).pnt.resolve(repo)
     const p2 = v2.resolve(repo).pnt.resolve(repo)
     const dir = repo.add(
@@ -205,11 +232,19 @@ export async function circuitJsonToStep(
 
   // Bottom face (z=0, normal pointing down)
   const bottomFrame = repo.add(
-    new Axis2Placement3D("", origin, repo.add(new Direction("", 0, 0, -1)), xDir),
+    new Axis2Placement3D(
+      "",
+      origin,
+      repo.add(new Direction("", 0, 0, -1)),
+      xDir,
+    ),
   )
   const bottomPlane = repo.add(new Plane("", bottomFrame))
   const bottomLoop = repo.add(
-    new EdgeLoop("", bottomEdges.map(edge => repo.add(new OrientedEdge("", edge, true)))),
+    new EdgeLoop(
+      "",
+      bottomEdges.map((edge) => repo.add(new OrientedEdge("", edge, true))),
+    ),
   )
 
   // Create holes in bottom face
@@ -224,7 +259,10 @@ export async function circuitJsonToStep(
 
       const holeCenter = repo.add(new CartesianPoint("", holeX, holeY, 0))
       const holeVertex = repo.add(
-        new VertexPoint("", repo.add(new CartesianPoint("", holeX + radius, holeY, 0))),
+        new VertexPoint(
+          "",
+          repo.add(new CartesianPoint("", holeX + radius, holeY, 0)),
+        ),
       )
       const holePlacement = repo.add(
         new Axis2Placement3D(
@@ -248,7 +286,10 @@ export async function circuitJsonToStep(
   const bottomFace = repo.add(
     new AdvancedFace(
       "",
-      [repo.add(new FaceOuterBound("", bottomLoop, true)), ...bottomHoleLoops] as any,
+      [
+        repo.add(new FaceOuterBound("", bottomLoop, true)),
+        ...bottomHoleLoops,
+      ] as any,
       bottomPlane,
       true,
     ),
@@ -259,7 +300,10 @@ export async function circuitJsonToStep(
   const topFrame = repo.add(new Axis2Placement3D("", topOrigin, zDir, xDir))
   const topPlane = repo.add(new Plane("", topFrame))
   const topLoop = repo.add(
-    new EdgeLoop("", topEdges.map(edge => repo.add(new OrientedEdge("", edge, false)))),
+    new EdgeLoop(
+      "",
+      topEdges.map((edge) => repo.add(new OrientedEdge("", edge, false))),
+    ),
   )
 
   // Create holes in top face
@@ -272,17 +316,19 @@ export async function circuitJsonToStep(
       const holeY = typeof hole.y === "number" ? hole.y : (hole.y as any).value
       const radius = hole.hole_diameter / 2
 
-      const holeCenter = repo.add(new CartesianPoint("", holeX, holeY, boardThickness))
+      const holeCenter = repo.add(
+        new CartesianPoint("", holeX, holeY, boardThickness),
+      )
       const holeVertex = repo.add(
-        new VertexPoint("", repo.add(new CartesianPoint("", holeX + radius, holeY, boardThickness))),
+        new VertexPoint(
+          "",
+          repo.add(
+            new CartesianPoint("", holeX + radius, holeY, boardThickness),
+          ),
+        ),
       )
       const holePlacement = repo.add(
-        new Axis2Placement3D(
-          "",
-          holeCenter,
-          zDir,
-          xDir,
-        ),
+        new Axis2Placement3D("", holeCenter, zDir, xDir),
       )
       const holeCircle = repo.add(new Circle("", holePlacement, radius))
       const holeEdge = repo.add(
@@ -319,7 +365,7 @@ export async function circuitJsonToStep(
     const edgeDir = {
       x: bottomV2.x - bottomV1.x,
       y: bottomV2.y - bottomV1.y,
-      z: 0
+      z: 0,
     }
     // Normal is perpendicular (rotate 90 degrees clockwise in XY plane for outward facing)
     const normalDir = repo.add(new Direction("", edgeDir.y, -edgeDir.x, 0))
@@ -340,7 +386,12 @@ export async function circuitJsonToStep(
       ]),
     )
     const sideFace = repo.add(
-      new AdvancedFace("", [repo.add(new FaceOuterBound("", sideLoop, true))], sidePlane, true),
+      new AdvancedFace(
+        "",
+        [repo.add(new FaceOuterBound("", sideLoop, true))],
+        sidePlane,
+        true,
+      ),
     )
     sideFaces.push(sideFace)
   }
@@ -357,7 +408,10 @@ export async function circuitJsonToStep(
       // Create circular edges at bottom and top
       const bottomHoleCenter = repo.add(new CartesianPoint("", holeX, holeY, 0))
       const bottomHoleVertex = repo.add(
-        new VertexPoint("", repo.add(new CartesianPoint("", holeX + radius, holeY, 0))),
+        new VertexPoint(
+          "",
+          repo.add(new CartesianPoint("", holeX + radius, holeY, 0)),
+        ),
       )
       const bottomHolePlacement = repo.add(
         new Axis2Placement3D(
@@ -367,22 +421,32 @@ export async function circuitJsonToStep(
           xDir,
         ),
       )
-      const bottomHoleCircle = repo.add(new Circle("", bottomHolePlacement, radius))
+      const bottomHoleCircle = repo.add(
+        new Circle("", bottomHolePlacement, radius),
+      )
       const bottomHoleEdge = repo.add(
-        new EdgeCurve("", bottomHoleVertex, bottomHoleVertex, bottomHoleCircle, true),
+        new EdgeCurve(
+          "",
+          bottomHoleVertex,
+          bottomHoleVertex,
+          bottomHoleCircle,
+          true,
+        ),
       )
 
-      const topHoleCenter = repo.add(new CartesianPoint("", holeX, holeY, boardThickness))
+      const topHoleCenter = repo.add(
+        new CartesianPoint("", holeX, holeY, boardThickness),
+      )
       const topHoleVertex = repo.add(
-        new VertexPoint("", repo.add(new CartesianPoint("", holeX + radius, holeY, boardThickness))),
+        new VertexPoint(
+          "",
+          repo.add(
+            new CartesianPoint("", holeX + radius, holeY, boardThickness),
+          ),
+        ),
       )
       const topHolePlacement = repo.add(
-        new Axis2Placement3D(
-          "",
-          topHoleCenter,
-          zDir,
-          xDir,
-        ),
+        new Axis2Placement3D("", topHoleCenter, zDir, xDir),
       )
       const topHoleCircle = repo.add(new Circle("", topHolePlacement, radius))
       const topHoleEdge = repo.add(
@@ -399,14 +463,11 @@ export async function circuitJsonToStep(
 
       // Create cylindrical surface for the hole (axis along Z)
       const holeCylinderPlacement = repo.add(
-        new Axis2Placement3D(
-          "",
-          bottomHoleCenter,
-          zDir,
-          xDir,
-        ),
+        new Axis2Placement3D("", bottomHoleCenter, zDir, xDir),
       )
-      const holeCylinderSurface = repo.add(new CylindricalSurface("", holeCylinderPlacement, radius))
+      const holeCylinderSurface = repo.add(
+        new CylindricalSurface("", holeCylinderPlacement, radius),
+      )
       const holeCylinderFace = repo.add(
         new AdvancedFace(
           "",

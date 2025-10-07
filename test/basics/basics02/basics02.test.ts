@@ -5,7 +5,7 @@ import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics02.json"
 
 test("basics02: convert pcb_board with outline only to STEP", async () => {
-  const stepText = circuitJsonToStep(circuitJson, {
+  const stepText = await circuitJsonToStep(circuitJson as any, {
     productName: "TestPCB_Outline",
   })
 

@@ -5,9 +5,7 @@ export type OcctLinearUnit =
   | "inch"
   | "foot"
 
-export type OcctLinearDeflectionType =
-  | "bounding_box_ratio"
-  | "absolute_value"
+export type OcctLinearDeflectionType = "bounding_box_ratio" | "absolute_value"
 
 export interface OcctImportParams {
   linearUnit?: OcctLinearUnit
@@ -72,7 +70,7 @@ let occtInstancePromise: Promise<OcctImport> | undefined
 
 async function loadOcct(): Promise<OcctImport> {
   if (!occtInstancePromise) {
-    const imported = (await import("occt-import-js")) as unknown
+    const imported = (await import("occt-import-js")) as any
     const factory = resolveFactory(imported)
     occtInstancePromise = factory()
   }

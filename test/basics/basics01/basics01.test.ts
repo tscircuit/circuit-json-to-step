@@ -5,7 +5,7 @@ import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics01.json"
 
 test("basics01: convert circuit json with circular holes to STEP", async () => {
-  const stepText = circuitJsonToStep(circuitJson, {
+  const stepText = await circuitJsonToStep(circuitJson as any, {
     boardWidth: 20,
     boardHeight: 15,
     boardThickness: 1.6,
