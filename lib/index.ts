@@ -78,6 +78,10 @@ export async function circuitJsonToStep(
   const boardThickness = options.boardThickness ?? pcbBoard?.thickness ?? 1.6
   const productName = options.productName ?? "PCB"
 
+  // Get board center position (defaults to 0, 0 if not specified)
+  const boardCenterX = pcbBoard?.center?.x ?? 0
+  const boardCenterY = pcbBoard?.center?.y ?? 0
+
   if (!boardWidth || !boardHeight) {
     throw new Error(
       "Board dimensions not found. Either provide boardWidth and boardHeight in options, or include a pcb_board in the circuit JSON with width and height properties.",
@@ -153,7 +157,7 @@ export async function circuitJsonToStep(
   let topVertices: Ref<VertexPoint>[]
 
   if (outline && Array.isArray(outline) && outline.length >= 3) {
-    // Use custom outline
+    // Use custom outline (points are already relative to board center)
     bottomVertices = outline.map((point) =>
       repo.add(
         new VertexPoint(
@@ -171,16 +175,18 @@ export async function circuitJsonToStep(
       ),
     )
   } else {
-    // Fall back to rectangular shape (8 corners of rectangular prism)
+    // Fall back to rectangular shape centered at (boardCenterX, boardCenterY)
+    const halfWidth = boardWidth / 2
+    const halfHeight = boardHeight / 2
     const corners = [
-      [0, 0, 0],
-      [boardWidth, 0, 0],
-      [boardWidth, boardHeight, 0],
-      [0, boardHeight, 0],
-      [0, 0, boardThickness],
-      [boardWidth, 0, boardThickness],
-      [boardWidth, boardHeight, boardThickness],
-      [0, boardHeight, boardThickness],
+      [boardCenterX - halfWidth, boardCenterY - halfHeight, 0],
+      [boardCenterX + halfWidth, boardCenterY - halfHeight, 0],
+      [boardCenterX + halfWidth, boardCenterY + halfHeight, 0],
+      [boardCenterX - halfWidth, boardCenterY + halfHeight, 0],
+      [boardCenterX - halfWidth, boardCenterY - halfHeight, boardThickness],
+      [boardCenterX + halfWidth, boardCenterY - halfHeight, boardThickness],
+      [boardCenterX + halfWidth, boardCenterY + halfHeight, boardThickness],
+      [boardCenterX - halfWidth, boardCenterY + halfHeight, boardThickness],
     ]
     const vertices = corners.map(([x, y, z]) =>
       repo.add(
@@ -232,7 +238,6 @@ export async function circuitJsonToStep(
 
   const origin = repo.add(new CartesianPoint("", 0, 0, 0))
   const xDir = repo.add(new Direction("", 1, 0, 0))
-  const yDir = repo.add(new Direction("", 0, 1, 0))
   const zDir = repo.add(new Direction("", 0, 0, 1))
 
   // Bottom face (z=0, normal pointing down)
