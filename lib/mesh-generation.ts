@@ -267,6 +267,7 @@ export async function generateComponentMeshes(
           // Remove model_*_url fields to avoid hanging on external model fetches
           return {
             ...e,
+            model_3mf_url: undefined,
             model_obj_url: undefined,
             model_stl_url: undefined,
             model_glb_url: undefined,
@@ -279,6 +280,7 @@ export async function generateComponentMeshes(
     // Convert circuit JSON to 3D scene
     const scene3d = await convertCircuitJsonTo3D(filteredCircuitJson, {
       boardThickness,
+      renderBoardTextures: false,
     })
 
     // Extract or generate triangles from component boxes
