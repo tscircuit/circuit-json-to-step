@@ -14,6 +14,7 @@ import {
   Direction,
   Axis2Placement3D,
   Plane,
+  CylindricalSurface,
   VertexPoint,
   EdgeCurve,
   Line,
@@ -62,7 +63,9 @@ export function circuitJsonToStep(
 
   // Extract pcb_board and holes from circuit JSON
   const pcbBoard = circuitJson.find((item) => item.type === "pcb_board")
-  const holes: PcbHole[] = circuitJson.filter((item) => item.type === "pcb_hole")
+  const holes: any[] = circuitJson.filter(
+    (item) => item.type === "pcb_hole" || item.type === "pcb_plated_hole"
+  )
 
   // Get dimensions from pcb_board or options
   const boardWidth = options.boardWidth ?? pcbBoard?.width
@@ -212,7 +215,9 @@ export function circuitJsonToStep(
   // Create holes in bottom face
   const bottomHoleLoops: Ref<FaceBound>[] = []
   for (const hole of holes) {
-    if (hole.hole_shape === "circle") {
+    // Check shape (pcb_hole uses hole_shape, pcb_plated_hole uses shape)
+    const holeShape = hole.hole_shape || hole.shape
+    if (holeShape === "circle") {
       const holeX = typeof hole.x === "number" ? hole.x : (hole.x as any).value
       const holeY = typeof hole.y === "number" ? hole.y : (hole.y as any).value
       const radius = hole.hole_diameter / 2
@@ -260,7 +265,9 @@ export function circuitJsonToStep(
   // Create holes in top face
   const topHoleLoops: Ref<FaceBound>[] = []
   for (const hole of holes) {
-    if (hole.hole_shape === "circle") {
+    // Check shape (pcb_hole uses hole_shape, pcb_plated_hole uses shape)
+    const holeShape = hole.hole_shape || hole.shape
+    if (holeShape === "circle") {
       const holeX = typeof hole.x === "number" ? hole.x : (hole.x as any).value
       const holeY = typeof hole.y === "number" ? hole.y : (hole.y as any).value
       const radius = hole.hole_diameter / 2
@@ -338,8 +345,82 @@ export function circuitJsonToStep(
     sideFaces.push(sideFace)
   }
 
+  // Create cylindrical faces for holes
+  const holeCylindricalFaces: Ref<AdvancedFace>[] = []
+  for (const hole of holes) {
+    const holeShape = hole.hole_shape || hole.shape
+    if (holeShape === "circle") {
+      const holeX = typeof hole.x === "number" ? hole.x : (hole.x as any).value
+      const holeY = typeof hole.y === "number" ? hole.y : (hole.y as any).value
+      const radius = hole.hole_diameter / 2
+
+      // Create circular edges at bottom and top
+      const bottomHoleCenter = repo.add(new CartesianPoint("", holeX, holeY, 0))
+      const bottomHoleVertex = repo.add(
+        new VertexPoint("", repo.add(new CartesianPoint("", holeX + radius, holeY, 0))),
+      )
+      const bottomHolePlacement = repo.add(
+        new Axis2Placement3D(
+          "",
+          bottomHoleCenter,
+          repo.add(new Direction("", 0, 0, -1)),
+          xDir,
+        ),
+      )
+      const bottomHoleCircle = repo.add(new Circle("", bottomHolePlacement, radius))
+      const bottomHoleEdge = repo.add(
+        new EdgeCurve("", bottomHoleVertex, bottomHoleVertex, bottomHoleCircle, true),
+      )
+
+      const topHoleCenter = repo.add(new CartesianPoint("", holeX, holeY, boardThickness))
+      const topHoleVertex = repo.add(
+        new VertexPoint("", repo.add(new CartesianPoint("", holeX + radius, holeY, boardThickness))),
+      )
+      const topHolePlacement = repo.add(
+        new Axis2Placement3D(
+          "",
+          topHoleCenter,
+          zDir,
+          xDir,
+        ),
+      )
+      const topHoleCircle = repo.add(new Circle("", topHolePlacement, radius))
+      const topHoleEdge = repo.add(
+        new EdgeCurve("", topHoleVertex, topHoleVertex, topHoleCircle, true),
+      )
+
+      // Create edge loop for cylindrical surface
+      const holeCylinderLoop = repo.add(
+        new EdgeLoop("", [
+          repo.add(new OrientedEdge("", bottomHoleEdge, true)),
+          repo.add(new OrientedEdge("", topHoleEdge, false)),
+        ]),
+      )
+
+      // Create cylindrical surface for the hole (axis along Z)
+      const holeCylinderPlacement = repo.add(
+        new Axis2Placement3D(
+          "",
+          bottomHoleCenter,
+          zDir,
+          xDir,
+        ),
+      )
+      const holeCylinderSurface = repo.add(new CylindricalSurface("", holeCylinderPlacement, radius))
+      const holeCylinderFace = repo.add(
+        new AdvancedFace(
+          "",
+          [repo.add(new FaceOuterBound("", holeCylinderLoop, true))],
+          holeCylinderSurface,
+          false,
+        ),
+      )
+      holeCylindricalFaces.push(holeCylinderFace)
+    }
+  }
+
   // Collect all faces
-  const allFaces = [bottomFace, topFace, ...sideFaces]
+  const allFaces = [bottomFace, topFace, ...sideFaces, ...holeCylindricalFaces]
 
   // Create closed shell and solid
   const shell = repo.add(new ClosedShell("", allFaces))

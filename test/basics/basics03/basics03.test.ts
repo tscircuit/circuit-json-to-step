@@ -1,15 +1,12 @@
+import { expect, test } from "bun:test"
 import { writeFileSync } from "node:fs"
-import { test, expect } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
-import circuitJson from "./basics01.json"
+import circuitJson from "./basics03.json"
 
-test("basics01: convert circuit json with circular holes to STEP", async () => {
+test("basics03: convert pcb_board with arrow outline and pcb_plated_holes to STEP", async () => {
   const stepText = circuitJsonToStep(circuitJson, {
-    boardWidth: 20,
-    boardHeight: 15,
-    boardThickness: 1.6,
-    productName: "TestPCB",
+    productName: "TestPCB_ArrowWithPlatedHoles",
   })
 
   // Verify STEP format
@@ -17,27 +14,14 @@ test("basics01: convert circuit json with circular holes to STEP", async () => {
   expect(stepText).toContain("END-ISO-10303-21")
 
   // Verify product structure
-  expect(stepText).toContain("TestPCB")
+  expect(stepText).toContain("TestPCB_ArrowWithPlatedHoles")
   expect(stepText).toContain("MANIFOLD_SOLID_BREP")
 
-  // Verify holes are created (should have CIRCLE and CYLINDRICAL_SURFACE entities)
-  expect(stepText).toContain("CIRCLE")
-  expect(stepText).toContain("CYLINDRICAL_SURFACE")
-
-  // Count CIRCLE occurrences - should have 12 (3 holes × 4 circles each: 2 for top/bottom faces, 2 for cylindrical surface)
-  const circleCount = (stepText.match(/CIRCLE/g) || []).length
-  expect(circleCount).toBe(12)
-
-  // Count CYLINDRICAL_SURFACE occurrences - should have 3 (one per hole)
-  const cylinderCount = (stepText.match(/CYLINDRICAL_SURFACE/g) || []).length
-  expect(cylinderCount).toBe(3)
-
   // Write STEP file to debug-output
-  const outputPath = "debug-output/basics01.step"
+  const outputPath = "debug-output/basics03.step"
   writeFileSync(outputPath, stepText)
 
   console.log("✓ STEP file generated successfully")
-  console.log(`  - Circles created: ${circleCount}`)
   console.log(`  - STEP text length: ${stepText.length} bytes`)
   console.log(`  - Output: ${outputPath}`)
 
