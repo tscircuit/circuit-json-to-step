@@ -51,4 +51,6 @@ test("basics01: convert circuit json with circular holes to STEP", async () => {
   expect(firstMesh.index.array.length).toBeGreaterThan(0)
 
   console.log("✓ STEP file successfully validated with occt-import-js")
+
+  await expect(stepText).toMatchStepSnapshot(import.meta.path, "basics01")
 }, 20000)

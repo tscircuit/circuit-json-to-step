@@ -1,0 +1,40 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_1",
+    "width": 20,
+    "height": 15,
+    "thickness": 1.6,
+    "center": { "x": 10, "y": 7.5 },
+    "outline": [
+      { "x": 0, "y": 0 },
+      { "x": 20, "y": 0 },
+      { "x": 20, "y": 15 },
+      { "x": 0, "y": 15 }
+    ]
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_1",
+    "hole_shape": "circle",
+    "hole_diameter": 1.1,
+    "x": 5,
+    "y": 5
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_2",
+    "hole_shape": "circle",
+    "hole_diameter": 1.5,
+    "x": 15,
+    "y": 5
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_3",
+    "hole_shape": "circle",
+    "hole_diameter": 2.0,
+    "x": 10,
+    "y": 10
+  }
+]

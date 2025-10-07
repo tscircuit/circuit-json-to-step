@@ -35,4 +35,6 @@ test("basics03: convert pcb_board with arrow outline and pcb_plated_holes to STE
   expect(firstMesh.index.array.length).toBeGreaterThan(0)
 
   console.log("✓ STEP file successfully validated with occt-import-js")
+
+  await expect(stepText).toMatchStepSnapshot(import.meta.path, "basics03")
 }, 20000)
