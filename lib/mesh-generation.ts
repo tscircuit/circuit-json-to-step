@@ -259,6 +259,96 @@ export async function generateComponentMeshes(
   const solids: Ref<ManifoldSolidBrep>[] = []
 
   try {
+    // First, generate solids for pcb_components (component bodies on PCB surface)
+    const pcbComponents = circuitJson.filter((e) => e.type === "pcb_component")
+    for (const comp of pcbComponents) {
+      const x = (comp as any).center.x
+      const y = (comp as any).center.y
+      const width = (comp as any).width
+      const height = (comp as any).height
+
+      // SMD component body height - using a more visible height for better rendering
+      const componentHeight = 1.5 // mm - increased for better visibility in renderings
+      const componentZ = boardThickness + componentHeight / 2
+
+      const componentBox = {
+        center: { x, y: componentZ, z: y }, // Transform to GLTF coords (Y=up)
+        size: { x: width, y: componentHeight, z: height },
+      }
+
+      const componentTriangles = createBoxTriangles(componentBox)
+
+      // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
+      const transformedTriangles = componentTriangles.map((tri) => ({
+        vertices: tri.vertices.map((v) => ({
+          x: v.x,
+          y: v.z, // GLTF Z becomes STEP Y
+          z: v.y, // GLTF Y becomes STEP Z
+        })),
+        normal: {
+          x: tri.normal.x,
+          y: tri.normal.z, // GLTF Z becomes STEP Y
+          z: tri.normal.y, // GLTF Y becomes STEP Z
+        },
+      }))
+
+      const componentFaces = createStepFacesFromTriangles(
+        repo,
+        transformedTriangles as any,
+      )
+      const componentShell = repo.add(new ClosedShell("", componentFaces as any))
+      const componentSolid = repo.add(
+        new ManifoldSolidBrep(`Component_${(comp as any).pcb_component_id}`, componentShell),
+      )
+      solids.push(componentSolid)
+    }
+
+    // Generate solids for pcb_smtpads (rectangular pads on PCB surface)
+    const smtpads = circuitJson.filter((e) => e.type === "pcb_smtpad")
+    for (const pad of smtpads) {
+      if ((pad as any).shape === "rect") {
+        const x = (pad as any).x
+        const y = (pad as any).y
+        const width = (pad as any).width
+        const height = (pad as any).height
+        const padThickness = 0.035 // Standard SMT pad thickness in mm
+
+        // Position pad on top surface of board
+        const padZ = boardThickness + padThickness / 2
+
+        const padBox = {
+          center: { x, y: padZ, z: y }, // Transform to GLTF coords (Y=up)
+          size: { x: width, y: padThickness, z: height },
+        }
+
+        const padTriangles = createBoxTriangles(padBox)
+
+        // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
+        const transformedTriangles = padTriangles.map((tri) => ({
+          vertices: tri.vertices.map((v) => ({
+            x: v.x,
+            y: v.z, // GLTF Z becomes STEP Y
+            z: v.y, // GLTF Y becomes STEP Z
+          })),
+          normal: {
+            x: tri.normal.x,
+            y: tri.normal.z, // GLTF Z becomes STEP Y
+            z: tri.normal.y, // GLTF Y becomes STEP Z
+          },
+        }))
+
+        const padFaces = createStepFacesFromTriangles(
+          repo,
+          transformedTriangles as any,
+        )
+        const padShell = repo.add(new ClosedShell("", padFaces as any))
+        const padSolid = repo.add(
+          new ManifoldSolidBrep(`SMTPad_${(pad as any).pcb_smtpad_id}`, padShell),
+        )
+        solids.push(padSolid)
+      }
+    }
+
     // Filter circuit JSON and optionally remove model URLs
     const filteredCircuitJson = circuitJson
       .filter((e) => e.type !== "pcb_board")

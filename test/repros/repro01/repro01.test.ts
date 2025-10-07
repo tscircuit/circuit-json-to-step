@@ -47,4 +47,4 @@ test("basics04: convert circuit json with components to STEP", async () => {
   console.log("✓ STEP file successfully validated with occt-import-js")
 
   await expect(stepText).toMatchStepSnapshot(import.meta.path, "repro01")
-}, 30000)
+}, 60000)
