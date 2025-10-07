@@ -250,7 +250,12 @@ function createStepFacesFromTriangles(
 export async function generateComponentMeshes(
   options: MeshGenerationOptions,
 ): Promise<Ref<ManifoldSolidBrep>[]> {
-  const { repo, circuitJson, boardThickness, includeExternalMeshes = false } = options
+  const {
+    repo,
+    circuitJson,
+    boardThickness,
+    includeExternalMeshes = false,
+  } = options
   const solids: Ref<ManifoldSolidBrep>[] = []
 
   try {
@@ -260,8 +265,13 @@ export async function generateComponentMeshes(
       .map((e) => {
         if (!includeExternalMeshes && e.type === "cad_component") {
           // Remove model_*_url fields to avoid hanging on external model fetches
-          const { model_obj_url: _, model_stl_url: __, model_glb_url: ___, model_gltf_url: ____, ...rest } = e as any
-          return rest
+          return {
+            ...e,
+            model_obj_url: undefined,
+            model_stl_url: undefined,
+            model_glb_url: undefined,
+            model_gltf_url: undefined,
+          }
         }
         return e
       })
@@ -304,7 +314,9 @@ export async function generateComponentMeshes(
       )
 
       // Create closed shell and solid for components
-      const componentShell = repo.add(new ClosedShell("", componentFaces as any))
+      const componentShell = repo.add(
+        new ClosedShell("", componentFaces as any),
+      )
       const componentSolid = repo.add(
         new ManifoldSolidBrep("Components", componentShell),
       )
