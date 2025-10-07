@@ -17,5 +17,8 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "circuit-json-to-gltf": "^0.0.17"
   }
 }

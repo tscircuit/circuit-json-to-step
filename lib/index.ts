@@ -1,4 +1,4 @@
-import type { PcbHole } from "circuit-json"
+import type { PcbHole, CircuitJson } from "circuit-json"
 import {
   Repository,
   ApplicationContext,
@@ -55,10 +55,10 @@ export interface CircuitJsonToStepOptions {
 /**
  * Converts circuit JSON to STEP format, creating holes in a PCB board
  */
-export function circuitJsonToStep(
+export async function circuitJsonToStep(
   circuitJson: any[],
   options: CircuitJsonToStepOptions = {},
-): string {
+): Promise<string> {
   const repo = new Repository()
 
   // Extract pcb_board and holes from circuit JSON
