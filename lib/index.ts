@@ -40,6 +40,11 @@ import {
   ShapeDefinitionRepresentation,
   type Ref,
 } from "stepts"
+import {
+  convertCircuitJsonTo3D,
+  convertSceneToGLTF,
+} from "circuit-json-to-gltf"
+import type { Scene3D, Triangle as GLTFTriangle } from "circuit-json-to-gltf"
 
 export interface CircuitJsonToStepOptions {
   /** Board width in mm (optional if pcb_board is present) */
@@ -50,6 +55,218 @@ export interface CircuitJsonToStepOptions {
   boardThickness?: number
   /** Product name (default: "PCB") */
   productName?: string
+  /** Include component meshes (default: false) */
+  includeComponents?: boolean
+}
+
+/**
+ * Generates triangles for a box mesh
+ */
+function createBoxTriangles(box: {
+  center: { x: number; y: number; z: number }
+  size: { x: number; y: number; z: number }
+  rotation?: { x: number; y: number; z: number }
+}): GLTFTriangle[] {
+  const { center, size } = box
+  const halfX = size.x / 2
+  const halfY = size.y / 2
+  const halfZ = size.z / 2
+
+  // Define 8 corners of the box
+  const corners = [
+    { x: -halfX, y: -halfY, z: -halfZ },
+    { x: halfX, y: -halfY, z: -halfZ },
+    { x: halfX, y: halfY, z: -halfZ },
+    { x: -halfX, y: halfY, z: -halfZ },
+    { x: -halfX, y: -halfY, z: halfZ },
+    { x: halfX, y: -halfY, z: halfZ },
+    { x: halfX, y: halfY, z: halfZ },
+    { x: -halfX, y: halfY, z: halfZ },
+  ].map((p) => ({ x: p.x + center.x, y: p.y + center.y, z: p.z + center.z }))
+
+  // Define triangles for each face (2 triangles per face)
+  const triangles: GLTFTriangle[] = [
+    // Bottom face (z = -halfZ)
+    {
+      vertices: [corners[0]!, corners[1]!, corners[2]!],
+      normal: { x: 0, y: 0, z: -1 },
+    },
+    {
+      vertices: [corners[0]!, corners[2]!, corners[3]!],
+      normal: { x: 0, y: 0, z: -1 },
+    },
+    // Top face (z = halfZ)
+    {
+      vertices: [corners[4]!, corners[6]!, corners[5]!],
+      normal: { x: 0, y: 0, z: 1 },
+    },
+    {
+      vertices: [corners[4]!, corners[7]!, corners[6]!],
+      normal: { x: 0, y: 0, z: 1 },
+    },
+    // Front face (y = -halfY)
+    {
+      vertices: [corners[0]!, corners[5]!, corners[1]!],
+      normal: { x: 0, y: -1, z: 0 },
+    },
+    {
+      vertices: [corners[0]!, corners[4]!, corners[5]!],
+      normal: { x: 0, y: -1, z: 0 },
+    },
+    // Back face (y = halfY)
+    {
+      vertices: [corners[2]!, corners[6]!, corners[7]!],
+      normal: { x: 0, y: 1, z: 0 },
+    },
+    {
+      vertices: [corners[2]!, corners[7]!, corners[3]!],
+      normal: { x: 0, y: 1, z: 0 },
+    },
+    // Left face (x = -halfX)
+    {
+      vertices: [corners[0]!, corners[3]!, corners[7]!],
+      normal: { x: -1, y: 0, z: 0 },
+    },
+    {
+      vertices: [corners[0]!, corners[7]!, corners[4]!],
+      normal: { x: -1, y: 0, z: 0 },
+    },
+    // Right face (x = halfX)
+    {
+      vertices: [corners[1]!, corners[6]!, corners[2]!],
+      normal: { x: 1, y: 0, z: 0 },
+    },
+    {
+      vertices: [corners[1]!, corners[5]!, corners[6]!],
+      normal: { x: 1, y: 0, z: 0 },
+    },
+  ]
+
+  return triangles
+}
+
+/**
+ * Creates STEP faces from GLTF triangles
+ */
+function createStepFacesFromTriangles(
+  repo: Repository,
+  triangles: GLTFTriangle[],
+): Ref<AdvancedFace>[] {
+  const faces: Ref<AdvancedFace>[] = []
+
+  for (const triangle of triangles) {
+    // Create vertices for triangle
+    const v1 = repo.add(
+      new VertexPoint(
+        "",
+        repo.add(
+          new CartesianPoint(
+            "",
+            triangle.vertices[0]!.x,
+            triangle.vertices[0]!.y,
+            triangle.vertices[0]!.z,
+          ),
+        ),
+      ),
+    )
+    const v2 = repo.add(
+      new VertexPoint(
+        "",
+        repo.add(
+          new CartesianPoint(
+            "",
+            triangle.vertices[1]!.x,
+            triangle.vertices[1]!.y,
+            triangle.vertices[1]!.z,
+          ),
+        ),
+      ),
+    )
+    const v3 = repo.add(
+      new VertexPoint(
+        "",
+        repo.add(
+          new CartesianPoint(
+            "",
+            triangle.vertices[2]!.x,
+            triangle.vertices[2]!.y,
+            triangle.vertices[2]!.z,
+          ),
+        ),
+      ),
+    )
+
+    // Create edges between vertices
+    const p1 = v1.resolve(repo).pnt.resolve(repo)
+    const p2 = v2.resolve(repo).pnt.resolve(repo)
+    const p3 = v3.resolve(repo).pnt.resolve(repo)
+
+    const createEdge = (
+      vStart: Ref<VertexPoint>,
+      vEnd: Ref<VertexPoint>,
+    ): Ref<EdgeCurve> => {
+      const pStart = vStart.resolve(repo).pnt.resolve(repo)
+      const pEnd = vEnd.resolve(repo).pnt.resolve(repo)
+      const dir = repo.add(
+        new Direction(
+          "",
+          pEnd.x - pStart.x,
+          pEnd.y - pStart.y,
+          pEnd.z - pStart.z,
+        ),
+      )
+      const vec = repo.add(new Vector("", dir, 1))
+      const line = repo.add(new Line("", vStart.resolve(repo).pnt, vec))
+      return repo.add(new EdgeCurve("", vStart, vEnd, line, true))
+    }
+
+    const edge1 = createEdge(v1, v2)
+    const edge2 = createEdge(v2, v3)
+    const edge3 = createEdge(v3, v1)
+
+    // Create edge loop for triangle
+    const edgeLoop = repo.add(
+      new EdgeLoop("", [
+        repo.add(new OrientedEdge("", edge1, true)),
+        repo.add(new OrientedEdge("", edge2, true)),
+        repo.add(new OrientedEdge("", edge3, true)),
+      ]),
+    )
+
+    // Create planar surface using triangle normal
+    const normalDir = repo.add(
+      new Direction(
+        "",
+        triangle.normal.x,
+        triangle.normal.y,
+        triangle.normal.z,
+      ),
+    )
+
+    // Use first vertex as origin, calculate reference direction from first edge
+    const refX = p2.x - p1.x
+    const refY = p2.y - p1.y
+    const refZ = p2.z - p1.z
+    const refDir = repo.add(new Direction("", refX, refY, refZ))
+
+    const placement = repo.add(
+      new Axis2Placement3D("", v1.resolve(repo).pnt, normalDir, refDir),
+    )
+    const plane = repo.add(new Plane("", placement))
+
+    // Create face
+    const face = repo.add(
+      new AdvancedFace(
+        "",
+        [repo.add(new FaceOuterBound("", edgeLoop, true))],
+        plane,
+        true,
+      ),
+    )
+    faces.push(face)
+  }
+
+  return faces
 }
 
 /**
@@ -487,27 +704,77 @@ export async function circuitJsonToStep(
   const shell = repo.add(new ClosedShell("", allFaces))
   const solid = repo.add(new ManifoldSolidBrep(productName, shell))
 
-  // Add presentation/styling
-  const color = repo.add(new ColourRgb("", 0.2, 0.6, 0.2))
-  const fillColor = repo.add(new FillAreaStyleColour("", color))
-  const fillStyle = repo.add(new FillAreaStyle("", [fillColor]))
-  const surfaceFill = repo.add(new SurfaceStyleFillArea(fillStyle))
-  const surfaceSide = repo.add(new SurfaceSideStyle("", [surfaceFill]))
-  const surfaceUsage = repo.add(new SurfaceStyleUsage(".BOTH.", surfaceSide))
-  const presStyle = repo.add(new PresentationStyleAssignment([surfaceUsage]))
-  const styledItem = repo.add(new StyledItem("", [presStyle], solid))
+  // Array to hold all solids (board + optional components)
+  const allSolids: Ref<ManifoldSolidBrep>[] = [solid]
+
+  // Generate component mesh if requested
+  if (options.includeComponents) {
+    try {
+      // Convert circuit JSON to 3D scene
+      const scene3d = await convertCircuitJsonTo3D(
+        circuitJson.filter((e) => e.type !== "pcb_board"),
+        {
+          boardThickness,
+        },
+      )
+
+      // Extract or generate triangles from component boxes
+      const allTriangles: GLTFTriangle[] = []
+      for (const box of scene3d.boxes) {
+        if (box.mesh && "triangles" in box.mesh) {
+          allTriangles.push(...box.mesh.triangles)
+        } else {
+          // Generate simple box mesh for this component
+          const boxTriangles = createBoxTriangles(box)
+          allTriangles.push(...boxTriangles)
+        }
+      }
+
+      // Create STEP faces from triangles if we have any
+      if (allTriangles.length > 0) {
+        const componentFaces = createStepFacesFromTriangles(repo, allTriangles)
+
+        // Create closed shell and solid for components
+        const componentShell = repo.add(
+          new ClosedShell("", componentFaces as any),
+        )
+        const componentSolid = repo.add(
+          new ManifoldSolidBrep("Components", componentShell),
+        )
+        allSolids.push(componentSolid)
+      }
+    } catch (error) {
+      console.warn("Failed to generate component mesh:", error)
+      // Continue without components if generation fails
+    }
+  }
+
+  // Add presentation/styling for all solids
+  const styledItems: Ref<StyledItem>[] = []
+
+  for (const solidRef of allSolids) {
+    const color = repo.add(new ColourRgb("", 0.2, 0.6, 0.2))
+    const fillColor = repo.add(new FillAreaStyleColour("", color))
+    const fillStyle = repo.add(new FillAreaStyle("", [fillColor]))
+    const surfaceFill = repo.add(new SurfaceStyleFillArea(fillStyle))
+    const surfaceSide = repo.add(new SurfaceSideStyle("", [surfaceFill]))
+    const surfaceUsage = repo.add(new SurfaceStyleUsage(".BOTH.", surfaceSide))
+    const presStyle = repo.add(new PresentationStyleAssignment([surfaceUsage]))
+    const styledItem = repo.add(new StyledItem("", [presStyle], solidRef))
+    styledItems.push(styledItem)
+  }
 
   repo.add(
     new MechanicalDesignGeometricPresentationRepresentation(
       "",
-      [styledItem],
+      styledItems,
       geomContext,
     ),
   )
 
-  // Shape representation
+  // Shape representation with all solids
   const shapeRep = repo.add(
-    new AdvancedBrepShapeRepresentation(productName, [solid], geomContext),
+    new AdvancedBrepShapeRepresentation(productName, allSolids, geomContext),
   )
   repo.add(new ShapeDefinitionRepresentation(productDefShape, shapeRep))
 
