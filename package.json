@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "pull-reference": "git clone https://github.com/tscircuit/circuit-json.git && find circuit-json/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\; && git clone https://github.com/tscircuit/stepts.git && find stepts/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\;",
+    "test": "bun test",
+    "test:update-snapshots": "BUN_UPDATE_SNAPSHOTS=1 bun test",
     "build": "tsup-node ./lib/index.ts --format esm --dts",
     "format": "biome format --write .",
     "format:check": "biome format ."
@@ -13,6 +15,8 @@
     "@types/bun": "latest",
     "circuit-json": "^0.0.272",
     "occt-import-js": "^0.0.23",
+    "looks-same": "^10.0.1",
+    "poppygl": "^0.0.13",
     "stepts": "^0.0.1",
     "tsup": "^8.5.0"
   },

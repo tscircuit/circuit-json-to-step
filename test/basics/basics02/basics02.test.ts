@@ -35,4 +35,6 @@ test("basics02: convert pcb_board with outline only to STEP", async () => {
   expect(firstMesh.index.array.length).toBeGreaterThan(0)
 
   console.log("✓ STEP file successfully validated with occt-import-js")
+
+  await expect(stepText).toMatchStepSnapshot(import.meta.path, "basics02")
 }, 20000)

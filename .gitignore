@@ -38,3 +38,7 @@ circuit-json
 stepts
 .vscode
 debug-output
+.aider*
+
+# Snapshot diff files
+*.diff.png

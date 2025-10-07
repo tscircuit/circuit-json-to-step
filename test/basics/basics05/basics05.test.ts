@@ -2,13 +2,14 @@ import { writeFileSync } from "node:fs"
 import { test, expect } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
-import circuitJson from "./basics04.json"
+import circuitJson from "./basics05.json"
 
-test("basics04: convert circuit json with components to STEP", async () => {
+test("basics05: new test to cause a diff error", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
-    includeComponents: true,
-    includeExternalMeshes: true,
-    productName: "TestPCB_with_components",
+    boardWidth: 20,
+    boardHeight: 15,
+    boardThickness: 1.6,
+    productName: "TestPCB_DiffError",
   })
 
   // Verify STEP format
@@ -16,23 +17,27 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(stepText).toContain("END-ISO-10303-21")
 
   // Verify product structure
-  expect(stepText).toContain("TestPCB_with_components")
+  expect(stepText).toContain("TestPCB_DiffError")
   expect(stepText).toContain("MANIFOLD_SOLID_BREP")
 
-  // Verify holes are created
+  // Verify holes are created (should have CIRCLE and CYLINDRICAL_SURFACE entities)
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Verify we have multiple solids (board + components)
-  const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
-  expect(solidCount).toBeGreaterThanOrEqual(1)
+  // Count CIRCLE occurrences - should have 12 (3 holes × 4 circles each: 2 for top/bottom faces, 2 for cylindrical surface)
+  const circleCount = (stepText.match(/CIRCLE/g) || []).length
+  expect(circleCount).toBe(12)
+
+  // Count CYLINDRICAL_SURFACE occurrences - should have 3 (one per hole)
+  const cylinderCount = (stepText.match(/CYLINDRICAL_SURFACE/g) || []).length
+  expect(cylinderCount).toBe(3)
 
   // Write STEP file to debug-output
-  const outputPath = "debug-output/basics04.step"
+  const outputPath = "debug-output/basics05.step"
   writeFileSync(outputPath, stepText)
 
-  console.log("✓ STEP file with components generated successfully")
-  console.log(`  - Solids created: ${solidCount}`)
+  console.log("✓ STEP file generated successfully")
+  console.log(`  - Circles created: ${circleCount}`)
   console.log(`  - STEP text length: ${stepText.length} bytes`)
   console.log(`  - Output: ${outputPath}`)
 
@@ -47,5 +52,5 @@ test("basics04: convert circuit json with components to STEP", async () => {
 
   console.log("✓ STEP file successfully validated with occt-import-js")
 
-  await expect(stepText).toMatchStepSnapshot(import.meta.path, "basics04")
-}, 30000)
+  await expect(stepText).toMatchStepSnapshot(import.meta.path, "basics05")
+}, 20000)
