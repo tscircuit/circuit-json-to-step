@@ -732,7 +732,23 @@ export async function circuitJsonToStep(
 
       // Create STEP faces from triangles if we have any
       if (allTriangles.length > 0) {
-        const componentFaces = createStepFacesFromTriangles(repo, allTriangles)
+        // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
+        const transformedTriangles = allTriangles.map((tri) => ({
+          vertices: tri.vertices.map((v) => ({
+            x: v.x,
+            y: v.z, // GLTF Z becomes STEP Y
+            z: v.y, // GLTF Y becomes STEP Z
+          })),
+          normal: {
+            x: tri.normal.x,
+            y: tri.normal.z, // GLTF Z becomes STEP Y
+            z: tri.normal.y, // GLTF Y becomes STEP Z
+          },
+        }))
+        const componentFaces = createStepFacesFromTriangles(
+          repo,
+          transformedTriangles,
+        )
 
         // Create closed shell and solid for components
         const componentShell = repo.add(
