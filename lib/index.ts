@@ -1,4 +1,4 @@
-import type { PcbHole, CircuitJson } from "circuit-json"
+import type { CircuitJson } from "circuit-json"
 import {
   Repository,
   ApplicationContext,
@@ -40,6 +40,7 @@ import {
   ShapeDefinitionRepresentation,
   type Ref,
 } from "stepts"
+import { generateComponentMeshes } from "./mesh-generation"
 
 export interface CircuitJsonToStepOptions {
   /** Board width in mm (optional if pcb_board is present) */
@@ -50,6 +51,10 @@ export interface CircuitJsonToStepOptions {
   boardThickness?: number
   /** Product name (default: "PCB") */
   productName?: string
+  /** Include component meshes (default: false) */
+  includeComponents?: boolean
+  /** Include external model meshes from model_*_url fields (default: false). Only applicable when includeComponents is true. */
+  includeExternalMeshes?: boolean
 }
 
 /**
@@ -72,6 +77,10 @@ export async function circuitJsonToStep(
   const boardHeight = options.boardHeight ?? pcbBoard?.height
   const boardThickness = options.boardThickness ?? pcbBoard?.thickness ?? 1.6
   const productName = options.productName ?? "PCB"
+
+  // Get board center position (defaults to 0, 0 if not specified)
+  const boardCenterX = pcbBoard?.center?.x ?? 0
+  const boardCenterY = pcbBoard?.center?.y ?? 0
 
   if (!boardWidth || !boardHeight) {
     throw new Error(
@@ -148,7 +157,7 @@ export async function circuitJsonToStep(
   let topVertices: Ref<VertexPoint>[]
 
   if (outline && Array.isArray(outline) && outline.length >= 3) {
-    // Use custom outline
+    // Use custom outline (points are already relative to board center)
     bottomVertices = outline.map((point) =>
       repo.add(
         new VertexPoint(
@@ -166,16 +175,18 @@ export async function circuitJsonToStep(
       ),
     )
   } else {
-    // Fall back to rectangular shape (8 corners of rectangular prism)
+    // Fall back to rectangular shape centered at (boardCenterX, boardCenterY)
+    const halfWidth = boardWidth / 2
+    const halfHeight = boardHeight / 2
     const corners = [
-      [0, 0, 0],
-      [boardWidth, 0, 0],
-      [boardWidth, boardHeight, 0],
-      [0, boardHeight, 0],
-      [0, 0, boardThickness],
-      [boardWidth, 0, boardThickness],
-      [boardWidth, boardHeight, boardThickness],
-      [0, boardHeight, boardThickness],
+      [boardCenterX - halfWidth, boardCenterY - halfHeight, 0],
+      [boardCenterX + halfWidth, boardCenterY - halfHeight, 0],
+      [boardCenterX + halfWidth, boardCenterY + halfHeight, 0],
+      [boardCenterX - halfWidth, boardCenterY + halfHeight, 0],
+      [boardCenterX - halfWidth, boardCenterY - halfHeight, boardThickness],
+      [boardCenterX + halfWidth, boardCenterY - halfHeight, boardThickness],
+      [boardCenterX + halfWidth, boardCenterY + halfHeight, boardThickness],
+      [boardCenterX - halfWidth, boardCenterY + halfHeight, boardThickness],
     ]
     const vertices = corners.map(([x, y, z]) =>
       repo.add(
@@ -227,7 +238,6 @@ export async function circuitJsonToStep(
 
   const origin = repo.add(new CartesianPoint("", 0, 0, 0))
   const xDir = repo.add(new Direction("", 1, 0, 0))
-  const yDir = repo.add(new Direction("", 0, 1, 0))
   const zDir = repo.add(new Direction("", 0, 0, 1))
 
   // Bottom face (z=0, normal pointing down)
@@ -487,27 +497,46 @@ export async function circuitJsonToStep(
   const shell = repo.add(new ClosedShell("", allFaces))
   const solid = repo.add(new ManifoldSolidBrep(productName, shell))
 
-  // Add presentation/styling
-  const color = repo.add(new ColourRgb("", 0.2, 0.6, 0.2))
-  const fillColor = repo.add(new FillAreaStyleColour("", color))
-  const fillStyle = repo.add(new FillAreaStyle("", [fillColor]))
-  const surfaceFill = repo.add(new SurfaceStyleFillArea(fillStyle))
-  const surfaceSide = repo.add(new SurfaceSideStyle("", [surfaceFill]))
-  const surfaceUsage = repo.add(new SurfaceStyleUsage(".BOTH.", surfaceSide))
-  const presStyle = repo.add(new PresentationStyleAssignment([surfaceUsage]))
-  const styledItem = repo.add(new StyledItem("", [presStyle], solid))
+  // Array to hold all solids (board + optional components)
+  const allSolids: Ref<ManifoldSolidBrep>[] = [solid]
+
+  // Generate component mesh if requested
+  if (options.includeComponents) {
+    const componentSolids = await generateComponentMeshes({
+      repo,
+      circuitJson,
+      boardThickness,
+      includeExternalMeshes: options.includeExternalMeshes,
+    })
+    allSolids.push(...componentSolids)
+  }
+
+  // Add presentation/styling for all solids
+  const styledItems: Ref<StyledItem>[] = []
+
+  for (const solidRef of allSolids) {
+    const color = repo.add(new ColourRgb("", 0.2, 0.6, 0.2))
+    const fillColor = repo.add(new FillAreaStyleColour("", color))
+    const fillStyle = repo.add(new FillAreaStyle("", [fillColor]))
+    const surfaceFill = repo.add(new SurfaceStyleFillArea(fillStyle))
+    const surfaceSide = repo.add(new SurfaceSideStyle("", [surfaceFill]))
+    const surfaceUsage = repo.add(new SurfaceStyleUsage(".BOTH.", surfaceSide))
+    const presStyle = repo.add(new PresentationStyleAssignment([surfaceUsage]))
+    const styledItem = repo.add(new StyledItem("", [presStyle], solidRef))
+    styledItems.push(styledItem)
+  }
 
   repo.add(
     new MechanicalDesignGeometricPresentationRepresentation(
       "",
-      [styledItem],
+      styledItems,
       geomContext,
     ),
   )
 
-  // Shape representation
+  // Shape representation with all solids
   const shapeRep = repo.add(
-    new AdvancedBrepShapeRepresentation(productName, [solid], geomContext),
+    new AdvancedBrepShapeRepresentation(productName, allSolids, geomContext),
   )
   repo.add(new ShapeDefinitionRepresentation(productDefShape, shapeRep))
 
