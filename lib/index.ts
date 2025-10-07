@@ -127,21 +127,37 @@ export function circuitJsonToStep(
     ]),
   )
 
-  // Create board vertices (8 corners of rectangular prism)
-  const corners = [
-    [0, 0, 0],
-    [boardWidth, 0, 0],
-    [boardWidth, boardHeight, 0],
-    [0, boardHeight, 0],
-    [0, 0, boardThickness],
-    [boardWidth, 0, boardThickness],
-    [boardWidth, boardHeight, boardThickness],
-    [0, boardHeight, boardThickness],
-  ]
+  // Create board vertices based on outline or rectangular shape
+  const outline = pcbBoard?.outline
+  let bottomVertices: Ref<VertexPoint>[]
+  let topVertices: Ref<VertexPoint>[]
 
-  const vertices = corners.map(([x, y, z]) =>
-    repo.add(new VertexPoint("", repo.add(new CartesianPoint("", x!, y!, z!)))),
-  )
+  if (outline && Array.isArray(outline) && outline.length >= 3) {
+    // Use custom outline
+    bottomVertices = outline.map((point) =>
+      repo.add(new VertexPoint("", repo.add(new CartesianPoint("", point.x, point.y, 0)))),
+    )
+    topVertices = outline.map((point) =>
+      repo.add(new VertexPoint("", repo.add(new CartesianPoint("", point.x, point.y, boardThickness)))),
+    )
+  } else {
+    // Fall back to rectangular shape (8 corners of rectangular prism)
+    const corners = [
+      [0, 0, 0],
+      [boardWidth, 0, 0],
+      [boardWidth, boardHeight, 0],
+      [0, boardHeight, 0],
+      [0, 0, boardThickness],
+      [boardWidth, 0, boardThickness],
+      [boardWidth, boardHeight, boardThickness],
+      [0, boardHeight, boardThickness],
+    ]
+    const vertices = corners.map(([x, y, z]) =>
+      repo.add(new VertexPoint("", repo.add(new CartesianPoint("", x!, y!, z!)))),
+    )
+    bottomVertices = [vertices[0]!, vertices[1]!, vertices[2]!, vertices[3]!]
+    topVertices = [vertices[4]!, vertices[5]!, vertices[6]!, vertices[7]!]
+  }
 
   // Helper to create edge between vertices
   function createEdge(v1: Ref<VertexPoint>, v2: Ref<VertexPoint>): Ref<EdgeCurve> {
@@ -155,21 +171,29 @@ export function circuitJsonToStep(
     return repo.add(new EdgeCurve("", v1, v2, line, true))
   }
 
-  // Create board edges (12 edges of rectangular prism)
-  const edges = [
-    createEdge(vertices[0]!, vertices[1]!), // bottom
-    createEdge(vertices[1]!, vertices[2]!),
-    createEdge(vertices[2]!, vertices[3]!),
-    createEdge(vertices[3]!, vertices[0]!),
-    createEdge(vertices[4]!, vertices[5]!), // top
-    createEdge(vertices[5]!, vertices[6]!),
-    createEdge(vertices[6]!, vertices[7]!),
-    createEdge(vertices[7]!, vertices[4]!),
-    createEdge(vertices[0]!, vertices[4]!), // vertical
-    createEdge(vertices[1]!, vertices[5]!),
-    createEdge(vertices[2]!, vertices[6]!),
-    createEdge(vertices[3]!, vertices[7]!),
-  ]
+  // Create board edges
+  const bottomEdges: Ref<EdgeCurve>[] = []
+  const topEdges: Ref<EdgeCurve>[] = []
+  const verticalEdges: Ref<EdgeCurve>[] = []
+
+  // Bottom edges (connect vertices in a loop)
+  for (let i = 0; i < bottomVertices.length; i++) {
+    const v1 = bottomVertices[i]!
+    const v2 = bottomVertices[(i + 1) % bottomVertices.length]!
+    bottomEdges.push(createEdge(v1, v2))
+  }
+
+  // Top edges (connect vertices in a loop)
+  for (let i = 0; i < topVertices.length; i++) {
+    const v1 = topVertices[i]!
+    const v2 = topVertices[(i + 1) % topVertices.length]!
+    topEdges.push(createEdge(v1, v2))
+  }
+
+  // Vertical edges (connect bottom to top)
+  for (let i = 0; i < bottomVertices.length; i++) {
+    verticalEdges.push(createEdge(bottomVertices[i]!, topVertices[i]!))
+  }
 
   const origin = repo.add(new CartesianPoint("", 0, 0, 0))
   const xDir = repo.add(new Direction("", 1, 0, 0))
@@ -182,12 +206,7 @@ export function circuitJsonToStep(
   )
   const bottomPlane = repo.add(new Plane("", bottomFrame))
   const bottomLoop = repo.add(
-    new EdgeLoop("", [
-      repo.add(new OrientedEdge("", edges[0]!, true)),
-      repo.add(new OrientedEdge("", edges[1]!, true)),
-      repo.add(new OrientedEdge("", edges[2]!, true)),
-      repo.add(new OrientedEdge("", edges[3]!, true)),
-    ]),
+    new EdgeLoop("", bottomEdges.map(edge => repo.add(new OrientedEdge("", edge, true)))),
   )
 
   // Create holes in bottom face
@@ -235,12 +254,7 @@ export function circuitJsonToStep(
   const topFrame = repo.add(new Axis2Placement3D("", topOrigin, zDir, xDir))
   const topPlane = repo.add(new Plane("", topFrame))
   const topLoop = repo.add(
-    new EdgeLoop("", [
-      repo.add(new OrientedEdge("", edges[4]!, false)),
-      repo.add(new OrientedEdge("", edges[5]!, false)),
-      repo.add(new OrientedEdge("", edges[6]!, false)),
-      repo.add(new OrientedEdge("", edges[7]!, false)),
-    ]),
+    new EdgeLoop("", topEdges.map(edge => repo.add(new OrientedEdge("", edge, false)))),
   )
 
   // Create holes in top face
@@ -283,74 +297,49 @@ export function circuitJsonToStep(
     ),
   )
 
-  // Front face (y=0, normal pointing forward)
-  const frontFrame = repo.add(
-    new Axis2Placement3D("", origin, repo.add(new Direction("", 0, -1, 0)), xDir),
-  )
-  const frontPlane = repo.add(new Plane("", frontFrame))
-  const frontLoop = repo.add(
-    new EdgeLoop("", [
-      repo.add(new OrientedEdge("", edges[0]!, true)),
-      repo.add(new OrientedEdge("", edges[9]!, true)),
-      repo.add(new OrientedEdge("", edges[4]!, false)),
-      repo.add(new OrientedEdge("", edges[8]!, false)),
-    ]),
-  )
-  const frontFace = repo.add(
-    new AdvancedFace("", [repo.add(new FaceOuterBound("", frontLoop, true))], frontPlane, true),
-  )
+  // Create side faces (one for each edge of the outline)
+  const sideFaces: Ref<AdvancedFace>[] = []
+  for (let i = 0; i < bottomEdges.length; i++) {
+    const nextI = (i + 1) % bottomEdges.length
 
-  // Back face (y=boardHeight, normal pointing backward)
-  const backOrigin = repo.add(new CartesianPoint("", 0, boardHeight, 0))
-  const backFrame = repo.add(new Axis2Placement3D("", backOrigin, yDir, xDir))
-  const backPlane = repo.add(new Plane("", backFrame))
-  const backLoop = repo.add(
-    new EdgeLoop("", [
-      repo.add(new OrientedEdge("", edges[2]!, true)),
-      repo.add(new OrientedEdge("", edges[11]!, true)),
-      repo.add(new OrientedEdge("", edges[6]!, false)),
-      repo.add(new OrientedEdge("", edges[10]!, false)),
-    ]),
-  )
-  const backFace = repo.add(
-    new AdvancedFace("", [repo.add(new FaceOuterBound("", backLoop, true))], backPlane, true),
-  )
+    // Get points for this side face
+    const bottomV1Pnt = bottomVertices[i]!.resolve(repo).pnt
+    const bottomV2Pnt = bottomVertices[nextI]!.resolve(repo).pnt
+    const bottomV1 = bottomV1Pnt.resolve(repo)
+    const bottomV2 = bottomV2Pnt.resolve(repo)
 
-  // Left face (x=0, normal pointing left)
-  const leftFrame = repo.add(
-    new Axis2Placement3D("", origin, repo.add(new Direction("", -1, 0, 0)), yDir),
-  )
-  const leftPlane = repo.add(new Plane("", leftFrame))
-  const leftLoop = repo.add(
-    new EdgeLoop("", [
-      repo.add(new OrientedEdge("", edges[3]!, true)),
-      repo.add(new OrientedEdge("", edges[8]!, true)),
-      repo.add(new OrientedEdge("", edges[7]!, false)),
-      repo.add(new OrientedEdge("", edges[11]!, false)),
-    ]),
-  )
-  const leftFace = repo.add(
-    new AdvancedFace("", [repo.add(new FaceOuterBound("", leftLoop, true))], leftPlane, true),
-  )
+    // Calculate edge direction and outward normal
+    const edgeDir = {
+      x: bottomV2.x - bottomV1.x,
+      y: bottomV2.y - bottomV1.y,
+      z: 0
+    }
+    // Normal is perpendicular (rotate 90 degrees clockwise in XY plane for outward facing)
+    const normalDir = repo.add(new Direction("", edgeDir.y, -edgeDir.x, 0))
 
-  // Right face (x=boardWidth, normal pointing right)
-  const rightOrigin = repo.add(new CartesianPoint("", boardWidth, 0, 0))
-  const rightFrame = repo.add(new Axis2Placement3D("", rightOrigin, xDir, yDir))
-  const rightPlane = repo.add(new Plane("", rightFrame))
-  const rightLoop = repo.add(
-    new EdgeLoop("", [
-      repo.add(new OrientedEdge("", edges[1]!, true)),
-      repo.add(new OrientedEdge("", edges[10]!, true)),
-      repo.add(new OrientedEdge("", edges[5]!, false)),
-      repo.add(new OrientedEdge("", edges[9]!, false)),
-    ]),
-  )
-  const rightFace = repo.add(
-    new AdvancedFace("", [repo.add(new FaceOuterBound("", rightLoop, true))], rightPlane, true),
-  )
+    // Reference direction along the edge
+    const refDir = repo.add(new Direction("", edgeDir.x, edgeDir.y, 0))
+
+    const sideFrame = repo.add(
+      new Axis2Placement3D("", bottomV1Pnt, normalDir, refDir),
+    )
+    const sidePlane = repo.add(new Plane("", sideFrame))
+    const sideLoop = repo.add(
+      new EdgeLoop("", [
+        repo.add(new OrientedEdge("", bottomEdges[i]!, true)),
+        repo.add(new OrientedEdge("", verticalEdges[nextI]!, true)),
+        repo.add(new OrientedEdge("", topEdges[i]!, false)),
+        repo.add(new OrientedEdge("", verticalEdges[i]!, false)),
+      ]),
+    )
+    const sideFace = repo.add(
+      new AdvancedFace("", [repo.add(new FaceOuterBound("", sideLoop, true))], sidePlane, true),
+    )
+    sideFaces.push(sideFace)
+  }
 
   // Collect all faces
-  const allFaces = [bottomFace, topFace, frontFace, backFace, leftFace, rightFace]
+  const allFaces = [bottomFace, topFace, ...sideFaces]
 
   // Create closed shell and solid
   const shell = repo.add(new ClosedShell("", allFaces))
