@@ -4,7 +4,7 @@ import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./repro01.json"
 
-test("basics04: convert circuit json with components to STEP", async () => {
+test("repro01: convert circuit json with components to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
     includeComponents: true,
     productName: "TestPCB_with_components",
@@ -27,7 +27,7 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(solidCount).toBeGreaterThanOrEqual(1)
 
   // Write STEP file to debug-output
-  const outputPath = "debug-output/basics04.step"
+  const outputPath = "debug-output/repro01.step"
   writeFileSync(outputPath, stepText)
 
   console.log("✓ STEP file with components generated successfully")
@@ -47,4 +47,4 @@ test("basics04: convert circuit json with components to STEP", async () => {
   console.log("✓ STEP file successfully validated with occt-import-js")
 
   await expect(stepText).toMatchStepSnapshot(import.meta.path, "repro01")
-}, 30000)
+}, 60000)

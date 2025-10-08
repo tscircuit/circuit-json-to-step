@@ -40,7 +40,7 @@ import {
   ShapeDefinitionRepresentation,
   type Ref,
 } from "stepts"
-import { generateComponentMeshes } from "./mesh-generation"
+import { generateComponentMeshes, type ComponentSolidInfo } from "./mesh-generation"
 
 export interface CircuitJsonToStepOptions {
   /** Board width in mm (optional if pcb_board is present) */
@@ -501,21 +501,36 @@ export async function circuitJsonToStep(
   const allSolids: Ref<ManifoldSolidBrep>[] = [solid]
 
   // Generate component mesh if requested
+  let componentInfos: ComponentSolidInfo[] = []
   if (options.includeComponents) {
-    const componentSolids = await generateComponentMeshes({
+    componentInfos = await generateComponentMeshes({
       repo,
       circuitJson,
       boardThickness,
       includeExternalMeshes: options.includeExternalMeshes,
     })
+    
+    // Add component solids to the main array
+    const componentSolids = componentInfos.map(info => info.solid)
     allSolids.push(...componentSolids)
   }
 
   // Add presentation/styling for all solids
   const styledItems: Ref<StyledItem>[] = []
 
-  for (const solidRef of allSolids) {
-    const color = repo.add(new ColourRgb("", 0.2, 0.6, 0.2))
+  for (let i = 0; i < allSolids.length; i++) {
+    const solidRef = allSolids[i]!
+    
+    // Check if this is a small component (resistor) that needs lighter color
+    const isSmallComponent = i > 0 && // Skip the PCB board (first solid)
+      componentInfos.find(info => info.solid === solidRef)?.isSmallComponent === true
+    
+    // Use lighter color for resistors, standard green for everything else
+    const [r, g, b] = isSmallComponent 
+      ? [0.7, 0.8, 0.7] // Lighter green/gray for resistors
+      : [0.2, 0.6, 0.2] // Standard green for PCB and other components
+    
+    const color = repo.add(new ColourRgb("", r, g, b))
     const fillColor = repo.add(new FillAreaStyleColour("", color))
     const fillStyle = repo.add(new FillAreaStyle("", [fillColor]))
     const surfaceFill = repo.add(new SurfaceStyleFillArea(fillStyle))

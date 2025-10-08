@@ -20,6 +20,11 @@ import {
   VertexPoint,
 } from "stepts"
 
+export interface ComponentSolidInfo {
+  solid: Ref<ManifoldSolidBrep>
+  isSmallComponent: boolean
+}
+
 export interface MeshGenerationOptions {
   /** Repository to add STEP entities to */
   repo: Repository
@@ -40,9 +45,20 @@ function createBoxTriangles(box: {
   rotation?: { x: number; y: number; z: number }
 }): GLTFTriangle[] {
   const { center, size } = box
-  const halfX = size.x / 2
-  const halfY = size.y / 2
-  const halfZ = size.z / 2
+  
+  // Only scale up very small components (likely resistors, small capacitors)
+  // Keep larger components at their original size
+  const isSmallComponent = size.x < 0.5 || size.y < 0.5 || size.z < 0.1
+  
+  const scaledSize = isSmallComponent ? {
+    x: Math.max(size.x, 0.6),  // Make small components visible but not huge
+    y: Math.max(size.y, 0.6),
+    z: Math.max(size.z, 0.3)   // Give them some height
+  } : size  // Keep original size for larger components
+  
+  const halfX = scaledSize.x / 2
+  const halfY = scaledSize.y / 2
+  const halfZ = scaledSize.z / 2
 
   // Define 8 corners of the box
   const corners = [
@@ -249,14 +265,14 @@ function createStepFacesFromTriangles(
  */
 export async function generateComponentMeshes(
   options: MeshGenerationOptions,
-): Promise<Ref<ManifoldSolidBrep>[]> {
+): Promise<ComponentSolidInfo[]> {
   const {
     repo,
     circuitJson,
     boardThickness,
     includeExternalMeshes = false,
   } = options
-  const solids: Ref<ManifoldSolidBrep>[] = []
+  const solidInfos: ComponentSolidInfo[] = []
 
   try {
     // Filter circuit JSON and optionally remove model URLs
@@ -283,51 +299,82 @@ export async function generateComponentMeshes(
       renderBoardTextures: false,
     })
 
-    // Extract or generate triangles from component boxes
-    const allTriangles: GLTFTriangle[] = []
+    // Extract or generate triangles from component boxes - create separate solids for each component
     for (const box of scene3d.boxes) {
-      if (box.mesh && "triangles" in box.mesh) {
-        allTriangles.push(...box.mesh.triangles)
-      } else {
-        // Generate simple box mesh for this component
-        const boxTriangles = createBoxTriangles(box)
-        allTriangles.push(...boxTriangles)
+      const componentTriangles: GLTFTriangle[] = []
+      
+      // Check if external mesh exists and has triangles
+      const hasValidExternalMesh = box.mesh && "triangles" in box.mesh && box.mesh.triangles.length > 0
+      
+      // Special handling for small components (likely resistors) - make them more visible
+      const isSmallComponent = box.size.x < 3 && box.size.y < 3 && box.size.z < 2
+      let modifiedBox = box
+      
+      if (isSmallComponent) {
+        modifiedBox = {
+          ...box,
+          center: {
+            x: box.center.x,
+            y: box.center.y,
+            z: Math.max(box.center.z, 2) // Bring it forward in Z
+          },
+          size: {
+            x: Math.max(box.size.x, 1.0), // Make it at least 1mm wide
+            y: Math.max(box.size.y, 1.0), // Make it at least 1mm deep  
+            z: Math.max(box.size.z, 0.5)  // Make it at least 0.5mm tall
+          }
+        }
       }
-    }
+      
+      if (hasValidExternalMesh) {
+        if (isSmallComponent) {
+          // For small components, use fallback box instead of external mesh to ensure visibility
+          const boxTriangles = createBoxTriangles(modifiedBox)
+          componentTriangles.push(...boxTriangles)
+        } else {
+          componentTriangles.push(...box.mesh!.triangles)
+        }
+      } else {
+        // Generate fallback box mesh - this ensures all components get geometry
+        const boxTriangles = createBoxTriangles(modifiedBox)
+        componentTriangles.push(...boxTriangles)
+      }
 
-    // Create STEP faces from triangles if we have any
-    if (allTriangles.length > 0) {
-      // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
-      const transformedTriangles = allTriangles.map((tri) => ({
-        vertices: tri.vertices.map((v) => ({
-          x: v.x,
-          y: v.z, // GLTF Z becomes STEP Y
-          z: v.y, // GLTF Y becomes STEP Z
-        })),
-        normal: {
-          x: tri.normal.x,
-          y: tri.normal.z, // GLTF Z becomes STEP Y
-          z: tri.normal.y, // GLTF Y becomes STEP Z
-        },
-      }))
-      const componentFaces = createStepFacesFromTriangles(
-        repo,
-        transformedTriangles as any,
-      )
+      // Create STEP faces from triangles if we have any for this component
+      if (componentTriangles.length > 0) {
+        // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
+        const transformedTriangles = componentTriangles.map((tri) => ({
+          vertices: tri.vertices.map((v) => ({
+            x: v.x,
+            y: v.z, // GLTF Z becomes STEP Y
+            z: v.y, // GLTF Y becomes STEP Z
+          })),
+          normal: {
+            x: tri.normal.x,
+            y: tri.normal.z, // GLTF Z becomes STEP Y
+            z: tri.normal.y, // GLTF Y becomes STEP Z
+          },
+        }))
+        
+        const componentFaces = createStepFacesFromTriangles(
+          repo,
+          transformedTriangles as any,
+        )
 
-      // Create closed shell and solid for components
-      const componentShell = repo.add(
-        new ClosedShell("", componentFaces as any),
-      )
-      const componentSolid = repo.add(
-        new ManifoldSolidBrep("Components", componentShell),
-      )
-      solids.push(componentSolid)
+        // Create closed shell and solid for this individual component
+        const componentShell = repo.add(
+          new ClosedShell("", componentFaces as any),
+        )
+        const componentSolid = repo.add(
+          new ManifoldSolidBrep(`Component_${solidInfos.length}`, componentShell),
+        )
+        solidInfos.push({ solid: componentSolid, isSmallComponent })
+      }
     }
   } catch (error) {
     console.warn("Failed to generate component mesh:", error)
     // Continue without components if generation fails
   }
 
-  return solids
+  return solidInfos
 }
