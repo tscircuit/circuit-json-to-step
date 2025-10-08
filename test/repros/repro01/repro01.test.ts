@@ -7,6 +7,7 @@ import circuitJson from "./repro01.json"
 test("repro01: convert circuit json with components to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
     includeComponents: true,
+    includeExternalMeshes: true,  // Enable proper GLTF loading for resistors
     productName: "TestPCB_with_components",
   })
 

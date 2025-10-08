@@ -306,37 +306,12 @@ export async function generateComponentMeshes(
       // Check if external mesh exists and has triangles
       const hasValidExternalMesh = box.mesh && "triangles" in box.mesh && box.mesh.triangles.length > 0
       
-      // Special handling for small components (likely resistors) - make them more visible
-      const isSmallComponent = box.size.x < 3 && box.size.y < 3 && box.size.z < 2
-      let modifiedBox = box
-      
-      if (isSmallComponent) {
-        modifiedBox = {
-          ...box,
-          center: {
-            x: box.center.x,
-            y: box.center.y,
-            z: Math.max(box.center.z, 2) // Bring it forward in Z
-          },
-          size: {
-            x: Math.max(box.size.x, 1.0), // Make it at least 1mm wide
-            y: Math.max(box.size.y, 1.0), // Make it at least 1mm deep  
-            z: Math.max(box.size.z, 0.5)  // Make it at least 0.5mm tall
-          }
-        }
-      }
-      
+      // Process all components with external meshes or fallback to box geometry
       if (hasValidExternalMesh) {
-        if (isSmallComponent) {
-          // For small components, use fallback box instead of external mesh to ensure visibility
-          const boxTriangles = createBoxTriangles(modifiedBox)
-          componentTriangles.push(...boxTriangles)
-        } else {
-          componentTriangles.push(...box.mesh!.triangles)
-        }
+        componentTriangles.push(...box.mesh!.triangles)
       } else {
-        // Generate fallback box mesh - this ensures all components get geometry
-        const boxTriangles = createBoxTriangles(modifiedBox)
+        // Generate fallback box mesh for large components
+        const boxTriangles = createBoxTriangles(box)
         componentTriangles.push(...boxTriangles)
       }
 
@@ -368,7 +343,7 @@ export async function generateComponentMeshes(
         const componentSolid = repo.add(
           new ManifoldSolidBrep(`Component_${solidInfos.length}`, componentShell),
         )
-        solidInfos.push({ solid: componentSolid, isSmallComponent })
+        solidInfos.push({ solid: componentSolid, isSmallComponent: false })
       }
     }
   } catch (error) {
