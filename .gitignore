@@ -42,3 +42,6 @@ debug-output
 
 # Snapshot diff files
 *.diff.png
+
+# Documentation
+CLAUDE.md
