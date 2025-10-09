@@ -275,19 +275,42 @@ export async function generateComponentMeshes(
   const solidInfos: ComponentSolidInfo[] = []
 
   try {
-    // Filter circuit JSON and optionally remove model URLs
+    // Filter circuit JSON and handle external mesh URLs
     const filteredCircuitJson = circuitJson
       .filter((e) => e.type !== "pcb_board")
       .map((e) => {
-        if (!includeExternalMeshes && e.type === "cad_component") {
-          // Remove model_*_url fields to avoid hanging on external model fetches
-          return {
-            ...e,
-            model_3mf_url: undefined,
-            model_obj_url: undefined,
-            model_stl_url: undefined,
-            model_glb_url: undefined,
-            model_gltf_url: undefined,
+        if (e.type === "cad_component") {
+          if (!includeExternalMeshes) {
+            // Remove model_*_url fields to avoid hanging on external model fetches
+            return {
+              ...e,
+              model_3mf_url: undefined,
+              model_obj_url: undefined,
+              model_stl_url: undefined,
+              model_glb_url: undefined,
+              model_gltf_url: undefined,
+            }
+          } else {
+            // When including external meshes, add default URLs for components that don't have them
+            const cadComponent = e as any
+            
+            // If component doesn't have a mesh URL, try to provide a default based on footprint
+            if (!cadComponent.model_obj_url && !cadComponent.model_gltf_url && !cadComponent.model_glb_url) {
+              // Find the corresponding source component to determine type
+              const sourceComponent = circuitJson.find(
+                (item: any) => item.type === "source_component" && item.source_component_id === cadComponent.source_component_id
+              ) as any
+              
+              if (sourceComponent?.ftype === "simple_resistor" && cadComponent.footprinter_string === "0603") {
+                // Add default 0603 resistor mesh URL
+                return {
+                  ...cadComponent,
+                  model_obj_url: "https://modelcdn.tscircuit.com/easyeda_models/download?uuid=7c6a08e7d1684d6baaa0a14a0e497e91&pn=C22936&cachebust_origin="
+                }
+              }
+            }
+            
+            return e
           }
         }
         return e
@@ -310,7 +333,7 @@ export async function generateComponentMeshes(
       if (hasValidExternalMesh) {
         componentTriangles.push(...box.mesh!.triangles)
       } else {
-        // Generate fallback box mesh for large components
+        // Generate fallback box mesh for components without external meshes
         const boxTriangles = createBoxTriangles(box)
         componentTriangles.push(...boxTriangles)
       }
