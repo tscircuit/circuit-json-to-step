@@ -1,4 +1,3 @@
-import { writeFileSync } from "node:fs"
 import { test, expect } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
@@ -28,7 +27,7 @@ test("basics04: convert circuit json with components to STEP", async () => {
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics04.step"
-  writeFileSync(outputPath, stepText)
+  await Bun.write(outputPath, stepText)
 
   console.log("✓ STEP file with components generated successfully")
   console.log(`  - Solids created: ${solidCount}`)
