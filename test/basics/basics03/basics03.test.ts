@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test"
-import { writeFileSync } from "node:fs"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics03.json"
@@ -19,7 +18,7 @@ test("basics03: convert pcb_board with arrow outline and pcb_plated_holes to STE
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics03.step"
-  writeFileSync(outputPath, stepText)
+  await Bun.write(outputPath, stepText)
 
   console.log("✓ STEP file generated successfully")
   console.log(`  - STEP text length: ${stepText.length} bytes`)

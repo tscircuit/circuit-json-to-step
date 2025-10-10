@@ -1,4 +1,3 @@
-import { writeFileSync } from "node:fs"
 import { test, expect } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
@@ -34,7 +33,7 @@ test("basics01: convert circuit json with circular holes to STEP", async () => {
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics01.step"
-  writeFileSync(outputPath, stepText)
+  await Bun.write(outputPath, stepText)
 
   console.log("✓ STEP file generated successfully")
   console.log(`  - Circles created: ${circleCount}`)

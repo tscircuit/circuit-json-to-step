@@ -16,7 +16,6 @@ bun add circuit-json-to-step
 
 ```typescript
 import { circuitJsonToStep } from "circuit-json-to-step"
-import { writeFileSync } from "fs"
 
 const circuitJson = [
   {
@@ -43,8 +42,7 @@ const stepText = await circuitJsonToStep(circuitJson, {
   boardThickness: 1.6,
   productName: "MyPCB",
 })
-
-writeFileSync("output.step", stepText)
+await Bun.write("output.step", stepText)
 ```
 
 ## Related Projects
