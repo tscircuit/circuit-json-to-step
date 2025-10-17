@@ -273,8 +273,10 @@ export async function generateComponentMeshes(
           
           // Get component position and rotation for transformation
           const transform = {
-            position: component.position || { x: 0, y: 0, z: 0 },
-            rotation: component.rotation || { x: 0, y: 0, z: 0 },
+            pose: {
+              position: component.position || { x: 0, y: 0, z: 0 },
+              rotation: component.rotation || { x: 0, y: 0, z: 0 },
+            },
             scale: component.model_unit_to_mm_scale_factor || 1,
           }
           

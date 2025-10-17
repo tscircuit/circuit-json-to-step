@@ -64,7 +64,7 @@ test("step-merge01: merge external STEP file from model_step_url", async () => {
 }, 30000)
 
 test("step-merge02: test STEP fetching utility", async () => {
-  const { fetchStepFile } = await import("../../lib/step-merging")
+  const { fetchStepFile } = await import("../../lib/fetch-step-file")
   
   // Test fetching local file
   const stepContent = await fetchStepFile("./test/step-merge/fixtures/simple-box.step")

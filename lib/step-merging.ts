@@ -15,47 +15,14 @@ import {
   VertexPoint,
   type Entity,
 } from "stepts"
-import { readFileSync } from "fs"
-
-/**
- * Fetches a STEP file from a URL or local path
- * @param url - The URL or local file path to fetch
- * @returns The STEP file content as a string
- */
-export async function fetchStepFile(url: string): Promise<string> {
-  // Check if it's a local file path
-  if (url.startsWith("file://") || url.startsWith("/") || url.startsWith("./")) {
-    // Local file
-    const filePath = url.startsWith("file://") ? url.slice(7) : url
-    try {
-      return readFileSync(filePath, "utf-8")
-    } catch (error) {
-      throw new Error(`Failed to read local STEP file: ${filePath}. Error: ${error}`)
-    }
-  }
-
-  // Remote URL - fetch it
-  try {
-    const response = await fetch(url)
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-    return await response.text()
-  } catch (error) {
-    throw new Error(`Failed to fetch STEP file from ${url}. Error: ${error}`)
-  }
-}
-
+import { fetchStepFile } from "./fetch-step-file"
+import type { StepTransform } from "./step-types"
 /**
  * Applies transformation to a CartesianPoint
  */
 function transformPoint(
   point: CartesianPoint,
-  transform?: {
-    position?: { x: number; y: number; z: number }
-    rotation?: { x: number; y: number; z: number }
-    scale?: number
-  }
+  transform?: StepTransform,
 ): CartesianPoint {
   if (!transform) {
     return point
@@ -67,8 +34,8 @@ function transformPoint(
   let z = point.z * scale
 
   // Apply rotation if specified (simplified - only handles rotation around Z axis)
-  if (transform.rotation) {
-    const rotZ = (transform.rotation.z || 0) * (Math.PI / 180) // Convert to radians
+  if (transform.pose?.rotation) {
+    const rotZ = (transform.pose.rotation.z || 0) * (Math.PI / 180) // Convert to radians
     const cosZ = Math.cos(rotZ)
     const sinZ = Math.sin(rotZ)
     const newX = x * cosZ - y * sinZ
@@ -80,10 +47,10 @@ function transformPoint(
   }
 
   // Apply translation
-  if (transform.position) {
-    x += transform.position.x || 0
-    y += transform.position.y || 0
-    z += transform.position.z || 0
+  if (transform.pose?.position) {
+    x += transform.pose.position.x || 0
+    y += transform.pose.position.y || 0
+    z += transform.pose.position.z || 0
   }
 
   return new CartesianPoint(point.name, x, y, z)
@@ -96,11 +63,7 @@ function copyEntity(
   entity: Entity,
   sourceRepo: Repository,
   targetRepo: Repository,
-  transform?: {
-    position?: { x: number; y: number; z: number }
-    rotation?: { x: number; y: number; z: number }
-    scale?: number
-  }
+  transform?: StepTransform
 ): Entity {
   // Transform CartesianPoint entities
   if (entity instanceof CartesianPoint) {
@@ -202,17 +165,13 @@ export function parseStepFile(stepContent: string): {
  * 
  * @param stepContent - The STEP file content as a string
  * @param targetRepo - The repository to merge entities into
- * @param transform - Optional transformation to apply (position, rotation, scale)
+ * @param transform - Optional transformation to apply (pose and scale)
  * @returns Array of references to merged solid entities
  */
 export function mergeStepFile(
   stepContent: string,
   targetRepo: Repository,
-  transform?: {
-    position?: { x: number; y: number; z: number }
-    rotation?: { x: number; y: number; z: number }
-    scale?: number
-  }
+  transform?: StepTransform
 ): Ref<ManifoldSolidBrep>[] {
   const solids: Ref<ManifoldSolidBrep>[] = []
 
@@ -284,11 +243,7 @@ function copyFaceWithTransform(
   face: AdvancedFace,
   sourceRepo: Repository,
   targetRepo: Repository,
-  transform?: {
-    position?: { x: number; y: number; z: number }
-    rotation?: { x: number; y: number; z: number }
-    scale?: number
-  }
+  transform?: StepTransform
 ): Ref<AdvancedFace> {
   // Copy the surface geometry
   const surface = face.surface.resolve(sourceRepo)
@@ -380,17 +335,13 @@ function copyFaceWithTransform(
  * 
  * @param stepUrl - The URL or local path to the STEP file
  * @param targetRepo - The repository to merge entities into
- * @param transform - Optional transformation to apply
+ * @param transform - Optional transformation to apply (pose and scale)
  * @returns Array of references to merged solid entities
  */
 export async function fetchAndMergeStepFile(
   stepUrl: string,
   targetRepo: Repository,
-  transform?: {
-    position?: { x: number; y: number; z: number }
-    rotation?: { x: number; y: number; z: number }
-    scale?: number
-  }
+  transform?: StepTransform
 ): Promise<Ref<ManifoldSolidBrep>[]> {
   try {
     const stepContent = await fetchStepFile(stepUrl)

@@ -97,6 +97,7 @@ You can also use the STEP merging utilities directly:
 
 ```typescript
 import { fetchStepFile, mergeStepFile, parseStepFile } from "circuit-json-to-step"
+import type { StepTransform } from "circuit-json-to-step"
 import { Repository } from "stepts"
 
 // Fetch a STEP file
@@ -106,13 +107,18 @@ const stepContent = await fetchStepFile("./model.step")
 const parsed = parseStepFile(stepContent)
 console.log(`Found ${parsed.entities.size} entities`)
 
+// Define transformation
+const transform: StepTransform = {
+  pose: {
+    position: { x: 10, y: 20, z: 5 },
+    rotation: { x: 0, y: 0, z: 45 },
+  },
+  scale: 2.0,
+}
+
 // Merge into an existing repository
 const targetRepo = new Repository()
-const mergedSolids = mergeStepFile(stepContent, targetRepo, {
-  position: { x: 10, y: 20, z: 5 },
-  rotation: { x: 0, y: 0, z: 45 },
-  scale: 2.0,
-})
+const mergedSolids = mergeStepFile(stepContent, targetRepo, transform)
 
 console.log(`Merged ${mergedSolids.length} solids`)
 ```
