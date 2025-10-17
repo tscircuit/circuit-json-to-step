@@ -1,4 +1,4 @@
-import type { Ref, ManifoldSolidBrep } from "stepts"
+import type { Ref, ManifoldSolidBrep, Curve, Surface } from "stepts"
 import {
   Repository,
   parseRepository,
@@ -13,6 +13,11 @@ import {
   OrientedEdge,
   EdgeCurve,
   VertexPoint,
+  Line,
+  Circle,
+  Vector,
+  Plane,
+  CylindricalSurface,
   type Entity,
 } from "stepts"
 import { fetchStepFile } from "./fetch-step-file"
@@ -75,6 +80,50 @@ function copyEntity(
     return new Direction(entity.name, entity.dx, entity.dy, entity.dz)
   }
 
+  // For Vector, copy direction and magnitude
+  if (entity instanceof Vector) {
+    const orientation = entity.orientation.resolve(sourceRepo)
+    const copiedOrientation = new Direction(orientation.name, orientation.dx, orientation.dy, orientation.dz)
+    const orientationRef = targetRepo.add(copiedOrientation)
+    return new Vector(entity.name, orientationRef, entity.magnitude)
+  }
+
+  // For Line, transform the point and copy the direction vector
+  if (entity instanceof Line) {
+    const transformedPoint = transformPoint(entity.pnt.resolve(sourceRepo), transform)
+    const pointRef = targetRepo.add(transformedPoint)
+    const dirVector = entity.dir.resolve(sourceRepo)
+    const copiedVector = copyEntity(dirVector, sourceRepo, targetRepo, transform) as Vector
+    const vectorRef = targetRepo.add(copiedVector)
+    return new Line(entity.name, pointRef, vectorRef)
+  }
+
+  // For Circle, transform the placement and keep the radius (scaled if needed)
+  if (entity instanceof Circle) {
+    const placement = entity.placement.resolve(sourceRepo)
+    const copiedPlacement = copyEntity(placement, sourceRepo, targetRepo, transform) as Axis2Placement3D
+    const placementRef = targetRepo.add(copiedPlacement)
+    const scaledRadius = entity.radius * (transform?.scale || 1)
+    return new Circle(entity.name, placementRef, scaledRadius)
+  }
+
+  // For Plane, transform the placement
+  if (entity instanceof Plane) {
+    const placement = entity.placement.resolve(sourceRepo)
+    const copiedPlacement = copyEntity(placement, sourceRepo, targetRepo, transform) as Axis2Placement3D
+    const placementRef = targetRepo.add(copiedPlacement)
+    return new Plane(entity.name, placementRef)
+  }
+
+  // For CylindricalSurface, transform the placement and apply scale to radius
+  if (entity instanceof CylindricalSurface) {
+    const position = entity.position.resolve(sourceRepo)
+    const copiedPosition = copyEntity(position, sourceRepo, targetRepo, transform) as Axis2Placement3D
+    const positionRef = targetRepo.add(copiedPosition)
+    const scaledRadius = entity.radius * (transform?.scale || 1)
+    return new CylindricalSurface(entity.name, positionRef, scaledRadius)
+  }
+
   // For Axis2Placement3D, transform the location point
   if (entity instanceof Axis2Placement3D) {
     const newLocation = transformPoint(entity.location.resolve(sourceRepo), transform)
@@ -98,9 +147,24 @@ function copyEntity(
     return new Axis2Placement3D(entity.name, newLocationRef, newAxis, newRefDir)
   }
 
-  // For other entities, we need to recursively copy them
-  // This is a simplified implementation - a full implementation would handle all entity types
+  // For other entity types, log a warning and return a copy
+  // This is a fallback - most geometry should be handled above
+  console.warn(`Unhandled entity type in copyEntity: ${entity.type}. Returning original entity.`)
   return entity
+}
+
+/**
+ * Type guard to check if an entity is a Curve (Line or Circle)
+ */
+function isCurve(entity: Entity): entity is Curve {
+  return entity instanceof Line || entity instanceof Circle
+}
+
+/**
+ * Type guard to check if an entity is a Surface (Plane or CylindricalSurface)
+ */
+function isSurface(entity: Entity): entity is Surface {
+  return entity instanceof Plane || entity instanceof CylindricalSurface
 }
 
 /**
@@ -148,11 +212,11 @@ export function mergeStepFile(
           const newFaces: Ref<AdvancedFace>[] = []
           
           for (const faceRef of shell.faces) {
-            const face = faceRef.resolve(sourceRepo)
+            const face = faceRef.resolve(sourceRepo) as AdvancedFace
             
             // Copy the face and its geometry
             const copiedFace = copyFaceWithTransform(
-              face as any,
+              face,
               sourceRepo,
               targetRepo,
               transform
@@ -161,7 +225,7 @@ export function mergeStepFile(
           }
           
           // Create new shell with copied faces
-          const newShell = targetRepo.add(new ClosedShell(shell.name, newFaces as any))
+          const newShell = targetRepo.add(new ClosedShell(shell.name, newFaces))
           
           // Create new solid
           const newSolid = targetRepo.add(
@@ -197,7 +261,12 @@ function copyFaceWithTransform(
   // Copy the surface geometry
   const surface = face.surface.resolve(sourceRepo)
   const copiedSurface = copyEntity(surface, sourceRepo, targetRepo, transform)
-  const surfaceRef = targetRepo.add(copiedSurface)
+  
+  if (!isSurface(copiedSurface)) {
+    throw new Error(`Expected Surface entity but got ${copiedSurface.type}`)
+  }
+  
+  const surfaceRef = targetRepo.add(copiedSurface) as Ref<Surface>
   
   // Copy all bounds (edges)
   const newBounds: Ref<FaceOuterBound>[] = []
@@ -235,7 +304,12 @@ function copyFaceWithTransform(
         // Copy the curve geometry
         const curveGeom = edgeCurve.curve.resolve(sourceRepo)
         const copiedCurveGeom = copyEntity(curveGeom, sourceRepo, targetRepo, transform)
-        const curveGeomRef = targetRepo.add(copiedCurveGeom)
+        
+        if (!isCurve(copiedCurveGeom)) {
+          throw new Error(`Expected Curve entity but got ${copiedCurveGeom.type}`)
+        }
+        
+        const curveGeomRef = targetRepo.add(copiedCurveGeom) as Ref<Curve>
         
         // Create new edge curve
         const newEdgeCurve = targetRepo.add(
@@ -243,7 +317,7 @@ function copyFaceWithTransform(
             edgeCurve.name,
             newStartVertex,
             newEndVertex,
-            curveGeomRef as any,
+            curveGeomRef,
             edgeCurve.sameSense
           )
         )
@@ -273,7 +347,7 @@ function copyFaceWithTransform(
   
   // Create new face
   const newFace = targetRepo.add(
-    new AdvancedFace(face.name, newBounds, surfaceRef as any, face.sameSense)
+    new AdvancedFace(face.name, newBounds, surfaceRef, face.sameSense)
   )
   
   return newFace
