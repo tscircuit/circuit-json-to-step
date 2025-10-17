@@ -19,6 +19,7 @@ import {
   Vector,
   VertexPoint,
 } from "stepts"
+import { fetchAndMergeStepFile } from "./step-merging"
 
 export interface MeshGenerationOptions {
   /** Repository to add STEP entities to */
@@ -246,6 +247,9 @@ function createStepFacesFromTriangles(
  * By default, model_*_url fields are filtered out to prevent hanging on external
  * model fetches during conversion. Set includeExternalMeshes to true to allow
  * external model fetching.
+ * 
+ * When includeExternalMeshes is true and model_step_url is present in a cad_component,
+ * the external STEP file will be fetched and merged into the output.
  */
 export async function generateComponentMeshes(
   options: MeshGenerationOptions,
@@ -259,6 +263,33 @@ export async function generateComponentMeshes(
   const solids: Ref<ManifoldSolidBrep>[] = []
 
   try {
+    // Process STEP files from cad_components with model_step_url
+    if (includeExternalMeshes) {
+      const cadComponents = circuitJson.filter((e) => e.type === "cad_component") as any[]
+      
+      for (const component of cadComponents) {
+        if (component.model_step_url) {
+          console.log(`Processing external STEP file from: ${component.model_step_url}`)
+          
+          // Get component position and rotation for transformation
+          const transform = {
+            position: component.position || { x: 0, y: 0, z: 0 },
+            rotation: component.rotation || { x: 0, y: 0, z: 0 },
+            scale: component.model_unit_to_mm_scale_factor || 1,
+          }
+          
+          // Fetch and merge the STEP file
+          const mergedSolids = await fetchAndMergeStepFile(
+            component.model_step_url,
+            repo,
+            transform
+          )
+          
+          solids.push(...mergedSolids)
+        }
+      }
+    }
+
     // Filter circuit JSON and optionally remove model URLs
     const filteredCircuitJson = circuitJson
       .filter((e) => e.type !== "pcb_board")
@@ -272,6 +303,7 @@ export async function generateComponentMeshes(
             model_stl_url: undefined,
             model_glb_url: undefined,
             model_gltf_url: undefined,
+            model_step_url: undefined,
           }
         }
         return e

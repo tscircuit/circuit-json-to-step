@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "circuit-json": "^0.0.272",
+    "circuit-json": "^0.0.284",
     "occt-import-js": "^0.0.23",
     "looks-same": "^10.0.1",
     "poppygl": "^0.0.13",
@@ -26,8 +26,8 @@
   "dependencies": {
     "@tscircuit/circuit-json-util": "^0.0.72",
     "circuit-json-to-connectivity-map": "^0.0.22",
-    "circuit-json-to-gltf": "^0.0.19",
-    "circuit-to-svg": "^0.0.226",
+    "circuit-json-to-gltf": "^0.0.26",
+    "circuit-to-svg": "^0.0.244",
     "schematic-symbols": "^0.0.202"
   }
 }

@@ -1,0 +1,402 @@
+import type { Ref, ManifoldSolidBrep } from "stepts"
+import {
+  Repository,
+  parseRepository,
+  CartesianPoint,
+  Direction,
+  Axis2Placement3D,
+  ManifoldSolidBrep as ManifoldSolidBrepClass,
+  ClosedShell,
+  AdvancedFace,
+  FaceOuterBound,
+  EdgeLoop,
+  OrientedEdge,
+  EdgeCurve,
+  VertexPoint,
+  type Entity,
+} from "stepts"
+import { readFileSync } from "fs"
+
+/**
+ * Fetches a STEP file from a URL or local path
+ * @param url - The URL or local file path to fetch
+ * @returns The STEP file content as a string
+ */
+export async function fetchStepFile(url: string): Promise<string> {
+  // Check if it's a local file path
+  if (url.startsWith("file://") || url.startsWith("/") || url.startsWith("./")) {
+    // Local file
+    const filePath = url.startsWith("file://") ? url.slice(7) : url
+    try {
+      return readFileSync(filePath, "utf-8")
+    } catch (error) {
+      throw new Error(`Failed to read local STEP file: ${filePath}. Error: ${error}`)
+    }
+  }
+
+  // Remote URL - fetch it
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    return await response.text()
+  } catch (error) {
+    throw new Error(`Failed to fetch STEP file from ${url}. Error: ${error}`)
+  }
+}
+
+/**
+ * Applies transformation to a CartesianPoint
+ */
+function transformPoint(
+  point: CartesianPoint,
+  transform?: {
+    position?: { x: number; y: number; z: number }
+    rotation?: { x: number; y: number; z: number }
+    scale?: number
+  }
+): CartesianPoint {
+  if (!transform) {
+    return point
+  }
+
+  const scale = transform.scale || 1
+  let x = point.x * scale
+  let y = point.y * scale
+  let z = point.z * scale
+
+  // Apply rotation if specified (simplified - only handles rotation around Z axis)
+  if (transform.rotation) {
+    const rotZ = (transform.rotation.z || 0) * (Math.PI / 180) // Convert to radians
+    const cosZ = Math.cos(rotZ)
+    const sinZ = Math.sin(rotZ)
+    const newX = x * cosZ - y * sinZ
+    const newY = x * sinZ + y * cosZ
+    x = newX
+    y = newY
+
+    // TODO: Implement rotation around X and Y axes if needed
+  }
+
+  // Apply translation
+  if (transform.position) {
+    x += transform.position.x || 0
+    y += transform.position.y || 0
+    z += transform.position.z || 0
+  }
+
+  return new CartesianPoint(point.name, x, y, z)
+}
+
+/**
+ * Deep copies an entity and all its referenced entities, applying transformations
+ */
+function copyEntity(
+  entity: Entity,
+  sourceRepo: Repository,
+  targetRepo: Repository,
+  transform?: {
+    position?: { x: number; y: number; z: number }
+    rotation?: { x: number; y: number; z: number }
+    scale?: number
+  }
+): Entity {
+  // Transform CartesianPoint entities
+  if (entity instanceof CartesianPoint) {
+    return transformPoint(entity, transform)
+  }
+
+  // For Direction, just copy (transformations would be more complex)
+  if (entity instanceof Direction) {
+    return new Direction(entity.name, entity.dx, entity.dy, entity.dz)
+  }
+
+  // For Axis2Placement3D, transform the location point
+  if (entity instanceof Axis2Placement3D) {
+    const newLocation = transformPoint(entity.location.resolve(sourceRepo), transform)
+    const newLocationRef = targetRepo.add(newLocation)
+    
+    let newAxis = entity.axis
+    let newRefDir = entity.refDirection
+    
+    if (entity.axis) {
+      const axis = entity.axis.resolve(sourceRepo)
+      const copiedAxis = new Direction(axis.name, axis.dx, axis.dy, axis.dz)
+      newAxis = targetRepo.add(copiedAxis)
+    }
+    
+    if (entity.refDirection) {
+      const refDir = entity.refDirection.resolve(sourceRepo)
+      const copiedRefDir = new Direction(refDir.name, refDir.dx, refDir.dy, refDir.dz)
+      newRefDir = targetRepo.add(copiedRefDir)
+    }
+    
+    return new Axis2Placement3D(entity.name, newLocationRef, newAxis, newRefDir)
+  }
+
+  // For other entities, we need to recursively copy them
+  // This is a simplified implementation - a full implementation would handle all entity types
+  return entity
+}
+
+/**
+ * Parses a STEP file string and extracts entity data
+ * STEP files follow the ISO 10303-21 format
+ * 
+ * This is a basic parser that extracts entity definitions from the DATA section.
+ * Full STEP parsing requires handling complex entity references and geometric transformations.
+ * 
+ * @param stepContent - The STEP file content as a string
+ * @returns Object containing parsed entities
+ */
+export function parseStepFile(stepContent: string): {
+  entities: Map<number, string>
+  header: string
+} {
+  const entities = new Map<number, string>()
+  let header = ""
+
+  try {
+    // Extract HEADER section
+    const headerMatch = stepContent.match(/HEADER;([\s\S]*?)ENDSEC;/)
+    if (headerMatch) {
+      header = headerMatch[1] || ""
+    }
+
+    // Extract DATA section
+    const dataMatch = stepContent.match(/DATA;([\s\S]*?)ENDSEC;/)
+    if (!dataMatch) {
+      throw new Error("No DATA section found in STEP file")
+    }
+
+    const dataSection = dataMatch[1] || ""
+    
+    // Parse entity definitions (format: #123 = ENTITY_TYPE(...);)
+    const entityRegex = /#(\d+)\s*=\s*([^;]+);/g
+    let match: RegExpExecArray | null
+    
+    while ((match = entityRegex.exec(dataSection)) !== null) {
+      const entityId = Number.parseInt(match[1]!, 10)
+      const entityDef = match[2]!.trim()
+      entities.set(entityId, entityDef)
+    }
+
+    console.log(`Parsed ${entities.size} entities from STEP file`)
+  } catch (error) {
+    console.error(`Failed to parse STEP file: ${error}`)
+    throw error
+  }
+
+  return { entities, header }
+}
+
+/**
+ * Merges STEP file content into the target repository
+ * 
+ * This implementation:
+ * 1. Parses the external STEP file using parseRepository
+ * 2. Finds all ManifoldSolidBrep entities (the main solid bodies)
+ * 3. Recursively copies these entities and their dependencies to the target repository
+ * 4. Applies coordinate transformations (position, rotation, scale)
+ * 
+ * @param stepContent - The STEP file content as a string
+ * @param targetRepo - The repository to merge entities into
+ * @param transform - Optional transformation to apply (position, rotation, scale)
+ * @returns Array of references to merged solid entities
+ */
+export function mergeStepFile(
+  stepContent: string,
+  targetRepo: Repository,
+  transform?: {
+    position?: { x: number; y: number; z: number }
+    rotation?: { x: number; y: number; z: number }
+    scale?: number
+  }
+): Ref<ManifoldSolidBrep>[] {
+  const solids: Ref<ManifoldSolidBrep>[] = []
+
+  try {
+    // Parse the external STEP file
+    const sourceRepo = parseRepository(stepContent)
+    
+    console.log(`Parsed external STEP file, found ${sourceRepo.entries().length} entities`)
+    
+    // Find all ManifoldSolidBrep entities (these are the main solid bodies)
+    const entries = sourceRepo.entries()
+    for (const [entityId, entity] of entries) {
+      if (entity.type === "MANIFOLD_SOLID_BREP") {
+        console.log(`Found MANIFOLD_SOLID_BREP at #${entityId}`)
+        
+        // Get the solid
+        const solid = entity as unknown as ManifoldSolidBrepClass
+        
+        // Copy the shell and all its dependencies
+        const shellEntity = solid.outer.resolve(sourceRepo)
+        
+        // Recursively copy all faces in the shell
+        if (shellEntity.type === "CLOSED_SHELL") {
+          const shell = shellEntity as unknown as ClosedShell
+          const newFaces: Ref<AdvancedFace>[] = []
+          
+          for (const faceRef of shell.faces) {
+            const face = faceRef.resolve(sourceRepo)
+            
+            // Copy the face and its geometry
+            const copiedFace = copyFaceWithTransform(
+              face as any,
+              sourceRepo,
+              targetRepo,
+              transform
+            )
+            newFaces.push(copiedFace)
+          }
+          
+          // Create new shell with copied faces
+          const newShell = targetRepo.add(new ClosedShell(shell.name, newFaces as any))
+          
+          // Create new solid
+          const newSolid = targetRepo.add(
+            new ManifoldSolidBrepClass(solid.name, newShell)
+          )
+          
+          solids.push(newSolid)
+          console.log(`Merged solid #${entityId} as #${newSolid.id}`)
+        }
+      }
+    }
+    
+    console.log(`Successfully merged ${solids.length} solid(s) from external STEP file`)
+    
+  } catch (error) {
+    console.error(`Failed to merge STEP file: ${error}`)
+    console.error(error)
+    // Continue without the external model rather than failing completely
+  }
+
+  return solids
+}
+
+/**
+ * Copies a face and applies transformations to its geometry
+ */
+function copyFaceWithTransform(
+  face: AdvancedFace,
+  sourceRepo: Repository,
+  targetRepo: Repository,
+  transform?: {
+    position?: { x: number; y: number; z: number }
+    rotation?: { x: number; y: number; z: number }
+    scale?: number
+  }
+): Ref<AdvancedFace> {
+  // Copy the surface geometry
+  const surface = face.surface.resolve(sourceRepo)
+  const copiedSurface = copyEntity(surface, sourceRepo, targetRepo, transform)
+  const surfaceRef = targetRepo.add(copiedSurface)
+  
+  // Copy all bounds (edges)
+  const newBounds: Ref<FaceOuterBound>[] = []
+  
+  for (const boundRef of face.bounds) {
+    const bound = boundRef.resolve(sourceRepo) as FaceOuterBound
+    
+    // Copy the edge loop
+    const edgeLoop = bound.bound.resolve(sourceRepo) as EdgeLoop
+    const newEdges: Ref<OrientedEdge>[] = []
+    
+    if (edgeLoop.type === "EDGE_LOOP") {
+      for (const edgeRef of edgeLoop.edges) {
+        const edge = edgeRef.resolve(sourceRepo) as OrientedEdge
+        
+        // Copy the edge curve
+        const edgeCurve = edge.edge.resolve(sourceRepo) as EdgeCurve
+        
+        // Copy start and end vertices with transformation
+        const startVertex = edgeCurve.start.resolve(sourceRepo) as VertexPoint
+        const endVertex = edgeCurve.end.resolve(sourceRepo) as VertexPoint
+        
+        const startPoint = startVertex.pnt.resolve(sourceRepo)
+        const endPoint = endVertex.pnt.resolve(sourceRepo)
+        
+        const newStartPoint = transformPoint(startPoint, transform)
+        const newEndPoint = transformPoint(endPoint, transform)
+        
+        const newStartPointRef = targetRepo.add(newStartPoint)
+        const newEndPointRef = targetRepo.add(newEndPoint)
+        
+        const newStartVertex = targetRepo.add(new VertexPoint(startVertex.name, newStartPointRef))
+        const newEndVertex = targetRepo.add(new VertexPoint(endVertex.name, newEndPointRef))
+        
+        // Copy the curve geometry
+        const curveGeom = edgeCurve.curve.resolve(sourceRepo)
+        const copiedCurveGeom = copyEntity(curveGeom, sourceRepo, targetRepo, transform)
+        const curveGeomRef = targetRepo.add(copiedCurveGeom)
+        
+        // Create new edge curve
+        const newEdgeCurve = targetRepo.add(
+          new EdgeCurve(
+            edgeCurve.name,
+            newStartVertex,
+            newEndVertex,
+            curveGeomRef as any,
+            edgeCurve.sameSense
+          )
+        )
+        
+        // Create new oriented edge
+        const newOrientedEdge = targetRepo.add(
+          new OrientedEdge(
+            edge.name,
+            newEdgeCurve,
+            edge.orientation
+          )
+        )
+        
+        newEdges.push(newOrientedEdge)
+      }
+      
+      // Create new edge loop
+      const newEdgeLoop = targetRepo.add(new EdgeLoop(edgeLoop.name, newEdges))
+      
+      // Create new bound (all bounds in AdvancedFace are FaceOuterBound)
+      const newBound = targetRepo.add(
+        new FaceOuterBound(bound.name, newEdgeLoop, bound.sameSense)
+      )
+      newBounds.push(newBound)
+    }
+  }
+  
+  // Create new face
+  const newFace = targetRepo.add(
+    new AdvancedFace(face.name, newBounds, surfaceRef as any, face.sameSense)
+  )
+  
+  return newFace
+}
+
+/**
+ * Fetches and merges a STEP file from a URL into the target repository
+ * 
+ * @param stepUrl - The URL or local path to the STEP file
+ * @param targetRepo - The repository to merge entities into
+ * @param transform - Optional transformation to apply
+ * @returns Array of references to merged solid entities
+ */
+export async function fetchAndMergeStepFile(
+  stepUrl: string,
+  targetRepo: Repository,
+  transform?: {
+    position?: { x: number; y: number; z: number }
+    rotation?: { x: number; y: number; z: number }
+    scale?: number
+  }
+): Promise<Ref<ManifoldSolidBrep>[]> {
+  try {
+    const stepContent = await fetchStepFile(stepUrl)
+    return mergeStepFile(stepContent, targetRepo, transform)
+  } catch (error) {
+    console.warn(`Failed to fetch and merge STEP file from ${stepUrl}: ${error}`)
+    return []
+  }
+}

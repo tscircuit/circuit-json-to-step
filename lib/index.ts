@@ -543,3 +543,11 @@ export async function circuitJsonToStep(
   // Generate and return STEP file text
   return repo.toPartFile({ name: productName })
 }
+
+// Export STEP merging utilities
+export {
+  fetchStepFile,
+  fetchAndMergeStepFile,
+  mergeStepFile,
+  parseStepFile,
+} from "./step-merging"
