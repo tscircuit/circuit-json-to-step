@@ -546,9 +546,5 @@ export async function circuitJsonToStep(
 
 // Export STEP merging utilities
 export { fetchStepFile } from "./fetch-step-file"
-export {
-  fetchAndMergeStepFile,
-  mergeStepFile,
-  parseStepFile,
-} from "./step-merging"
+export { fetchAndMergeStepFile, mergeStepFile } from "./step-merging"
 export type { StepTransform } from "./step-types"

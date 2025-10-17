@@ -76,16 +76,15 @@ test("step-merge02: test STEP fetching utility", async () => {
   console.log("✓ Successfully fetched local STEP file")
 }, 10000)
 
-test("step-merge03: test STEP parsing", async () => {
-  const { parseStepFile } = await import("../../lib/step-merging")
+test("step-merge03: test STEP parsing with stepts", async () => {
+  const { parseRepository } = await import("stepts")
   
   const stepContent = readFileSync("./test/step-merge/fixtures/simple-box.step", "utf-8")
-  const parsed = parseStepFile(stepContent)
+  const repo = parseRepository(stepContent)
   
-  expect(parsed.entities.size).toBeGreaterThan(0)
-  expect(parsed.header).toBeTruthy()
+  expect(repo.entries().length).toBeGreaterThan(0)
   
-  console.log(`✓ Parsed ${parsed.entities.size} entities from STEP file`)
+  console.log(`✓ Parsed ${repo.entries().length} entities from STEP file using stepts`)
 }, 10000)
 
 test("step-merge04: test coordinate transformation", async () => {

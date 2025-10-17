@@ -96,16 +96,12 @@ const stepText = await circuitJsonToStep(circuitJson, {
 You can also use the STEP merging utilities directly:
 
 ```typescript
-import { fetchStepFile, mergeStepFile, parseStepFile } from "circuit-json-to-step"
+import { fetchStepFile, mergeStepFile } from "circuit-json-to-step"
 import type { StepTransform } from "circuit-json-to-step"
 import { Repository } from "stepts"
 
 // Fetch a STEP file
 const stepContent = await fetchStepFile("./model.step")
-
-// Parse a STEP file
-const parsed = parseStepFile(stepContent)
-console.log(`Found ${parsed.entities.size} entities`)
 
 // Define transformation
 const transform: StepTransform = {

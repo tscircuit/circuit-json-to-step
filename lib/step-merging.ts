@@ -104,57 +104,6 @@ function copyEntity(
 }
 
 /**
- * Parses a STEP file string and extracts entity data
- * STEP files follow the ISO 10303-21 format
- * 
- * This is a basic parser that extracts entity definitions from the DATA section.
- * Full STEP parsing requires handling complex entity references and geometric transformations.
- * 
- * @param stepContent - The STEP file content as a string
- * @returns Object containing parsed entities
- */
-export function parseStepFile(stepContent: string): {
-  entities: Map<number, string>
-  header: string
-} {
-  const entities = new Map<number, string>()
-  let header = ""
-
-  try {
-    // Extract HEADER section
-    const headerMatch = stepContent.match(/HEADER;([\s\S]*?)ENDSEC;/)
-    if (headerMatch) {
-      header = headerMatch[1] || ""
-    }
-
-    // Extract DATA section
-    const dataMatch = stepContent.match(/DATA;([\s\S]*?)ENDSEC;/)
-    if (!dataMatch) {
-      throw new Error("No DATA section found in STEP file")
-    }
-
-    const dataSection = dataMatch[1] || ""
-    
-    // Parse entity definitions (format: #123 = ENTITY_TYPE(...);)
-    const entityRegex = /#(\d+)\s*=\s*([^;]+);/g
-    let match: RegExpExecArray | null
-    
-    while ((match = entityRegex.exec(dataSection)) !== null) {
-      const entityId = Number.parseInt(match[1]!, 10)
-      const entityDef = match[2]!.trim()
-      entities.set(entityId, entityDef)
-    }
-
-    console.log(`Parsed ${entities.size} entities from STEP file`)
-  } catch (error) {
-    console.error(`Failed to parse STEP file: ${error}`)
-    throw error
-  }
-
-  return { entities, header }
-}
-
-/**
  * Merges STEP file content into the target repository
  * 
  * This implementation:
