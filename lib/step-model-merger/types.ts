@@ -4,6 +4,7 @@ import type { ManifoldSolidBrep, Ref, Repository } from "stepts"
 export type CadComponent = {
   type: "cad_component"
   cad_component_id?: string
+  pcb_component_id?: string
   model_step_url?: string
   position?: { x?: number; y?: number; z?: number }
   rotation?: { x?: number; y?: number; z?: number }
@@ -23,6 +24,7 @@ export type MergeTransform = {
 export type MergeStepModelResult = {
   solids: Ref<ManifoldSolidBrep>[]
   handledComponentIds: Set<string>
+  handledPcbComponentIds: Set<string>
 }
 
 export interface MergeStepModelOptions {

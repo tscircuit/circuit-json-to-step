@@ -31,6 +31,8 @@ export interface MeshGenerationOptions {
   includeExternalMeshes?: boolean
   /** Cad component ids already handled by STEP merging */
   excludeCadComponentIds?: Set<string>
+  /** PCB component ids already handled by STEP merging */
+  excludePcbComponentIds?: Set<string>
 }
 
 /**
@@ -258,6 +260,7 @@ export async function generateComponentMeshes(
     boardThickness,
     includeExternalMeshes = false,
     excludeCadComponentIds,
+    excludePcbComponentIds,
   } = options
   const solids: Ref<ManifoldSolidBrep>[] = []
 
@@ -270,6 +273,13 @@ export async function generateComponentMeshes(
           e.type === "cad_component" &&
           e.cad_component_id &&
           excludeCadComponentIds?.has(e.cad_component_id)
+        ) {
+          return false
+        }
+        if (
+          e.type === "pcb_component" &&
+          e.pcb_component_id &&
+          excludePcbComponentIds?.has(e.pcb_component_id)
         ) {
           return false
         }

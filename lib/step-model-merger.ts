@@ -36,6 +36,7 @@ export async function mergeExternalStepModels(
 
   const solids: Ref<ManifoldSolidBrep>[] = []
   const handledComponentIds = new Set<string>()
+  const handledPcbComponentIds = new Set<string>()
 
   for (const component of cadComponents) {
     const componentId = component.cad_component_id ?? ""
@@ -53,8 +54,14 @@ export async function mergeExternalStepModels(
       }
 
       const componentSolids = mergeSingleStepModel(repo, stepText, transform)
-      if (componentSolids.length > 0 && componentId) {
-        handledComponentIds.add(componentId)
+      if (componentSolids.length > 0) {
+        if (componentId) {
+          handledComponentIds.add(componentId)
+        }
+        const pcbComponentId = component.pcb_component_id
+        if (pcbComponentId) {
+          handledPcbComponentIds.add(pcbComponentId)
+        }
       }
       solids.push(...componentSolids)
     } catch (error) {
@@ -62,7 +69,7 @@ export async function mergeExternalStepModels(
     }
   }
 
-  return { solids, handledComponentIds }
+  return { solids, handledComponentIds, handledPcbComponentIds }
 }
 
 function mergeSingleStepModel(

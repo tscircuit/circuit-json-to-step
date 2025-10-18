@@ -503,6 +503,7 @@ export async function circuitJsonToStep(
   const allSolids: Ref<ManifoldSolidBrep>[] = [solid]
 
   let handledComponentIds = new Set<string>()
+  let handledPcbComponentIds = new Set<string>()
 
   if (options.includeComponents && options.includeExternalMeshes) {
     const mergeResult = await mergeExternalStepModels({
@@ -510,6 +511,7 @@ export async function circuitJsonToStep(
       circuitJson,
     })
     handledComponentIds = mergeResult.handledComponentIds
+    handledPcbComponentIds = mergeResult.handledPcbComponentIds
     allSolids.push(...mergeResult.solids)
   }
 
@@ -521,6 +523,7 @@ export async function circuitJsonToStep(
       boardThickness,
       includeExternalMeshes: options.includeExternalMeshes,
       excludeCadComponentIds: handledComponentIds,
+      excludePcbComponentIds: handledPcbComponentIds,
     })
     allSolids.push(...componentSolids)
   }
