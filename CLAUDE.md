@@ -8,4 +8,3 @@ This project converts circuit json to step using `circuit-json` and `stepts` mod
 - There are references you can explore in `circuit-json` and `stepts`
 - We only need to create the holes inside the outline of a circuit board to
   generate the STEP files
-
