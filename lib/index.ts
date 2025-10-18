@@ -42,6 +42,7 @@ import {
 } from "stepts"
 import { generateComponentMeshes } from "./mesh-generation"
 import { mergeExternalStepModels } from "./step-model-merger"
+import { normalizeStepNumericExponents } from "./step-text-utils"
 
 export interface CircuitJsonToStepOptions {
   /** Board width in mm (optional if pcb_board is present) */
@@ -558,11 +559,4 @@ export async function circuitJsonToStep(
   // Generate and return STEP file text
   const stepText = repo.toPartFile({ name: productName })
   return normalizeStepNumericExponents(stepText)
-}
-
-function normalizeStepNumericExponents(stepText: string): string {
-  return stepText.replace(
-    /(-?(?:\d+\.\d*|\.\d+|\d+))e([+-]?\d+)/g,
-    (_match, mantissa: string, exponent: string) => `${mantissa}E${exponent}`,
-  )
 }
