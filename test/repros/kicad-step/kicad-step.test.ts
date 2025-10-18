@@ -61,19 +61,6 @@ function computeBounds(mesh: OcctMesh): Bounds | null {
   }
 }
 
-function approxColor(
-  color: [number, number, number] | null | undefined,
-  target: [number, number, number],
-  tolerance = 0.02,
-) {
-  if (!color) return false
-  return (
-    Math.abs(color[0]! - target[0]) <= tolerance &&
-    Math.abs(color[1]! - target[1]) <= tolerance &&
-    Math.abs(color[2]! - target[2]) <= tolerance
-  )
-}
-
 test("kicad-step: resistor fixture renders consistently", async () => {
   const resistorStep = await loadStepFixture("R_0603_1608Metric.step")
   const result = await importStepWithOcct(resistorStep)
