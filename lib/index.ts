@@ -41,6 +41,7 @@ import {
   type Ref,
 } from "stepts"
 import { generateComponentMeshes } from "./mesh-generation"
+import { mergeExternalStepModels } from "./step-model-merger"
 
 export interface CircuitJsonToStepOptions {
   /** Board width in mm (optional if pcb_board is present) */
@@ -500,13 +501,25 @@ export async function circuitJsonToStep(
   // Array to hold all solids (board + optional components)
   const allSolids: Ref<ManifoldSolidBrep>[] = [solid]
 
-  // Generate component mesh if requested
+  let handledComponentIds = new Set<string>()
+
+  if (options.includeComponents && options.includeExternalMeshes) {
+    const mergeResult = await mergeExternalStepModels({
+      repo,
+      circuitJson,
+    })
+    handledComponentIds = mergeResult.handledComponentIds
+    allSolids.push(...mergeResult.solids)
+  }
+
+  // Generate component mesh fallback if requested
   if (options.includeComponents) {
     const componentSolids = await generateComponentMeshes({
       repo,
       circuitJson,
       boardThickness,
       includeExternalMeshes: options.includeExternalMeshes,
+      excludeCadComponentIds: handledComponentIds,
     })
     allSolids.push(...componentSolids)
   }
@@ -514,8 +527,10 @@ export async function circuitJsonToStep(
   // Add presentation/styling for all solids
   const styledItems: Ref<StyledItem>[] = []
 
-  for (const solidRef of allSolids) {
-    const color = repo.add(new ColourRgb("", 0.2, 0.6, 0.2))
+  allSolids.forEach((solidRef, index) => {
+    const isBoard = index === 0
+    const [r, g, b] = isBoard ? [0.2, 0.6, 0.2] : [0.75, 0.75, 0.75]
+    const color = repo.add(new ColourRgb("", r, g, b))
     const fillColor = repo.add(new FillAreaStyleColour("", color))
     const fillStyle = repo.add(new FillAreaStyle("", [fillColor]))
     const surfaceFill = repo.add(new SurfaceStyleFillArea(fillStyle))
@@ -524,7 +539,7 @@ export async function circuitJsonToStep(
     const presStyle = repo.add(new PresentationStyleAssignment([surfaceUsage]))
     const styledItem = repo.add(new StyledItem("", [presStyle], solidRef))
     styledItems.push(styledItem)
-  }
+  })
 
   repo.add(
     new MechanicalDesignGeometricPresentationRepresentation(
@@ -541,5 +556,13 @@ export async function circuitJsonToStep(
   repo.add(new ShapeDefinitionRepresentation(productDefShape, shapeRep))
 
   // Generate and return STEP file text
-  return repo.toPartFile({ name: productName })
+  const stepText = repo.toPartFile({ name: productName })
+  return normalizeStepNumericExponents(stepText)
+}
+
+function normalizeStepNumericExponents(stepText: string): string {
+  return stepText.replace(
+    /(-?(?:\d+\.\d*|\.\d+|\d+))e([+-]?\d+)/g,
+    (_match, mantissa: string, exponent: string) => `${mantissa}E${exponent}`,
+  )
 }

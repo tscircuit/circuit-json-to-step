@@ -29,6 +29,8 @@ export interface MeshGenerationOptions {
   boardThickness: number
   /** Include external model meshes from model_*_url fields (default: false) */
   includeExternalMeshes?: boolean
+  /** Cad component ids already handled by STEP merging */
+  excludeCadComponentIds?: Set<string>
 }
 
 /**
@@ -255,13 +257,24 @@ export async function generateComponentMeshes(
     circuitJson,
     boardThickness,
     includeExternalMeshes = false,
+    excludeCadComponentIds,
   } = options
   const solids: Ref<ManifoldSolidBrep>[] = []
 
   try {
     // Filter circuit JSON and optionally remove model URLs
     const filteredCircuitJson = circuitJson
-      .filter((e) => e.type !== "pcb_board")
+      .filter((e) => {
+        if (e.type === "pcb_board") return false
+        if (
+          e.type === "cad_component" &&
+          e.cad_component_id &&
+          excludeCadComponentIds?.has(e.cad_component_id)
+        ) {
+          return false
+        }
+        return true
+      })
       .map((e) => {
         if (!includeExternalMeshes && e.type === "cad_component") {
           // Remove model_*_url fields to avoid hanging on external model fetches
