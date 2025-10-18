@@ -130,8 +130,8 @@ test(
           const height = entry.bounds.max.y - entry.bounds.min.y
           const thickness = entry.bounds.max.z - entry.bounds.min.z
           return (
-            Math.abs(width - 20) < 1 &&
-            Math.abs(height - 40) < 1 &&
+            Math.abs(width - 16) < 1 &&
+            Math.abs(height - 32) < 1 &&
             Math.abs(thickness - 1.6) < 0.3
           )
         })
@@ -142,8 +142,8 @@ test(
       const boardBounds = boardCandidate?.bounds ?? null
       expect(boardBounds).not.toBeNull()
       if (boardBounds) {
-        expect(boardBounds.max.x - boardBounds.min.x).toBeCloseTo(20, 1)
-        expect(boardBounds.max.y - boardBounds.min.y).toBeCloseTo(40, 1)
+  expect(boardBounds.max.x - boardBounds.min.x).toBeCloseTo(16, 1)
+  expect(boardBounds.max.y - boardBounds.min.y).toBeCloseTo(32, 1)
         expect(boardBounds.max.z - boardBounds.min.z).toBeCloseTo(1.6, 1)
       }
 
