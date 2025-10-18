@@ -14,10 +14,12 @@ import {
   toRadians,
   transformDirection,
   transformPoint,
+  rotateVector,
 } from "./step-model-merger/vector-utils"
 import { readStepFile } from "./step-model-merger/read-step-file"
 import type {
   CadComponent,
+  PcbComponent,
   MergeStepModelOptions,
   MergeStepModelResult,
   MergeTransform,
@@ -28,11 +30,18 @@ export type { MergeStepModelOptions, MergeStepModelResult } from "./step-model-m
 export async function mergeExternalStepModels(
   options: MergeStepModelOptions,
 ): Promise<MergeStepModelResult> {
-  const { repo, circuitJson } = options
+  const { repo, circuitJson, boardThickness } = options
   const cadComponents = (circuitJson as CadComponent[]).filter(
     (item) =>
       item?.type === "cad_component" && typeof item.model_step_url === "string",
   )
+
+  const pcbComponentMap = new Map<string, PcbComponent>()
+  for (const item of circuitJson as (CadComponent | PcbComponent)[]) {
+    if (item?.type === "pcb_component" && item.pcb_component_id) {
+      pcbComponentMap.set(item.pcb_component_id, item)
+    }
+  }
 
   const solids: Ref<ManifoldSolidBrep>[] = []
   const handledComponentIds = new Set<string>()
@@ -48,12 +57,20 @@ export async function mergeExternalStepModels(
         throw new Error("STEP file is empty")
       }
 
+      const pcbComponent = component.pcb_component_id
+        ? pcbComponentMap.get(component.pcb_component_id)
+        : undefined
+      const layer = pcbComponent?.layer?.toLowerCase()
+
       const transform: MergeTransform = {
         translation: asVector3(component.position),
         rotation: asVector3(component.rotation),
       }
 
-      const componentSolids = mergeSingleStepModel(repo, stepText, transform)
+      const componentSolids = mergeSingleStepModel(repo, stepText, transform, {
+        layer,
+        boardThickness,
+      })
       if (componentSolids.length > 0) {
         if (componentId) {
           handledComponentIds.add(componentId)
@@ -72,10 +89,16 @@ export async function mergeExternalStepModels(
   return { solids, handledComponentIds, handledPcbComponentIds }
 }
 
+type PlacementOptions = {
+  layer?: string
+  boardThickness?: number
+}
+
 function mergeSingleStepModel(
   targetRepo: Repository,
   stepText: string,
   transform: MergeTransform,
+  placement?: PlacementOptions,
 ): Ref<ManifoldSolidBrep>[] {
   const sourceRepo = parseRepository(stepText)
   let entries: RepositoryEntry[] = sourceRepo
@@ -85,6 +108,7 @@ function mergeSingleStepModel(
 
   entries = pruneInvalidEntries(entries)
 
+  adjustTransformForPlacement(entries, transform, placement)
   applyTransform(entries, transform)
 
   const idMapping = allocateIds(targetRepo, entries)
@@ -110,6 +134,78 @@ function mergeSingleStepModel(
 }
 
 type RepositoryEntry = readonly [number, any]
+
+function adjustTransformForPlacement(
+  entries: ReadonlyArray<RepositoryEntry>,
+  transform: MergeTransform,
+  placement?: PlacementOptions,
+) {
+  if (!placement) return
+
+  const points: [number, number, number][] = []
+  for (const [, entity] of entries) {
+    if (entity instanceof CartesianPoint) {
+      points.push([entity.x, entity.y, entity.z])
+    }
+  }
+
+  if (!points.length) return
+
+  const rotationRadians = toRadians(transform.rotation)
+
+  let minX = Infinity
+  let minY = Infinity
+  let minZ = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let maxZ = -Infinity
+
+  for (const point of points) {
+    const [x, y, z] = rotateVector(point, rotationRadians)
+    if (x < minX) minX = x
+    if (y < minY) minY = y
+    if (z < minZ) minZ = z
+    if (x > maxX) maxX = x
+    if (y > maxY) maxY = y
+    if (z > maxZ) maxZ = z
+  }
+
+  if (!Number.isFinite(minX)) return
+
+  const center = {
+    x: (minX + maxX) / 2,
+    y: (minY + maxY) / 2,
+    z: (minZ + maxZ) / 2,
+  }
+
+  const normalizedLayer = placement.layer?.toLowerCase() === "bottom" ? "bottom" : "top"
+  const boardThickness = placement.boardThickness ?? 0
+  const halfThickness = boardThickness / 2
+
+  const targetX = transform.translation.x
+  const targetY = transform.translation.y
+  const targetZ = transform.translation.z
+
+  transform.translation.x = targetX - center.x
+  transform.translation.y = targetY - center.y
+
+  if (boardThickness > 0) {
+    const offsetZ = targetZ - halfThickness
+    if (normalizedLayer === "bottom") {
+      transform.translation.z = -maxZ + offsetZ
+      transform.rotation.x = normalizeDegrees(transform.rotation.x + 180)
+    } else {
+      transform.translation.z = boardThickness - minZ + offsetZ
+    }
+  } else {
+    transform.translation.z = targetZ - center.z
+  }
+}
+
+function normalizeDegrees(value: number): number {
+  const wrapped = value % 360
+  return wrapped < 0 ? wrapped + 360 : wrapped
+}
 
 function pruneInvalidEntries(entries: ReadonlyArray<RepositoryEntry>) {
   let remaining = entries.slice()

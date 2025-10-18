@@ -10,6 +10,12 @@ export type CadComponent = {
   rotation?: { x?: number; y?: number; z?: number }
 }
 
+export type PcbComponent = {
+  type: "pcb_component"
+  pcb_component_id?: string
+  layer?: string
+}
+
 export type Vector3 = {
   x: number
   y: number
@@ -30,4 +36,5 @@ export type MergeStepModelResult = {
 export interface MergeStepModelOptions {
   repo: Repository
   circuitJson: CircuitJson
+  boardThickness: number
 }

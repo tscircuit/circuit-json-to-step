@@ -509,6 +509,7 @@ export async function circuitJsonToStep(
     const mergeResult = await mergeExternalStepModels({
       repo,
       circuitJson,
+      boardThickness,
     })
     handledComponentIds = mergeResult.handledComponentIds
     handledPcbComponentIds = mergeResult.handledPcbComponentIds
