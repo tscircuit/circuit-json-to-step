@@ -1,5 +1,5 @@
 import type { CircuitJson } from "circuit-json"
-import type { Triangle as GLTFTriangle } from "circuit-json-to-gltf"
+import type { Triangle as GLTFTriangle, Box3D } from "circuit-json-to-gltf"
 import { convertCircuitJsonTo3D } from "circuit-json-to-gltf"
 import type { Ref } from "stepts"
 import type { Repository } from "stepts"
@@ -115,6 +115,61 @@ function createBoxTriangles(box: {
   ]
 
   return triangles
+}
+
+function rotatePoint(
+  p: { x: number; y: number; z: number },
+  rot?: { x?: number; y?: number; z?: number },
+): { x: number; y: number; z: number } {
+  if (!rot) return { ...p }
+
+  const rx = rot.x ?? 0
+  const ry = rot.y ?? 0
+  const rz = rot.z ?? 0
+
+  // Rotate around X axis
+  let x = p.x
+  let y = p.y * Math.cos(rx) - p.z * Math.sin(rx)
+  let z = p.y * Math.sin(rx) + p.z * Math.cos(rx)
+
+  // Rotate around Y axis
+  const x1 = x * Math.cos(ry) + z * Math.sin(ry)
+  const z1 = -x * Math.sin(ry) + z * Math.cos(ry)
+  x = x1
+  z = z1
+
+  // Rotate around Z axis
+  const x2 = x * Math.cos(rz) - y * Math.sin(rz)
+  const y2 = x * Math.sin(rz) + y * Math.cos(rz)
+  x = x2
+  y = y2
+
+  return { x, y, z }
+}
+
+function transformTrianglesForBox(
+  triangles: GLTFTriangle[],
+  box: Pick<Box3D, "center" | "rotation"> & { meshUrl?: string },
+): GLTFTriangle[] {
+  // For GLTF/GLB/OBJ/STL meshes (meshUrl defined), triangles are in model-local
+  // coordinates and must be rotated and translated to the box center. Board
+  // meshes are already positioned in world coordinates, so we only translate
+  // when a meshUrl is present.
+  const shouldTransformByCenter = Boolean(box.meshUrl)
+
+  return triangles.map((tri) => {
+    const rot = box.rotation
+    const verts = tri.vertices.map((v) => {
+      const vr = rotatePoint(v, rot)
+      return shouldTransformByCenter
+        ? { x: vr.x + box.center.x, y: vr.y + box.center.y, z: vr.z + box.center.z }
+        : vr
+    }) as [typeof tri.vertices[0], typeof tri.vertices[1], typeof tri.vertices[2]]
+
+    const normal = rotatePoint(tri.normal, rot)
+
+    return { vertices: verts, normal }
+  })
 }
 
 /**
@@ -283,14 +338,16 @@ export async function generateComponentMeshes(
       renderBoardTextures: false,
     })
 
-    // Extract or generate triangles from component boxes
+    // Extract triangles from scene boxes, applying position/rotation for
+    // externally loaded meshes. Avoid inventing geometry: use provided GLTF.
     const allTriangles: GLTFTriangle[] = []
-    for (const box of scene3d.boxes) {
+    for (const box of scene3d.boxes as Box3D[]) {
       if (box.mesh && "triangles" in box.mesh) {
-        allTriangles.push(...box.mesh.triangles)
+        const transformed = transformTrianglesForBox(box.mesh.triangles, box)
+        allTriangles.push(...transformed)
       } else {
-        // Generate simple box mesh for this component
-        const boxTriangles = createBoxTriangles(box)
+        // Fallback: generate a simple box when no mesh is provided in the GLTF scene
+        const boxTriangles = createBoxTriangles(box as any)
         allTriangles.push(...boxTriangles)
       }
     }
