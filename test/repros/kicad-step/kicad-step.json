@@ -52,6 +52,13 @@
     "ftype": "simple_push_button"
   },
   {
+    "type": "source_component",
+    "source_component_id": "source_component_pushbutton",
+    "name": "PB1",
+    "supplier_part_numbers": {},
+    "ftype": "simple_push_button"
+  },
+  {
     "type": "pcb_component",
     "pcb_component_id": "pcb_component_switch",
     "source_component_id": "source_component_switch",
@@ -76,6 +83,16 @@
     "pcb_component_id": "pcb_component_switch_3",
     "source_component_id": "source_component_switch",
     "center": { "x": 14, "y": 10 },
+    "width": 6,
+    "height": 6,
+    "rotation": 0,
+    "layer": "top"
+  },
+  {
+    "type": "pcb_component",
+    "pcb_component_id": "pcb_component_pushbutton",
+    "source_component_id": "source_component_pushbutton",
+    "center": { "x": 10, "y": 36 },
     "width": 6,
     "height": 6,
     "rotation": 0,
@@ -125,6 +142,15 @@
     "position": { "x": 14, "y": 20, "z": 0.8 },
     "rotation": { "x": 0, "y": 0, "z": 0 },
     "model_step_url": "test/fixtures/kicad-models/Panasonic_EVQPUJ_EVQPUA.step"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_component_pushbutton",
+    "pcb_component_id": "pcb_component_pushbutton",
+    "source_component_id": "source_component_pushbutton",
+    "position": { "x": 10, "y": 36, "z": 0.8 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "model_step_url": "test/fixtures/kicad-models/SW_Push_1P1T_NO_CK_KMR2.step"
   },
   {
     "type": "cad_component",
