@@ -197,9 +197,7 @@ export function mergeStepFile(
     // Find all ManifoldSolidBrep entities (these are the main solid bodies)
     const entries = sourceRepo.entries()
     for (const [entityId, entity] of entries) {
-      if (entity.type === "MANIFOLD_SOLID_BREP") {
-        console.log(`Found MANIFOLD_SOLID_BREP at #${entityId}`)
-        
+      if (entity.type === "MANIFOLD_SOLID_BREP") {        
         // Get the solid
         const solid = entity as unknown as ManifoldSolidBrepClass
         
