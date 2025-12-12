@@ -295,6 +295,7 @@ export async function generateComponentMeshes(
             model_stl_url: undefined,
             model_glb_url: undefined,
             model_gltf_url: undefined,
+            model_step_url: undefined,
           }
         }
         return e
