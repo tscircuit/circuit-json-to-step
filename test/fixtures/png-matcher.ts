@@ -75,14 +75,24 @@ async function toMatchPngSnapshot(
     process.env["PNG_SNAPSHOT_AA_TOLERANCE"] ?? 4,
   )
 
-  const result: any = await looksSame(Buffer.from(buf), existingSnapshot, {
-    strict,
-    tolerance,
-    antialiasingTolerance,
+  // Build options conditionally: tolerance and strict cannot be used together
+  const looksSameOptions: any = {
     ignoreCaret: true,
     shouldCluster: true,
     clustersSize: 10,
-  })
+  }
+  if (strict) {
+    looksSameOptions.strict = true
+  } else {
+    looksSameOptions.tolerance = tolerance
+    looksSameOptions.antialiasingTolerance = antialiasingTolerance
+  }
+
+  const result: any = await looksSame(
+    Buffer.from(buf),
+    existingSnapshot,
+    looksSameOptions,
+  )
 
   if (result.equal) {
     return {
@@ -116,15 +126,22 @@ async function toMatchPngSnapshot(
   }
 
   const diffPath = filePath.replace(/\.snap\.png$/, ".diff.png")
-  await looksSame.createDiff({
+
+  // Build diff options conditionally: tolerance and strict cannot be used together
+  const diffOptions: any = {
     reference: existingSnapshot,
     current: Buffer.from(buf),
     diff: diffPath,
     highlightColor: "#ff00ff",
-    strict,
-    tolerance,
-    antialiasingTolerance,
-  })
+  }
+  if (strict) {
+    diffOptions.strict = true
+  } else {
+    diffOptions.tolerance = tolerance
+    diffOptions.antialiasingTolerance = antialiasingTolerance
+  }
+
+  await looksSame.createDiff(diffOptions)
 
   const threshold = DEFAULT_DIFF_PERCENTAGE
   if (diffPercentage <= threshold) {
