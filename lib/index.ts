@@ -62,7 +62,7 @@ export interface CircuitJsonToStepOptions {
    * If a URL is found here, the content is used directly instead of fetching.
    * Useful for tests that need to load local files.
    */
-  stepContents?: Record<string, string>
+  fsMap?: Record<string, string>
 }
 
 /**
@@ -516,7 +516,7 @@ export async function circuitJsonToStep(
       repo,
       circuitJson,
       boardThickness,
-      stepContents: options.stepContents,
+      fsMap: options.fsMap,
     })
     handledComponentIds = mergeResult.handledComponentIds
     handledPcbComponentIds = mergeResult.handledPcbComponentIds

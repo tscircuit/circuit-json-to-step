@@ -9,28 +9,32 @@ type CadComponent = {
   model_step_url?: string
 }
 
+function isFilePath(value: string): boolean {
+  return !/^https?:\/\//i.test(value)
+}
+
 /**
- * Loads all STEP files referenced by cad_components in circuit JSON.
- * Returns a map of URL/path to file content.
+ * Loads all local STEP files referenced by cad_components in circuit JSON.
+ * Returns a map of file path to file content.
  */
 export async function loadStepFilesFromCircuitJson(
   circuitJson: unknown[],
 ): Promise<Record<string, string>> {
   const stepContents: Record<string, string> = {}
-  const urls = new Set<string>()
+  const stepFilePaths = new Set<string>()
 
   for (const item of circuitJson as CadComponent[]) {
-    if (item?.type === "cad_component" && item.model_step_url) {
-      urls.add(item.model_step_url)
+    if (
+      item?.type === "cad_component" &&
+      item.model_step_url &&
+      isFilePath(item.model_step_url)
+    ) {
+      stepFilePaths.add(item.model_step_url)
     }
   }
 
-  for (const url of urls) {
-    // Skip HTTP URLs - those will be fetched by the lib
-    if (/^https?:\/\//i.test(url)) continue
-
-    // Load local file using Node
-    stepContents[url] = await readFile(url, "utf8")
+  for (const filePath of stepFilePaths) {
+    stepContents[filePath] = await readFile(filePath, "utf8")
   }
 
   return stepContents

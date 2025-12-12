@@ -33,7 +33,7 @@ export type {
 export async function mergeExternalStepModels(
   options: MergeStepModelOptions,
 ): Promise<MergeStepModelResult> {
-  const { repo, circuitJson, boardThickness, stepContents } = options
+  const { repo, circuitJson, boardThickness, fsMap } = options
   const cadComponents = (circuitJson as CadComponent[]).filter(
     (item) =>
       item?.type === "cad_component" && typeof item.model_step_url === "string",
@@ -55,7 +55,7 @@ export async function mergeExternalStepModels(
     const stepUrl = component.model_step_url!
 
     try {
-      const stepText = stepContents?.[stepUrl] ?? (await readStepFile(stepUrl))
+      const stepText = fsMap?.[stepUrl] ?? (await readStepFile(stepUrl))
       if (!stepText.trim()) {
         throw new Error("STEP file is empty")
       }
