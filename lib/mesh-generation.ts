@@ -283,6 +283,11 @@ export async function generateComponentMeshes(
         ) {
           return false
         }
+        // Skip cad_components that have model_step_url
+        // (they should be handled by mergeExternalStepModels, not mesh generation)
+        if (e.type === "cad_component" && e.model_step_url) {
+          return false
+        }
         return true
       })
       .map((e) => {
@@ -295,7 +300,6 @@ export async function generateComponentMeshes(
             model_stl_url: undefined,
             model_glb_url: undefined,
             model_gltf_url: undefined,
-            model_step_url: undefined,
           }
         }
         return e
