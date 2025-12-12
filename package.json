@@ -12,10 +12,11 @@
     "format:check": "biome format ."
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
     "@types/bun": "latest",
     "circuit-json": "^0.0.286",
-    "occt-import-js": "^0.0.23",
     "looks-same": "^10.0.1",
+    "occt-import-js": "^0.0.23",
     "poppygl": "^0.0.13",
     "stepts": "^0.0.1",
     "tsup": "^8.5.0"

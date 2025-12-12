@@ -25,7 +25,10 @@ import type {
   MergeTransform,
 } from "./step-model-merger/types"
 
-export type { MergeStepModelOptions, MergeStepModelResult } from "./step-model-merger/types"
+export type {
+  MergeStepModelOptions,
+  MergeStepModelResult,
+} from "./step-model-merger/types"
 
 export async function mergeExternalStepModels(
   options: MergeStepModelOptions,
@@ -178,7 +181,8 @@ function adjustTransformForPlacement(
     z: (minZ + maxZ) / 2,
   }
 
-  const normalizedLayer = placement.layer?.toLowerCase() === "bottom" ? "bottom" : "top"
+  const normalizedLayer =
+    placement.layer?.toLowerCase() === "bottom" ? "bottom" : "top"
   const boardThickness = placement.boardThickness ?? 0
   const halfThickness = boardThickness / 2
 

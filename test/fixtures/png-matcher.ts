@@ -19,9 +19,7 @@ function resolveSnapshotPath(
   const snapshotDir = path.join(dirname, "__snapshots__")
   const baseName =
     pngName ??
-    path
-      .basename(testPathOriginal)
-      .replace(/\.(test|spec)\.[mc]?[tj]sx?$/i, "")
+    path.basename(testPathOriginal).replace(/\.(test|spec)\.[mc]?[tj]sx?$/i, "")
   const filePath = path.join(snapshotDir, `${baseName}.snap.png`)
   return { snapshotDir, filePath, baseName }
 }
@@ -54,7 +52,8 @@ async function toMatchPngSnapshot(
     if (shouldUpdate) {
       fs.writeFileSync(filePath, buf)
       return {
-        message: () => `PNG snapshot created: ${path.relative(process.cwd(), filePath)}`,
+        message: () =>
+          `PNG snapshot created: ${path.relative(process.cwd(), filePath)}`,
         pass: true,
       }
     }
