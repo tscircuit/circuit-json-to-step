@@ -37,4 +37,10 @@ export interface MergeStepModelOptions {
   repo: Repository
   circuitJson: CircuitJson
   boardThickness: number
+  /**
+   * Pre-loaded STEP file contents, keyed by URL/path.
+   * If a URL is found here, the content is used directly instead of fetching.
+   * Useful for tests that need to load local files.
+   */
+  stepContents?: Record<string, string>
 }

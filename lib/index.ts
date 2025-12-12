@@ -57,6 +57,12 @@ export interface CircuitJsonToStepOptions {
   includeComponents?: boolean
   /** Include external model meshes from model_*_url fields (default: false). Only applicable when includeComponents is true. */
   includeExternalMeshes?: boolean
+  /**
+   * Pre-loaded STEP file contents, keyed by URL/path.
+   * If a URL is found here, the content is used directly instead of fetching.
+   * Useful for tests that need to load local files.
+   */
+  stepContents?: Record<string, string>
 }
 
 /**
@@ -510,6 +516,7 @@ export async function circuitJsonToStep(
       repo,
       circuitJson,
       boardThickness,
+      stepContents: options.stepContents,
     })
     handledComponentIds = mergeResult.handledComponentIds
     handledPcbComponentIds = mergeResult.handledPcbComponentIds
