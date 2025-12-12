@@ -283,6 +283,11 @@ export async function generateComponentMeshes(
         ) {
           return false
         }
+        // Skip cad_components that have model_step_url
+        // (they should be handled by mergeExternalStepModels, not mesh generation)
+        if (e.type === "cad_component" && e.model_step_url) {
+          return false
+        }
         return true
       })
       .map((e) => {
