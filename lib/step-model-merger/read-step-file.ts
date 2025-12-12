@@ -1,7 +1,3 @@
-import { promises as fs } from "node:fs"
-import path from "node:path"
-import { fileURLToPath } from "node:url"
-
 export async function readStepFile(modelUrl: string): Promise<string> {
   if (/^https?:\/\//i.test(modelUrl)) {
     const globalFetch = (globalThis as any).fetch as
@@ -17,7 +13,10 @@ export async function readStepFile(modelUrl: string): Promise<string> {
     return await res.text()
   }
 
+  const fs = await import("node:fs/promises")
+  const path = await import("node:path")
   if (modelUrl.startsWith("file://")) {
+    const { fileURLToPath } = await import("node:url")
     const filePath = fileURLToPath(modelUrl)
     return await fs.readFile(filePath, "utf8")
   }
