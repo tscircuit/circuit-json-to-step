@@ -37,4 +37,10 @@ export interface MergeStepModelOptions {
   repo: Repository
   circuitJson: CircuitJson
   boardThickness: number
+  /**
+   * Pre-loaded STEP file contents, keyed by file path.
+   * If a path is found here, the content is used directly instead of reading from disk.
+   * Useful for browser environments where fs is not available.
+   */
+  fsMap?: Record<string, string>
 }

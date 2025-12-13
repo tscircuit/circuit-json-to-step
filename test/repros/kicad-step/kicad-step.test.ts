@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import type { OcctMesh } from "../../utils/occt/importer"
+import { loadStepFilesFromCircuitJson } from "../../utils/load-step-files"
 import { parseRepository, ManifoldSolidBrep } from "stepts"
 import circuitJson from "./kicad-step.json"
 
@@ -90,10 +91,12 @@ test("kicad-step: switch fixture renders consistently", async () => {
 }, 30000)
 
 test("kicad-step: merges KiCad STEP models referenced via model_step_url", async () => {
+  const fsMap = await loadStepFilesFromCircuitJson(circuitJson)
   const stepText = await circuitJsonToStep(circuitJson as any, {
     includeComponents: true,
     includeExternalMeshes: true,
     productName: "KiCadStepMerge",
+    fsMap,
   })
 
   expect(stepText).toContain("KiCadStepMerge")
