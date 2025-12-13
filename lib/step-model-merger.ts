@@ -184,7 +184,6 @@ function adjustTransformForPlacement(
   const normalizedLayer =
     placement.layer?.toLowerCase() === "bottom" ? "bottom" : "top"
   const boardThickness = placement.boardThickness ?? 0
-  const halfThickness = boardThickness / 2
 
   const targetX = transform.translation.x
   const targetY = transform.translation.y
@@ -194,12 +193,16 @@ function adjustTransformForPlacement(
   transform.translation.y = targetY - center.y
 
   if (boardThickness > 0) {
-    const offsetZ = targetZ - halfThickness
+    // targetZ is an offset from the board surface (0 = flush with surface)
     if (normalizedLayer === "bottom") {
-      transform.translation.z = -maxZ + offsetZ
+      // Bottom layer: component bottom at z=0, pointing downward
+      // Place so maxZ aligns with z=0, then apply targetZ offset
+      transform.translation.z = -maxZ + targetZ
       transform.rotation.x = normalizeDegrees(transform.rotation.x + 180)
     } else {
-      transform.translation.z = boardThickness - minZ + offsetZ
+      // Top layer: component bottom at z=boardThickness
+      // Place so minZ aligns with boardThickness, then apply targetZ offset
+      transform.translation.z = boardThickness - minZ + targetZ
     }
   } else {
     transform.translation.z = targetZ - center.z
