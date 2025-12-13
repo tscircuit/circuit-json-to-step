@@ -530,7 +530,10 @@ export async function circuitJsonToStep(
     const hasUnhandledComponents = circuitJson.some((item) => {
       if (item.type === "cad_component") {
         // Skip if already handled by STEP merging
-        if (item.cad_component_id && handledComponentIds.has(item.cad_component_id)) {
+        if (
+          item.cad_component_id &&
+          handledComponentIds.has(item.cad_component_id)
+        ) {
           return false
         }
         // Skip if it has model_step_url (should have been handled, or will fail anyway)
@@ -542,7 +545,10 @@ export async function circuitJsonToStep(
       }
       if (item.type === "pcb_component") {
         // Skip if already handled
-        if (item.pcb_component_id && handledPcbComponentIds.has(item.pcb_component_id)) {
+        if (
+          item.pcb_component_id &&
+          handledPcbComponentIds.has(item.pcb_component_id)
+        ) {
           return false
         }
         // pcb_components without corresponding handled cad_component need mesh generation
