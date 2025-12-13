@@ -524,16 +524,44 @@ export async function circuitJsonToStep(
   }
 
   // Generate component mesh fallback if requested
+  // Only call mesh generation if there are components that weren't handled by STEP merging
   if (options.includeComponents) {
-    const componentSolids = await generateComponentMeshes({
-      repo,
-      circuitJson,
-      boardThickness,
-      includeExternalMeshes: options.includeExternalMeshes,
-      excludeCadComponentIds: handledComponentIds,
-      excludePcbComponentIds: handledPcbComponentIds,
+    // Check if there are any cad_components without model_step_url that need mesh generation
+    const hasUnhandledComponents = circuitJson.some((item) => {
+      if (item.type === "cad_component") {
+        // Skip if already handled by STEP merging
+        if (item.cad_component_id && handledComponentIds.has(item.cad_component_id)) {
+          return false
+        }
+        // Skip if it has model_step_url (should have been handled, or will fail anyway)
+        if (item.model_step_url) {
+          return false
+        }
+        // This component needs mesh generation
+        return true
+      }
+      if (item.type === "pcb_component") {
+        // Skip if already handled
+        if (item.pcb_component_id && handledPcbComponentIds.has(item.pcb_component_id)) {
+          return false
+        }
+        // pcb_components without corresponding handled cad_component need mesh generation
+        return true
+      }
+      return false
     })
-    allSolids.push(...componentSolids)
+
+    if (hasUnhandledComponents) {
+      const componentSolids = await generateComponentMeshes({
+        repo,
+        circuitJson,
+        boardThickness,
+        includeExternalMeshes: options.includeExternalMeshes,
+        excludeCadComponentIds: handledComponentIds,
+        excludePcbComponentIds: handledPcbComponentIds,
+      })
+      allSolids.push(...componentSolids)
+    }
   }
 
   // Add presentation/styling for all solids
