@@ -1,0 +1,70 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_1",
+    "width": 12,
+    "height": 8,
+    "thickness": 1.6,
+    "center": { "x": 6, "y": 4 }
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_1",
+    "hole_shape": "circle",
+    "hole_diameter": 1.0,
+    "x": 2,
+    "y": 2
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "source_component_1",
+    "name": "R1",
+    "supplier_part_numbers": {},
+    "ftype": "simple_resistor"
+  },
+  {
+    "type": "pcb_component",
+    "pcb_component_id": "pcb_component_1",
+    "source_component_id": "source_component_1",
+    "center": { "x": 4, "y": 4 },
+    "width": 1.6,
+    "height": 0.8,
+    "layer": "top",
+    "rotation": 0
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_component_1",
+    "pcb_component_id": "pcb_component_1",
+    "source_component_id": "source_component_1",
+    "position": { "x": 4, "y": 4, "z": 1.6 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "model_step_url": "test/fixtures/kicad-models/R_0603_1608Metric.step"
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "source_component_2",
+    "name": "SW1",
+    "supplier_part_numbers": {},
+    "ftype": "simple_push_button"
+  },
+  {
+    "type": "pcb_component",
+    "pcb_component_id": "pcb_component_2",
+    "source_component_id": "source_component_2",
+    "center": { "x": 9, "y": 4 },
+    "width": 4.2,
+    "height": 2.8,
+    "layer": "top",
+    "rotation": 0
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_component_2",
+    "pcb_component_id": "pcb_component_2",
+    "source_component_id": "source_component_2",
+    "position": { "x": 9, "y": 4, "z": 1.6 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "model_step_url": "test/fixtures/kicad-models/SW_Push_1P1T_NO_CK_KMR2.step"
+  }
+]
