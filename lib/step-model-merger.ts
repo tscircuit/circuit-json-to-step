@@ -203,8 +203,10 @@ function adjustTransformForPlacement(
 
   if (isThroughHoleComponent) {
     // Place model's z=0 at board top surface.
-    // position.z = 0 means the component sits directly on the board top.
-    transform.translation.z = targetZ + boardThickness
+    // For through-hole components, the flange should always sit at board top (z=boardThickness),
+    // regardless of position.z from circuit JSON (which may include absolute coordinates or offsets
+    // that shouldn't affect the flange placement).
+    transform.translation.z = boardThickness
   }
 
   if (!isThroughHoleComponent && boardThickness > 0) {
