@@ -527,14 +527,14 @@ export async function circuitJsonToStep(
   // Only call mesh generation if there are components that need it
   if (options.includeComponents) {
     // Build set of pcb_component_ids covered by cad_components with model_step_url
-    const pcbIdsCoveredByStepUrl = new Set<string>()
+    const pcbComponentIdsWithStepUrl = new Set<string>()
     for (const item of circuitJson) {
       if (
         item.type === "cad_component" &&
         item.model_step_url &&
         item.pcb_component_id
       ) {
-        pcbIdsCoveredByStepUrl.add(item.pcb_component_id)
+        pcbComponentIdsWithStepUrl.add(item.pcb_component_id)
       }
     }
 
@@ -553,7 +553,7 @@ export async function circuitJsonToStep(
         // Skip if this cad_component's pcb is covered by another cad_component with STEP URL
         if (
           item.pcb_component_id &&
-          pcbIdsCoveredByStepUrl.has(item.pcb_component_id)
+          pcbComponentIdsWithStepUrl.has(item.pcb_component_id)
         ) {
           return false
         }
@@ -571,7 +571,7 @@ export async function circuitJsonToStep(
         // Skip if covered by a cad_component with model_step_url
         if (
           item.pcb_component_id &&
-          pcbIdsCoveredByStepUrl.has(item.pcb_component_id)
+          pcbComponentIdsWithStepUrl.has(item.pcb_component_id)
         ) {
           return false
         }
@@ -588,7 +588,7 @@ export async function circuitJsonToStep(
         includeExternalMeshes: options.includeExternalMeshes,
         excludeCadComponentIds: handledComponentIds,
         excludePcbComponentIds: handledPcbComponentIds,
-        pcbIdsCoveredByStepUrl,
+        pcbComponentIdsWithStepUrl,
       })
       allSolids.push(...componentSolids)
     }

@@ -34,7 +34,7 @@ export interface MeshGenerationOptions {
   /** PCB component ids already handled by STEP merging */
   excludePcbComponentIds?: Set<string>
   /** PCB component ids covered by cad_components with model_step_url */
-  pcbIdsCoveredByStepUrl?: Set<string>
+  pcbComponentIdsWithStepUrl?: Set<string>
 }
 
 /**
@@ -263,7 +263,7 @@ export async function generateComponentMeshes(
     includeExternalMeshes = false,
     excludeCadComponentIds,
     excludePcbComponentIds,
-    pcbIdsCoveredByStepUrl,
+    pcbComponentIdsWithStepUrl,
   } = options
   const solids: Ref<ManifoldSolidBrep>[] = []
   try {
@@ -294,7 +294,7 @@ export async function generateComponentMeshes(
         if (
           e.type === "cad_component" &&
           e.pcb_component_id &&
-          pcbIdsCoveredByStepUrl?.has(e.pcb_component_id)
+          pcbComponentIdsWithStepUrl?.has(e.pcb_component_id)
         ) {
           return false
         }
