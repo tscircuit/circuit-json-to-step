@@ -191,25 +191,20 @@ function adjustTransformForPlacement(
 
   // Check if this is a through-hole component (model spans both positive and negative Z)
   // Through-hole components have their z=0 as the natural reference point (e.g., flange position)
-  // Use a tolerance to avoid floating point precision issues (e.g., -2.78e-17 being treated as negative)
-  const THROUGH_HOLE_Z_TOLERANCE = 0.1 // mm
+  // Use a small tolerance to avoid floating point precision issues (e.g., -2.78e-17 being treated as negative)
+  // but not so large that it excludes real geometry (e.g., MachineContactMedium has maxZ = 0.083mm)
+  const THROUGH_HOLE_Z_TOLERANCE = 0.001 // 1 micrometer - filters floating point noise but keeps real geometry
   const isThroughHoleComponent =
     minZ < -THROUGH_HOLE_Z_TOLERANCE && maxZ > THROUGH_HOLE_Z_TOLERANCE
 
+  // Center X/Y by bounding box for all components
+  transform.translation.x = targetX - center.x
+  transform.translation.y = targetY - center.y
+
   if (isThroughHoleComponent) {
-    // For through-hole components, use model's origin (0,0,0) as the reference point,
-    // NOT the bounding box center. The model's origin should be at the pin axis.
-    // This is important for asymmetric models like MachineContactLarge.
-    transform.translation.x = targetX
-    transform.translation.y = targetY
     // Place model's z=0 at board top surface.
     // position.z = 0 means the component sits directly on the board top.
-    // Any non-zero position.z is treated as an additional offset (e.g., for standoffs).
     transform.translation.z = targetZ + boardThickness
-  } else {
-    // For SMD components, center by bounding box
-    transform.translation.x = targetX - center.x
-    transform.translation.y = targetY - center.y
   }
 
   if (!isThroughHoleComponent && boardThickness > 0) {
