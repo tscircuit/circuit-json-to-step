@@ -631,5 +631,3 @@ export async function circuitJsonToStep(
   const stepText = repo.toPartFile({ name: productName })
   return normalizeStepNumericExponents(stepText)
 }
-
-export { VERSION } from "./version"
