@@ -189,18 +189,30 @@ function adjustTransformForPlacement(
   const targetY = transform.translation.y
   const targetZ = transform.translation.z
 
-  transform.translation.x = targetX - center.x
-  transform.translation.y = targetY - center.y
-
   // Check if this is a through-hole component (model spans both positive and negative Z)
   // Through-hole components have their z=0 as the natural reference point (e.g., flange position)
-  const isThroughHoleComponent = minZ < 0 && maxZ > 0
+  // Use a tolerance to avoid floating point precision issues (e.g., -2.78e-17 being treated as negative)
+  const THROUGH_HOLE_Z_TOLERANCE = 0.1 // mm
+  const isThroughHoleComponent =
+    minZ < -THROUGH_HOLE_Z_TOLERANCE && maxZ > THROUGH_HOLE_Z_TOLERANCE
 
   if (isThroughHoleComponent) {
-    // For through-hole components, use the position.z directly as the offset from board top
-    // The model's z=0 is the reference point, so we just add board thickness to get to top surface
+    // For through-hole components, use model's origin (0,0,0) as the reference point,
+    // NOT the bounding box center. The model's origin should be at the pin axis.
+    // This is important for asymmetric models like MachineContactLarge.
+    transform.translation.x = targetX
+    transform.translation.y = targetY
+    // Place model's z=0 at board top surface.
+    // position.z = 0 means the component sits directly on the board top.
+    // Any non-zero position.z is treated as an additional offset (e.g., for standoffs).
     transform.translation.z = targetZ + boardThickness
-  } else if (boardThickness > 0) {
+  } else {
+    // For SMD components, center by bounding box
+    transform.translation.x = targetX - center.x
+    transform.translation.y = targetY - center.y
+  }
+
+  if (!isThroughHoleComponent && boardThickness > 0) {
     const halfThickness = boardThickness / 2
     const offsetZ = targetZ - halfThickness
     if (normalizedLayer === "bottom") {
@@ -209,9 +221,11 @@ function adjustTransformForPlacement(
     } else {
       transform.translation.z = boardThickness - minZ + offsetZ
     }
-  } else {
+  } else if (!isThroughHoleComponent) {
+    // Only apply center-based Z for non-through-hole components without board thickness
     transform.translation.z = targetZ - center.z
   }
+  // For through-hole components, Z is already set above
 }
 
 function normalizeDegrees(value: number): number {
