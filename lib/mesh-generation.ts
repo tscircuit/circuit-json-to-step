@@ -33,6 +33,8 @@ export interface MeshGenerationOptions {
   excludeCadComponentIds?: Set<string>
   /** PCB component ids already handled by STEP merging */
   excludePcbComponentIds?: Set<string>
+  /** PCB component ids covered by cad_components with model_step_url */
+  pcbComponentIdsWithStepUrl?: Set<string>
 }
 
 /**
@@ -261,9 +263,9 @@ export async function generateComponentMeshes(
     includeExternalMeshes = false,
     excludeCadComponentIds,
     excludePcbComponentIds,
+    pcbComponentIdsWithStepUrl,
   } = options
   const solids: Ref<ManifoldSolidBrep>[] = []
-
   try {
     // Filter circuit JSON and optionally remove model URLs
     const filteredCircuitJson = circuitJson
@@ -286,6 +288,14 @@ export async function generateComponentMeshes(
         // Skip cad_components that have model_step_url
         // (they should be handled by mergeExternalStepModels, not mesh generation)
         if (e.type === "cad_component" && e.model_step_url) {
+          return false
+        }
+        // Skip cad_components whose pcb_component_id is covered by another cad_component with STEP URL
+        if (
+          e.type === "cad_component" &&
+          e.pcb_component_id &&
+          pcbComponentIdsWithStepUrl?.has(e.pcb_component_id)
+        ) {
           return false
         }
         return true
