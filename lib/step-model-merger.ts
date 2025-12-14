@@ -184,7 +184,6 @@ function adjustTransformForPlacement(
   const normalizedLayer =
     placement.layer?.toLowerCase() === "bottom" ? "bottom" : "top"
   const boardThickness = placement.boardThickness ?? 0
-  const halfThickness = boardThickness / 2
 
   const targetX = transform.translation.x
   const targetY = transform.translation.y
@@ -193,7 +192,16 @@ function adjustTransformForPlacement(
   transform.translation.x = targetX - center.x
   transform.translation.y = targetY - center.y
 
-  if (boardThickness > 0) {
+  // Check if this is a through-hole component (model spans both positive and negative Z)
+  // Through-hole components have their z=0 as the natural reference point (e.g., flange position)
+  const isThroughHoleComponent = minZ < 0 && maxZ > 0
+
+  if (isThroughHoleComponent) {
+    // For through-hole components, use the position.z directly as the offset from board top
+    // The model's z=0 is the reference point, so we just add board thickness to get to top surface
+    transform.translation.z = targetZ + boardThickness
+  } else if (boardThickness > 0) {
+    const halfThickness = boardThickness / 2
     const offsetZ = targetZ - halfThickness
     if (normalizedLayer === "bottom") {
       transform.translation.z = -maxZ + offsetZ
