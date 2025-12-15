@@ -232,6 +232,116 @@
         .show-more:hover {
             color: #004499;
         }
+
+        .step-models-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .step-models-section h3 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .step-models-hint {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .step-models-list {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+        }
+
+        .step-model-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: white;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .step-model-item.loaded {
+            border-color: #28a745;
+            background: #f0fff2;
+        }
+
+        .step-model-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #333;
+        }
+
+        .step-model-status {
+            margin-left: 10px;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+
+        .step-model-status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .step-model-status.loaded {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .step-upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .step-upload-area:hover {
+            border-color: #2ecc71;
+            background: #f8fff9;
+        }
+
+        .step-upload-area.dragover {
+            border-color: #27ae60;
+            background: #e8ffeb;
+        }
+
+        .step-upload-area .upload-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .step-upload-area .upload-text {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 4px;
+        }
+
+        .step-upload-area .upload-hint {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .step-models-status {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -262,6 +372,19 @@
                 <input type="checkbox" id="includeExternalMeshes">
                 <label for="includeExternalMeshes">Include external STEP models (requires Include components)</label>
             </div>
+        </div>
+
+        <div class="step-models-section" id="stepModelsSection" style="display: none;">
+            <h3>External STEP Models</h3>
+            <p class="step-models-hint">Your circuit JSON references external STEP models. Upload them here or they will be fetched from URLs.</p>
+            <div class="step-models-list" id="stepModelsList"></div>
+            <div class="step-upload-area" id="stepUploadArea">
+                <div class="upload-icon">📦</div>
+                <div class="upload-text">Drag & Drop STEP files here</div>
+                <div class="upload-hint">or click to browse (.step, .stp)</div>
+            </div>
+            <input type="file" id="stepFileInput" accept=".step,.stp" multiple>
+            <div class="step-models-status" id="stepModelsStatus"></div>
         </div>
 
         <div class="actions">

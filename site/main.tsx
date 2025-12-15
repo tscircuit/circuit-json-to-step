@@ -16,8 +16,22 @@ const includeExternalMeshesCheckbox = document.getElementById(
   "includeExternalMeshes",
 )! as HTMLInputElement
 
+// STEP models upload elements
+const stepModelsSection = document.getElementById("stepModelsSection")!
+const stepModelsList = document.getElementById("stepModelsList")!
+const stepUploadArea = document.getElementById("stepUploadArea")!
+const stepFileInput = document.getElementById(
+  "stepFileInput",
+)! as HTMLInputElement
+const stepModelsStatus = document.getElementById("stepModelsStatus")!
+
 let currentFile: File | null = null
 let circuitJson: any = null
+
+// Map of URL/path -> STEP file content
+let stepFilesMap: Record<string, string> = {}
+// List of required STEP model URLs/paths from circuit JSON
+let requiredStepModels: string[] = []
 
 // Handle click on upload area
 uploadArea.addEventListener("click", () => {
@@ -62,13 +76,117 @@ includeComponentsCheckbox.addEventListener("change", () => {
   if (!includeComponentsCheckbox.checked) {
     includeExternalMeshesCheckbox.checked = false
     includeExternalMeshesCheckbox.disabled = true
+    stepModelsSection.style.display = "none"
   } else {
     includeExternalMeshesCheckbox.disabled = false
   }
 })
 
+// Handle includeExternalMeshes checkbox change
+includeExternalMeshesCheckbox.addEventListener("change", () => {
+  if (includeExternalMeshesCheckbox.checked && requiredStepModels.length > 0) {
+    stepModelsSection.style.display = "block"
+    updateStepModelsList()
+  } else {
+    stepModelsSection.style.display = "none"
+  }
+})
+
 // Initialize external meshes checkbox state
 includeExternalMeshesCheckbox.disabled = true
+
+// STEP file upload handlers
+stepUploadArea.addEventListener("click", () => {
+  stepFileInput.click()
+})
+
+stepFileInput.addEventListener("change", (e) => {
+  const target = e.target as HTMLInputElement
+  if (target.files) {
+    handleStepFiles(Array.from(target.files))
+  }
+})
+
+stepUploadArea.addEventListener("dragover", (e) => {
+  e.preventDefault()
+  stepUploadArea.classList.add("dragover")
+})
+
+stepUploadArea.addEventListener("dragleave", () => {
+  stepUploadArea.classList.remove("dragover")
+})
+
+stepUploadArea.addEventListener("drop", (e) => {
+  e.preventDefault()
+  stepUploadArea.classList.remove("dragover")
+  if (e.dataTransfer?.files) {
+    handleStepFiles(Array.from(e.dataTransfer.files))
+  }
+})
+
+// Handle uploaded STEP files
+async function handleStepFiles(files: File[]) {
+  for (const file of files) {
+    const content = await file.text()
+    const filename = file.name.toLowerCase()
+
+    // Try to match with required models by filename
+    for (const modelPath of requiredStepModels) {
+      const modelFilename = modelPath.split(/[/\\]/).pop()?.toLowerCase() || ""
+      if (
+        modelFilename === filename ||
+        modelFilename.replace(/\.step$|\.stp$/, "") ===
+          filename.replace(/\.step$|\.stp$/, "")
+      ) {
+        stepFilesMap[modelPath] = content
+      }
+    }
+  }
+  updateStepModelsList()
+}
+
+// Extract STEP model URLs from circuit JSON
+function extractStepModelUrls(json: any[]): string[] {
+  const urls: string[] = []
+  for (const item of json) {
+    if (item?.type === "cad_component" && item.model_step_url) {
+      if (!urls.includes(item.model_step_url)) {
+        urls.push(item.model_step_url)
+      }
+    }
+  }
+  return urls
+}
+
+// Update the STEP models list UI
+function updateStepModelsList() {
+  stepModelsList.innerHTML = ""
+  let loadedCount = 0
+
+  for (const modelPath of requiredStepModels) {
+    const filename = modelPath.split(/[/\\]/).pop() || modelPath
+    const isLoaded = modelPath in stepFilesMap
+    if (isLoaded) loadedCount++
+
+    const item = document.createElement("div")
+    item.className = `step-model-item${isLoaded ? " loaded" : ""}`
+
+    const nameSpan = document.createElement("span")
+    nameSpan.className = "step-model-name"
+    nameSpan.textContent = filename
+    nameSpan.title = modelPath
+
+    const statusSpan = document.createElement("span")
+    statusSpan.className = `step-model-status ${isLoaded ? "loaded" : "pending"}`
+    statusSpan.textContent = isLoaded ? "Uploaded" : "Pending"
+
+    item.appendChild(nameSpan)
+    item.appendChild(statusSpan)
+    stepModelsList.appendChild(item)
+  }
+
+  stepModelsStatus.textContent = `${loadedCount} of ${requiredStepModels.length} models uploaded`
+}
 
 // Handle file
 async function handleFile(file: File) {
@@ -85,9 +203,29 @@ async function handleFile(file: File) {
     const text = await file.text()
     circuitJson = JSON.parse(text)
 
+    // Extract STEP model URLs
+    requiredStepModels = extractStepModelUrls(circuitJson)
+    stepFilesMap = {}
+
+    // Update STEP models section visibility
+    if (
+      includeExternalMeshesCheckbox.checked &&
+      requiredStepModels.length > 0
+    ) {
+      stepModelsSection.style.display = "block"
+      updateStepModelsList()
+    }
+
     // Enable convert button
     convertBtn.disabled = false
-    showStatus("File loaded successfully! Ready to convert.", "success")
+    const modelInfo =
+      requiredStepModels.length > 0
+        ? ` Found ${requiredStepModels.length} external STEP model(s).`
+        : ""
+    showStatus(
+      `File loaded successfully!${modelInfo} Ready to convert.`,
+      "success",
+    )
   } catch (error) {
     showStatus(
       `Error reading file: ${error instanceof Error ? error.message : String(error)}`,
@@ -95,6 +233,8 @@ async function handleFile(file: File) {
     )
     convertBtn.disabled = true
     circuitJson = null
+    requiredStepModels = []
+    stepFilesMap = {}
   }
 }
 
@@ -139,6 +279,7 @@ convertBtn.addEventListener("click", async () => {
     const stepContent = await circuitJsonToStep(circuitJson, {
       includeComponents,
       includeExternalMeshes: includeComponents && includeExternalMeshes,
+      fsMap: Object.keys(stepFilesMap).length > 0 ? stepFilesMap : undefined,
     })
 
     // Restore console.warn
@@ -171,6 +312,12 @@ clearBtn.addEventListener("click", () => {
   fileInfo.classList.remove("visible")
   convertBtn.disabled = true
   hideStatus()
+  // Reset STEP models
+  requiredStepModels = []
+  stepFilesMap = {}
+  stepModelsSection.style.display = "none"
+  stepModelsList.innerHTML = ""
+  stepFileInput.value = ""
 })
 
 // Helper function to download a file
