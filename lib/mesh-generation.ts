@@ -1,7 +1,6 @@
 import type { CircuitJson } from "circuit-json"
-import type { Triangle as GLTFTriangle } from "circuit-json-to-gltf"
-import { convertCircuitJsonTo3D } from "circuit-json-to-gltf"
 import type { Ref } from "stepts"
+import type { Triangle as GLTFTriangle } from "circuit-json-to-gltf"
 import type { Repository } from "stepts"
 import {
   AdvancedFace,
@@ -314,6 +313,13 @@ export async function generateComponentMeshes(
         }
         return e
       })
+
+    // Dynamically import circuit-json-to-gltf to avoid bundling native dependencies
+    // Use a variable to prevent the bundler from statically analyzing the import
+    const gltfModule = "circuit-json-to-gltf"
+    const { convertCircuitJsonTo3D } = await import(
+      /* @vite-ignore */ gltfModule
+    )
 
     // Convert circuit JSON to 3D scene
     const scene3d = await convertCircuitJsonTo3D(filteredCircuitJson, {

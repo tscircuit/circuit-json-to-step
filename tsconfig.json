@@ -26,5 +26,5 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  "exclude": ["circuit-json", "stepts"]
+  "exclude": ["circuit-json", "stepts", "site"]
 }

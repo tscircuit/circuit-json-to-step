@@ -42,3 +42,4 @@ debug-output
 
 # Snapshot diff files
 *.diff.png
+.vercel
