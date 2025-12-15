@@ -148,10 +148,7 @@ convertBtn.addEventListener("click", async () => {
     downloadFile(`${baseName}.step`, stepContent)
 
     if (warnings.length > 0) {
-      showStatus(
-        `Conversion complete with warnings:\n${warnings.slice(0, 3).join("\n")}${warnings.length > 3 ? `\n...and ${warnings.length - 3} more` : ""}`,
-        "success",
-      )
+      showStatusWithWarnings(warnings)
     } else {
       showStatus("Conversion complete! File downloaded.", "success")
     }
@@ -190,9 +187,54 @@ function downloadFile(filename: string, content: string) {
 }
 
 // Helper function to show status
-function showStatus(message: string, type: "success" | "error" | "processing") {
+function showStatus(
+  message: string,
+  type: "success" | "error" | "processing" | "warning",
+) {
   status.textContent = message
   status.className = `status visible ${type}`
+}
+
+// Helper function to show status with expandable warnings
+function showStatusWithWarnings(warnings: string[]) {
+  const maxInitial = 3
+  const hasMore = warnings.length > maxInitial
+
+  status.innerHTML = ""
+  status.className = "status visible warning"
+
+  const header = document.createTextNode(
+    "Conversion complete with warnings (file downloaded):\n",
+  )
+  status.appendChild(header)
+
+  const initialWarnings = warnings.slice(0, maxInitial)
+  const remainingWarnings = warnings.slice(maxInitial)
+
+  const warningsText = document.createTextNode(initialWarnings.join("\n"))
+  status.appendChild(warningsText)
+
+  if (hasMore) {
+    const moreContainer = document.createElement("span")
+    moreContainer.id = "more-warnings-container"
+
+    const hiddenWarnings = document.createElement("span")
+    hiddenWarnings.id = "hidden-warnings"
+    hiddenWarnings.style.display = "none"
+    hiddenWarnings.textContent = "\n" + remainingWarnings.join("\n")
+
+    const showMoreLink = document.createElement("span")
+    showMoreLink.className = "show-more"
+    showMoreLink.textContent = `\n...and ${remainingWarnings.length} more`
+    showMoreLink.onclick = () => {
+      hiddenWarnings.style.display = "inline"
+      showMoreLink.style.display = "none"
+    }
+
+    moreContainer.appendChild(showMoreLink)
+    moreContainer.appendChild(hiddenWarnings)
+    status.appendChild(moreContainer)
+  }
 }
 
 // Helper function to hide status
