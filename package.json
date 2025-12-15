@@ -9,10 +9,14 @@
     "test:update-snapshots": "BUN_UPDATE_SNAPSHOTS=1 bun test",
     "build": "tsup-node ./lib/index.ts --format esm --dts",
     "format": "biome format --write .",
-    "format:check": "biome format ."
+    "format:check": "biome format .",
+    "start": "bun site/index.html",
+    "build:site": "bun build site/index.html --outdir=site-export"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
+    "@resvg/resvg-js": "^2.6.2",
+    "@resvg/resvg-wasm": "^2.6.2",
     "@types/bun": "latest",
     "circuit-json": "^0.0.286",
     "looks-same": "^10.0.1",

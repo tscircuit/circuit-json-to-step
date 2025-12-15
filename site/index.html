@@ -1,0 +1,400 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circuit JSON to STEP Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            border: 3px dashed #2ecc71;
+            border-radius: 8px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8fff9;
+        }
+
+        .upload-area:hover {
+            border-color: #27ae60;
+            background: #f0fff2;
+        }
+
+        .upload-area.dragover {
+            border-color: #27ae60;
+            background: #e8ffeb;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0fff2;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .file-info.visible {
+            display: block;
+        }
+
+        .file-name {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .options {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .options h3 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .option-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .option-row input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .option-row label {
+            font-size: 14px;
+            color: #555;
+            cursor: pointer;
+        }
+
+        .actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-convert {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+        }
+
+        .btn-convert:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(46, 204, 113, 0.4);
+        }
+
+        .btn-convert:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-clear {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .btn-clear:hover {
+            background: #d0d0d0;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            font-size: 14px;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .status.visible {
+            display: block;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.processing {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .show-more {
+            color: #0066cc;
+            cursor: pointer;
+            text-decoration: underline;
+            display: inline;
+        }
+
+        .show-more:hover {
+            color: #004499;
+        }
+
+        .step-models-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .step-models-section h3 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .step-models-hint {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .step-models-list {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 12px;
+        }
+
+        .step-model-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: white;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .step-model-item.loaded {
+            border-color: #28a745;
+            background: #f0fff2;
+        }
+
+        .step-model-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #333;
+        }
+
+        .step-model-status {
+            margin-left: 10px;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+
+        .step-model-status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .step-model-status.loaded {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .step-upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .step-upload-area:hover {
+            border-color: #2ecc71;
+            background: #f8fff9;
+        }
+
+        .step-upload-area.dragover {
+            border-color: #27ae60;
+            background: #e8ffeb;
+        }
+
+        .step-upload-area .upload-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .step-upload-area .upload-text {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 4px;
+        }
+
+        .step-upload-area .upload-hint {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .step-models-status {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Circuit JSON to STEP Converter</h1>
+        <p class="subtitle">Convert your Circuit JSON files to STEP format for 3D CAD software</p>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">Drag & Drop your Circuit JSON file here</div>
+            <div class="upload-hint">or click to browse</div>
+        </div>
+
+        <input type="file" id="fileInput" accept=".json,application/json">
+
+        <div class="file-info" id="fileInfo">
+            <div class="file-name" id="fileName"></div>
+            <div class="file-size" id="fileSize"></div>
+        </div>
+
+        <div class="options">
+            <h3>Options</h3>
+            <div class="option-row">
+                <input type="checkbox" id="includeComponents">
+                <label for="includeComponents">Include components</label>
+            </div>
+            <div class="option-row">
+                <input type="checkbox" id="includeExternalMeshes">
+                <label for="includeExternalMeshes">Include external STEP models (requires Include components)</label>
+            </div>
+        </div>
+
+        <div class="step-models-section" id="stepModelsSection" style="display: none;">
+            <h3>External STEP Models</h3>
+            <p class="step-models-hint">Your circuit JSON references external STEP models. Upload them here to include them in the conversion.</p>
+            <div class="step-models-list" id="stepModelsList"></div>
+            <div class="step-upload-area" id="stepUploadArea">
+                <div class="upload-icon">📦</div>
+                <div class="upload-text">Drag & Drop STEP files here</div>
+                <div class="upload-hint">or click to browse (.step, .stp)</div>
+            </div>
+            <input type="file" id="stepFileInput" accept=".step,.stp" multiple>
+            <div class="step-models-status" id="stepModelsStatus"></div>
+        </div>
+
+        <div class="actions">
+            <button class="btn-convert" id="convertBtn" disabled>Convert to STEP</button>
+            <button class="btn-clear" id="clearBtn">Clear</button>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script type="module" src="main.tsx"></script>
+</body>
+</html>

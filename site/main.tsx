@@ -1,0 +1,390 @@
+import { circuitJsonToStep } from "../lib/index"
+
+// Get DOM elements
+const uploadArea = document.getElementById("uploadArea")!
+const fileInput = document.getElementById("fileInput")! as HTMLInputElement
+const fileInfo = document.getElementById("fileInfo")!
+const fileName = document.getElementById("fileName")!
+const fileSize = document.getElementById("fileSize")!
+const convertBtn = document.getElementById("convertBtn")! as HTMLButtonElement
+const clearBtn = document.getElementById("clearBtn")!
+const status = document.getElementById("status")!
+const includeComponentsCheckbox = document.getElementById(
+  "includeComponents",
+)! as HTMLInputElement
+const includeExternalMeshesCheckbox = document.getElementById(
+  "includeExternalMeshes",
+)! as HTMLInputElement
+
+// STEP models upload elements
+const stepModelsSection = document.getElementById("stepModelsSection")!
+const stepModelsList = document.getElementById("stepModelsList")!
+const stepUploadArea = document.getElementById("stepUploadArea")!
+const stepFileInput = document.getElementById(
+  "stepFileInput",
+)! as HTMLInputElement
+const stepModelsStatus = document.getElementById("stepModelsStatus")!
+
+let currentFile: File | null = null
+let circuitJson: any = null
+
+// Map of URL/path -> STEP file content
+let stepFilesMap: Record<string, string> = {}
+// List of required STEP model URLs/paths from circuit JSON
+let requiredStepModels: string[] = []
+
+// Handle click on upload area
+uploadArea.addEventListener("click", () => {
+  fileInput.click()
+})
+
+// Handle file selection
+fileInput.addEventListener("change", (e) => {
+  const target = e.target as HTMLInputElement
+  if (target.files && target.files.length > 0 && target.files[0]) {
+    handleFile(target.files[0])
+  }
+})
+
+// Handle drag over
+uploadArea.addEventListener("dragover", (e) => {
+  e.preventDefault()
+  uploadArea.classList.add("dragover")
+})
+
+// Handle drag leave
+uploadArea.addEventListener("dragleave", () => {
+  uploadArea.classList.remove("dragover")
+})
+
+// Handle drop
+uploadArea.addEventListener("drop", (e) => {
+  e.preventDefault()
+  uploadArea.classList.remove("dragover")
+
+  if (
+    e.dataTransfer &&
+    e.dataTransfer.files.length > 0 &&
+    e.dataTransfer.files[0]
+  ) {
+    handleFile(e.dataTransfer.files[0])
+  }
+})
+
+// Handle includeComponents checkbox change
+includeComponentsCheckbox.addEventListener("change", () => {
+  if (!includeComponentsCheckbox.checked) {
+    includeExternalMeshesCheckbox.checked = false
+    includeExternalMeshesCheckbox.disabled = true
+    stepModelsSection.style.display = "none"
+  } else {
+    includeExternalMeshesCheckbox.disabled = false
+  }
+})
+
+// Handle includeExternalMeshes checkbox change
+includeExternalMeshesCheckbox.addEventListener("change", () => {
+  if (includeExternalMeshesCheckbox.checked && requiredStepModels.length > 0) {
+    stepModelsSection.style.display = "block"
+    updateStepModelsList()
+  } else {
+    stepModelsSection.style.display = "none"
+  }
+})
+
+// Initialize external meshes checkbox state
+includeExternalMeshesCheckbox.disabled = true
+
+// STEP file upload handlers
+stepUploadArea.addEventListener("click", () => {
+  stepFileInput.click()
+})
+
+stepFileInput.addEventListener("change", (e) => {
+  const target = e.target as HTMLInputElement
+  if (target.files) {
+    handleStepFiles(Array.from(target.files))
+  }
+})
+
+stepUploadArea.addEventListener("dragover", (e) => {
+  e.preventDefault()
+  stepUploadArea.classList.add("dragover")
+})
+
+stepUploadArea.addEventListener("dragleave", () => {
+  stepUploadArea.classList.remove("dragover")
+})
+
+stepUploadArea.addEventListener("drop", (e) => {
+  e.preventDefault()
+  stepUploadArea.classList.remove("dragover")
+  if (e.dataTransfer?.files) {
+    handleStepFiles(Array.from(e.dataTransfer.files))
+  }
+})
+
+// Handle uploaded STEP files
+async function handleStepFiles(files: File[]) {
+  for (const file of files) {
+    const content = await file.text()
+    const filename = file.name.toLowerCase()
+
+    // Try to match with required models by filename
+    for (const modelPath of requiredStepModels) {
+      const modelFilename = modelPath.split(/[/\\]/).pop()?.toLowerCase() || ""
+      if (
+        modelFilename === filename ||
+        modelFilename.replace(/\.step$|\.stp$/, "") ===
+          filename.replace(/\.step$|\.stp$/, "")
+      ) {
+        stepFilesMap[modelPath] = content
+      }
+    }
+  }
+  updateStepModelsList()
+}
+
+// Extract STEP model URLs from circuit JSON
+function extractStepModelUrls(json: any[]): string[] {
+  const urls: string[] = []
+  for (const item of json) {
+    if (item?.type === "cad_component" && item.model_step_url) {
+      if (!urls.includes(item.model_step_url)) {
+        urls.push(item.model_step_url)
+      }
+    }
+  }
+  return urls
+}
+
+// Update the STEP models list UI
+function updateStepModelsList() {
+  stepModelsList.innerHTML = ""
+  let loadedCount = 0
+
+  for (const modelPath of requiredStepModels) {
+    const filename = modelPath.split(/[/\\]/).pop() || modelPath
+    const isLoaded = modelPath in stepFilesMap
+    if (isLoaded) loadedCount++
+
+    const item = document.createElement("div")
+    item.className = `step-model-item${isLoaded ? " loaded" : ""}`
+
+    const nameSpan = document.createElement("span")
+    nameSpan.className = "step-model-name"
+    nameSpan.textContent = filename
+    nameSpan.title = modelPath
+
+    const statusSpan = document.createElement("span")
+    statusSpan.className = `step-model-status ${isLoaded ? "loaded" : "pending"}`
+    statusSpan.textContent = isLoaded ? "Uploaded" : "Pending"
+
+    item.appendChild(nameSpan)
+    item.appendChild(statusSpan)
+    stepModelsList.appendChild(item)
+  }
+
+  stepModelsStatus.textContent = `${loadedCount} of ${requiredStepModels.length} models uploaded`
+}
+
+// Handle file
+async function handleFile(file: File) {
+  currentFile = file
+
+  // Show file info
+  fileName.textContent = file.name
+  fileSize.textContent = `${(file.size / 1024).toFixed(2)} KB`
+  fileInfo.classList.add("visible")
+
+  // Read and parse the file
+  try {
+    showStatus("Reading file...", "processing")
+    const text = await file.text()
+    circuitJson = JSON.parse(text)
+
+    // Extract STEP model URLs
+    requiredStepModels = extractStepModelUrls(circuitJson)
+    stepFilesMap = {}
+
+    // Update STEP models section visibility
+    if (
+      includeExternalMeshesCheckbox.checked &&
+      requiredStepModels.length > 0
+    ) {
+      stepModelsSection.style.display = "block"
+      updateStepModelsList()
+    }
+
+    // Enable convert button
+    convertBtn.disabled = false
+    const modelInfo =
+      requiredStepModels.length > 0
+        ? ` Found ${requiredStepModels.length} external STEP model(s).`
+        : ""
+    showStatus(
+      `File loaded successfully!${modelInfo} Ready to convert.`,
+      "success",
+    )
+  } catch (error) {
+    showStatus(
+      `Error reading file: ${error instanceof Error ? error.message : String(error)}`,
+      "error",
+    )
+    convertBtn.disabled = true
+    circuitJson = null
+    requiredStepModels = []
+    stepFilesMap = {}
+  }
+}
+
+// Convert and download
+convertBtn.addEventListener("click", async () => {
+  if (!circuitJson) return
+
+  try {
+    showStatus("Converting to STEP format...", "processing")
+    convertBtn.disabled = true
+
+    // Allow UI to update
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // Get base filename without extension
+    const baseName = currentFile!.name.replace(/\.json$/i, "")
+
+    // Get options from checkboxes
+    const includeComponents = includeComponentsCheckbox.checked
+    const includeExternalMeshes = includeExternalMeshesCheckbox.checked
+
+    // Capture console warnings during conversion
+    const warnings: string[] = []
+    const originalWarn = console.warn
+    console.warn = (...args: any[]) => {
+      const msg = args.map((a) => String(a)).join(" ")
+      if (msg.includes("Failed to merge STEP model")) {
+        // Extract just the filename from the path/URL
+        const pathMatch =
+          msg.match(/from ([^:]+:.*?)(?=:|$)/) || msg.match(/from (\S+)/)
+        if (pathMatch) {
+          const fullPath = pathMatch[1]
+          // Get just the filename
+          const filename = fullPath.split(/[/\\]/).pop() || fullPath
+          warnings.push(`Could not load: ${filename}`)
+        }
+      }
+      originalWarn.apply(console, args)
+    }
+
+    // Convert to STEP
+    const stepContent = await circuitJsonToStep(circuitJson, {
+      includeComponents,
+      includeExternalMeshes: includeComponents && includeExternalMeshes,
+      fsMap: Object.keys(stepFilesMap).length > 0 ? stepFilesMap : undefined,
+    })
+
+    // Restore console.warn
+    console.warn = originalWarn
+
+    // Download the STEP file
+    downloadFile(`${baseName}.step`, stepContent)
+
+    if (warnings.length > 0) {
+      showStatusWithWarnings(warnings)
+    } else {
+      showStatus("Conversion complete! File downloaded.", "success")
+    }
+    convertBtn.disabled = false
+  } catch (error) {
+    showStatus(
+      `Error during conversion: ${error instanceof Error ? error.message : String(error)}`,
+      "error",
+    )
+    convertBtn.disabled = false
+    console.error(error)
+  }
+})
+
+// Clear button
+clearBtn.addEventListener("click", () => {
+  currentFile = null
+  circuitJson = null
+  fileInput.value = ""
+  fileInfo.classList.remove("visible")
+  convertBtn.disabled = true
+  hideStatus()
+  // Reset STEP models
+  requiredStepModels = []
+  stepFilesMap = {}
+  stepModelsSection.style.display = "none"
+  stepModelsList.innerHTML = ""
+  stepFileInput.value = ""
+})
+
+// Helper function to download a file
+function downloadFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: "application/step" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// Helper function to show status
+function showStatus(
+  message: string,
+  type: "success" | "error" | "processing" | "warning",
+) {
+  status.textContent = message
+  status.className = `status visible ${type}`
+}
+
+// Helper function to show status with expandable warnings
+function showStatusWithWarnings(warnings: string[]) {
+  const maxInitial = 3
+  const hasMore = warnings.length > maxInitial
+
+  status.innerHTML = ""
+  status.className = "status visible warning"
+
+  const header = document.createTextNode(
+    "Conversion complete with warnings (file downloaded):\n",
+  )
+  status.appendChild(header)
+
+  const initialWarnings = warnings.slice(0, maxInitial)
+  const remainingWarnings = warnings.slice(maxInitial)
+
+  const warningsText = document.createTextNode(initialWarnings.join("\n"))
+  status.appendChild(warningsText)
+
+  if (hasMore) {
+    const moreContainer = document.createElement("span")
+    moreContainer.id = "more-warnings-container"
+
+    const hiddenWarnings = document.createElement("span")
+    hiddenWarnings.id = "hidden-warnings"
+    hiddenWarnings.style.display = "none"
+    hiddenWarnings.textContent = "\n" + remainingWarnings.join("\n")
+
+    const showMoreLink = document.createElement("span")
+    showMoreLink.className = "show-more"
+    showMoreLink.textContent = `\n...and ${remainingWarnings.length} more`
+    showMoreLink.onclick = () => {
+      hiddenWarnings.style.display = "inline"
+      showMoreLink.style.display = "none"
+    }
+
+    moreContainer.appendChild(showMoreLink)
+    moreContainer.appendChild(hiddenWarnings)
+    status.appendChild(moreContainer)
+  }
+}
+
+// Helper function to hide status
+function hideStatus() {
+  status.classList.remove("visible")
+}
