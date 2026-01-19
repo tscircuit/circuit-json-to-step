@@ -332,12 +332,15 @@ export async function generateComponentMeshes(
     for (let i = 0; i < scene3d.boxes.length; i++) {
       const box = scene3d.boxes[i]
 
-      // Skip boxes that have their own mesh (these are the board, not components)
-      // The board is already generated separately in circuitJsonToStep
-      if (box.mesh && "triangles" in box.mesh) continue
-
-      // Generate simple box mesh for this component
-      const boxTriangles = createBoxTriangles(box)
+      // Get triangles from mesh or generate simple box geometry
+      let boxTriangles: GLTFTriangle[]
+      if (box.mesh && "triangles" in box.mesh) {
+        // Use custom mesh triangles for this component
+        boxTriangles = box.mesh.triangles
+      } else {
+        // Generate simple box mesh for this component
+        boxTriangles = createBoxTriangles(box)
+      }
 
       if (boxTriangles.length === 0) continue
 
