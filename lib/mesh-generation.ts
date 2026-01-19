@@ -331,14 +331,13 @@ export async function generateComponentMeshes(
     // (STEP requires each solid to have its own closed, watertight boundary)
     for (let i = 0; i < scene3d.boxes.length; i++) {
       const box = scene3d.boxes[i]
-      let boxTriangles: GLTFTriangle[]
 
-      if (box.mesh && "triangles" in box.mesh) {
-        boxTriangles = box.mesh.triangles
-      } else {
-        // Generate simple box mesh for this component
-        boxTriangles = createBoxTriangles(box)
-      }
+      // Skip boxes that have their own mesh (these are the board, not components)
+      // The board is already generated separately in circuitJsonToStep
+      if (box.mesh && "triangles" in box.mesh) continue
+
+      // Generate simple box mesh for this component
+      const boxTriangles = createBoxTriangles(box)
 
       if (boxTriangles.length === 0) continue
 
