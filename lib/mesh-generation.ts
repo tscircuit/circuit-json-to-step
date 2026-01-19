@@ -327,22 +327,23 @@ export async function generateComponentMeshes(
       renderBoardTextures: false,
     })
 
-    // Extract or generate triangles from component boxes
-    const allTriangles: GLTFTriangle[] = []
-    for (const box of scene3d.boxes) {
+    // Process each component box individually to create separate STEP solids
+    // (STEP requires each solid to have its own closed, watertight boundary)
+    for (let i = 0; i < scene3d.boxes.length; i++) {
+      const box = scene3d.boxes[i]
+      let boxTriangles: GLTFTriangle[]
+
       if (box.mesh && "triangles" in box.mesh) {
-        allTriangles.push(...box.mesh.triangles)
+        boxTriangles = box.mesh.triangles
       } else {
         // Generate simple box mesh for this component
-        const boxTriangles = createBoxTriangles(box)
-        allTriangles.push(...boxTriangles)
+        boxTriangles = createBoxTriangles(box)
       }
-    }
 
-    // Create STEP faces from triangles if we have any
-    if (allTriangles.length > 0) {
+      if (boxTriangles.length === 0) continue
+
       // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
-      const transformedTriangles = allTriangles.map((tri) => ({
+      const transformedTriangles = boxTriangles.map((tri) => ({
         vertices: tri.vertices.map((v) => ({
           x: v.x,
           y: v.z, // GLTF Z becomes STEP Y
@@ -354,17 +355,19 @@ export async function generateComponentMeshes(
           z: tri.normal.y, // GLTF Y becomes STEP Z
         },
       }))
+
       const componentFaces = createStepFacesFromTriangles(
         repo,
         transformedTriangles as any,
       )
 
-      // Create closed shell and solid for components
+      // Create closed shell and solid for this component
       const componentShell = repo.add(
         new ClosedShell("", componentFaces as any),
       )
+      const componentName = box.name || `Component_${i + 1}`
       const componentSolid = repo.add(
-        new ManifoldSolidBrep("Components", componentShell),
+        new ManifoldSolidBrep(componentName, componentShell),
       )
       solids.push(componentSolid)
     }
