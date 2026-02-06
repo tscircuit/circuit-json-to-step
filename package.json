@@ -22,7 +22,7 @@
     "circuit-json": "^0.0.286",
     "looks-same": "^10.0.1",
     "occt-import-js": "^0.0.23",
-    "poppygl": "^0.0.13",
+    "poppygl": "^0.0.17",
     "stepts": "^0.0.2",
     "tsup": "^8.5.0"
   },
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
-    "circuit-json-to-gltf": "^0.0.19",
-    "circuit-to-svg": "^0.0.248",
+    "circuit-json-to-gltf": "^0.0.62",
+    "circuit-to-svg": "^0.0.327",
     "schematic-symbols": "^0.0.202"
   }
 }
