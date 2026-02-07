@@ -168,7 +168,27 @@ export async function circuitJsonToStep(
 
   if (outline && Array.isArray(outline) && outline.length >= 3) {
     // Use custom outline (points are already relative to board center)
-    bottomVertices = outline.map((point) =>
+    // Filter out duplicate consecutive vertices (including first/last wrap-around)
+    const cleanedOutline: { x: number; y: number }[] = []
+    for (let i = 0; i < outline.length; i++) {
+      const current = outline[i]!
+      const next = outline[(i + 1) % outline.length]!
+      const dx = next.x - current.x
+      const dy = next.y - current.y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      // Only add vertex if it's not a duplicate of the next one
+      if (dist > 1e-6) {
+        cleanedOutline.push(current)
+      }
+    }
+
+    if (cleanedOutline.length < 3) {
+      throw new Error(
+        `Outline has too few unique vertices after removing duplicates (${cleanedOutline.length}). Need at least 3.`,
+      )
+    }
+
+    bottomVertices = cleanedOutline.map((point) =>
       repo.add(
         new VertexPoint(
           "",
@@ -176,7 +196,7 @@ export async function circuitJsonToStep(
         ),
       ),
     )
-    topVertices = outline.map((point) =>
+    topVertices = cleanedOutline.map((point) =>
       repo.add(
         new VertexPoint(
           "",
@@ -214,10 +234,26 @@ export async function circuitJsonToStep(
   ): Ref<EdgeCurve> {
     const p1 = v1.resolve(repo).pnt.resolve(repo)
     const p2 = v2.resolve(repo).pnt.resolve(repo)
+    const dx = p2.x - p1.x
+    const dy = p2.y - p1.y
+    const dz = p2.z - p1.z
+    const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    // Handle zero-length edges (duplicate vertices)
+    if (length < 1e-10) {
+      // Use arbitrary direction for degenerate edge
+      const dir = repo.add(new Direction("", 1, 0, 0))
+      const vec = repo.add(new Vector("", dir, 1e-10))
+      const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
+      return repo.add(new EdgeCurve("", v1, v2, line, true))
+    }
+
+    // Direction must be normalized (unit vector)
     const dir = repo.add(
-      new Direction("", p2.x - p1.x, p2.y - p1.y, p2.z - p1.z),
+      new Direction("", dx / length, dy / length, dz / length),
     )
-    const vec = repo.add(new Vector("", dir, 1))
+    // Vector magnitude is the actual edge length
+    const vec = repo.add(new Vector("", dir, length))
     const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
     return repo.add(new EdgeCurve("", v1, v2, line, true))
   }
