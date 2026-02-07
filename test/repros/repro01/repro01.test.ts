@@ -26,7 +26,7 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(solidCount).toBeGreaterThanOrEqual(1)
 
   // Write STEP file to debug-output
-  const outputPath = "debug-output/basics04.step"
+  const outputPath = "debug-output/repro01.step"
   await Bun.write(outputPath, stepText)
 
   console.log("✓ STEP file with components generated successfully")
