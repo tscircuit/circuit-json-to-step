@@ -44,6 +44,7 @@ import { generateComponentMeshes } from "./mesh-generation"
 import { mergeExternalStepModels } from "./step-model-merger"
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
+import { createPillCylindricalFaces, createPillHoleLoop } from "./pill-geometry"
 
 export interface CircuitJsonToStepOptions {
   /** Board width in mm (optional if pcb_board is present) */
@@ -336,6 +337,10 @@ export async function circuitJsonToStep(
         new EdgeLoop("", [repo.add(new OrientedEdge("", holeEdge, false))]),
       )
       bottomHoleLoops.push(repo.add(new FaceBound("", holeLoop, true)))
+    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
+      // Create rotated pill-shaped hole boundary at z=0
+      const pillLoop = createPillHoleLoop(repo, hole, 0, xDir)
+      bottomHoleLoops.push(repo.add(new FaceBound("", pillLoop, true)))
     }
   }
 
@@ -394,6 +399,10 @@ export async function circuitJsonToStep(
         new EdgeLoop("", [repo.add(new OrientedEdge("", holeEdge, true))]),
       )
       topHoleLoops.push(repo.add(new FaceBound("", holeLoop, true)))
+    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
+      // Create rotated pill-shaped hole boundary at z=boardThickness
+      const pillLoop = createPillHoleLoop(repo, hole, boardThickness, xDir)
+      topHoleLoops.push(repo.add(new FaceBound("", pillLoop, true)))
     }
   }
 
@@ -533,6 +542,16 @@ export async function circuitJsonToStep(
         ),
       )
       holeCylindricalFaces.push(holeCylinderFace)
+    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
+      // Create cylindrical and planar faces for pill hole walls
+      const pillFaces = createPillCylindricalFaces(
+        repo,
+        hole,
+        boardThickness,
+        xDir,
+        zDir,
+      )
+      holeCylindricalFaces.push(...pillFaces)
     }
   }
 
