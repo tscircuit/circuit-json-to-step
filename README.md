@@ -41,6 +41,7 @@ const stepText = await circuitJsonToStep(circuitJson, {
   boardHeight: 15,
   boardThickness: 1.6,
   productName: "MyPCB",
+  // Components are included by default
 })
 await Bun.write("output.step", stepText)
 ```

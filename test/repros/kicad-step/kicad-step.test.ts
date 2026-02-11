@@ -90,6 +90,18 @@ test("kicad-step: switch fixture renders consistently", async () => {
   )
 }, 30000)
 
+test("kicad-step: includes component geometry by default", async () => {
+  const fsMap = await loadStepFilesFromCircuitJson(circuitJson)
+  const stepText = await circuitJsonToStep(circuitJson as any, {
+    includeExternalMeshes: true,
+    productName: "KiCadStepDefaultComponents",
+    fsMap,
+  })
+
+  const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
+  expect(solidCount).toBeGreaterThanOrEqual(3)
+})
+
 test("kicad-step: merges KiCad STEP models referenced via model_step_url", async () => {
   const fsMap = await loadStepFilesFromCircuitJson(circuitJson)
   const stepText = await circuitJsonToStep(circuitJson as any, {
