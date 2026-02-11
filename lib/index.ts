@@ -55,7 +55,7 @@ export interface CircuitJsonToStepOptions {
   boardThickness?: number
   /** Product name (default: "PCB") */
   productName?: string
-  /** Include component meshes (default: false) */
+  /** Include component meshes (default: true) */
   includeComponents?: boolean
   /** Include external model meshes from model_*_url fields (default: false). Only applicable when includeComponents is true. */
   includeExternalMeshes?: boolean
@@ -565,10 +565,12 @@ export async function circuitJsonToStep(
   // Array to hold all solids (board + optional components)
   const allSolids: Ref<ManifoldSolidBrep>[] = [solid]
 
+  const includeComponents = options.includeComponents ?? true
+
   let handledComponentIds = new Set<string>()
   let handledPcbComponentIds = new Set<string>()
 
-  if (options.includeComponents && options.includeExternalMeshes) {
+  if (includeComponents && options.includeExternalMeshes) {
     const mergeResult = await mergeExternalStepModels({
       repo,
       circuitJson,
@@ -582,7 +584,7 @@ export async function circuitJsonToStep(
 
   // Generate component mesh fallback if requested
   // Only call mesh generation if there are components that need it
-  if (options.includeComponents) {
+  if (includeComponents) {
     // Build set of pcb_component_ids covered by cad_components with model_step_url
     const pcbComponentIdsWithStepUrl = new Set<string>()
     for (const item of circuitJson) {
