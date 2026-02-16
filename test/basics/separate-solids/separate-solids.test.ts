@@ -15,7 +15,8 @@ test("separate-solids: each component gets its own ManifoldSolidBrep", async () 
 
   // Count ManifoldSolidBrep entries — should be at least 3:
   // 1 for the board + 1 per component (2 components in basics04)
-  const solidMatches = stepText.match(/MANIFOLD_SOLID_BREP\s*\(\s*'([^']*)'/g) || []
+  const solidMatches =
+    stepText.match(/MANIFOLD_SOLID_BREP\s*\(\s*'([^']*)'/g) || []
   const solidNames = solidMatches.map((m) => {
     const nameMatch = m.match(/MANIFOLD_SOLID_BREP\s*\(\s*'([^']*)'/)
     return nameMatch?.[1] ?? ""
