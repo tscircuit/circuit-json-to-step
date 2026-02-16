@@ -23,7 +23,7 @@
     "looks-same": "^10.0.1",
     "occt-import-js": "^0.0.23",
     "poppygl": "^0.0.17",
-    "stepts": "^0.0.2",
+    "stepts": "^0.0.3",
     "tsup": "^8.5.0"
   },
   "peerDependencies": {
