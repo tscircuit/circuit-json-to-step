@@ -183,15 +183,21 @@ function createStepFacesFromTriangles(
     ): Ref<EdgeCurve> => {
       const pStart = vStart.resolve(repo).pnt.resolve(repo)
       const pEnd = vEnd.resolve(repo).pnt.resolve(repo)
-      const dir = repo.add(
-        new Direction(
-          "",
-          pEnd.x - pStart.x,
-          pEnd.y - pStart.y,
-          pEnd.z - pStart.z,
-        ),
-      )
-      const vec = repo.add(new Vector("", dir, 1))
+      const dx = pEnd.x - pStart.x
+      const dy = pEnd.y - pStart.y
+      const dz = pEnd.z - pStart.z
+      const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+      // Keep edge construction valid for tiny/degenerate triangles
+      if (length < 1e-10) {
+        const dir = repo.add(new Direction("", 1, 0, 0))
+        const vec = repo.add(new Vector("", dir, 1e-10))
+        const line = repo.add(new Line("", vStart.resolve(repo).pnt, vec))
+        return repo.add(new EdgeCurve("", vStart, vEnd, line, true))
+      }
+
+      const dir = repo.add(new Direction("", dx / length, dy / length, dz / length))
+      const vec = repo.add(new Vector("", dir, length))
       const line = repo.add(new Line("", vStart.resolve(repo).pnt, vec))
       return repo.add(new EdgeCurve("", vStart, vEnd, line, true))
     }
