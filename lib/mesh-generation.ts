@@ -216,20 +216,33 @@ function createStepFacesFromTriangles(
     )
 
     // Create planar surface using triangle normal
+    const normalLen = Math.sqrt(
+      triangle.normal.x * triangle.normal.x +
+        triangle.normal.y * triangle.normal.y +
+        triangle.normal.z * triangle.normal.z,
+    )
     const normalDir = repo.add(
       new Direction(
         "",
-        triangle.normal.x,
-        triangle.normal.y,
-        triangle.normal.z,
+        normalLen > 1e-10 ? triangle.normal.x / normalLen : 0,
+        normalLen > 1e-10 ? triangle.normal.y / normalLen : 0,
+        normalLen > 1e-10 ? triangle.normal.z / normalLen : 1,
       ),
     )
 
-    // Use first vertex as origin, calculate reference direction from first edge
+    // Use first vertex as origin, calculate normalized reference direction from first edge
     const refX = p2.x - p1.x
     const refY = p2.y - p1.y
     const refZ = p2.z - p1.z
-    const refDir = repo.add(new Direction("", refX, refY, refZ))
+    const refLen = Math.sqrt(refX * refX + refY * refY + refZ * refZ)
+    const refDir = repo.add(
+      new Direction(
+        "",
+        refLen > 1e-10 ? refX / refLen : 1,
+        refLen > 1e-10 ? refY / refLen : 0,
+        refLen > 1e-10 ? refZ / refLen : 0,
+      ),
+    )
 
     const placement = repo.add(
       new Axis2Placement3D("", v1.resolve(repo).pnt, normalDir, refDir),
