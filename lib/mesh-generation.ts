@@ -327,22 +327,31 @@ export async function generateComponentMeshes(
       renderBoardTextures: false,
     })
 
-    // Extract or generate triangles from component boxes
-    const allTriangles: GLTFTriangle[] = []
+    // Create a separate STEP solid for each component box.
+    // Mesh triangles from convertCircuitJsonTo3D are in local coordinates
+    // relative to each box center, so we translate them to world coordinates.
     for (const box of scene3d.boxes) {
+      let boxTriangles: GLTFTriangle[]
       if (box.mesh && "triangles" in box.mesh) {
-        allTriangles.push(...box.mesh.triangles)
+        const cx = box.center.x
+        const cy = box.center.y
+        const cz = box.center.z
+        boxTriangles = box.mesh.triangles.map((tri: GLTFTriangle) => ({
+          vertices: tri.vertices.map((v) => ({
+            x: v.x + cx,
+            y: v.y + cy,
+            z: v.z + cz,
+          })),
+          normal: tri.normal,
+        }))
       } else {
-        // Generate simple box mesh for this component
-        const boxTriangles = createBoxTriangles(box)
-        allTriangles.push(...boxTriangles)
+        boxTriangles = createBoxTriangles(box)
       }
-    }
 
-    // Create STEP faces from triangles if we have any
-    if (allTriangles.length > 0) {
-      // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
-      const transformedTriangles = allTriangles.map((tri) => ({
+      if (boxTriangles.length === 0) continue
+
+      // Transform from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
+      const transformedTriangles = boxTriangles.map((tri) => ({
         vertices: tri.vertices.map((v) => ({
           x: v.x,
           y: v.z, // GLTF Z becomes STEP Y
@@ -350,21 +359,19 @@ export async function generateComponentMeshes(
         })),
         normal: {
           x: tri.normal.x,
-          y: tri.normal.z, // GLTF Z becomes STEP Y
-          z: tri.normal.y, // GLTF Y becomes STEP Z
+          y: tri.normal.z,
+          z: tri.normal.y,
         },
       }))
       const componentFaces = createStepFacesFromTriangles(
         repo,
         transformedTriangles as any,
       )
-
-      // Create closed shell and solid for components
       const componentShell = repo.add(
         new ClosedShell("", componentFaces as any),
       )
       const componentSolid = repo.add(
-        new ManifoldSolidBrep("Components", componentShell),
+        new ManifoldSolidBrep("Component", componentShell),
       )
       solids.push(componentSolid)
     }
