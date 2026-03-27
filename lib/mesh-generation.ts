@@ -1,6 +1,5 @@
 import type { CircuitJson } from "circuit-json"
 import type { Ref } from "stepts"
-import type { Triangle as GLTFTriangle } from "circuit-json-to-gltf"
 import type { Repository } from "stepts"
 import {
   AdvancedFace,
@@ -37,201 +36,113 @@ export interface MeshGenerationOptions {
 }
 
 /**
- * Generates triangles for a box mesh
+ * Creates a proper B-Rep box solid in STEP format.
+ * The box is defined by 8 vertices, 12 edges, and 6 rectangular faces,
+ * forming a valid manifold closed shell.
+ *
+ * Input coordinates are in GLTF convention (Y=up).
+ * This function converts to STEP convention (Z=up) internally.
  */
-function createBoxTriangles(box: {
-  center: { x: number; y: number; z: number }
-  size: { x: number; y: number; z: number }
-  rotation?: { x: number; y: number; z: number }
-}): GLTFTriangle[] {
-  const { center, size } = box
-  const halfX = size.x / 2
-  const halfY = size.y / 2
-  const halfZ = size.z / 2
+function createBRepBoxSolid(
+  repo: Repository,
+  box: {
+    center: { x: number; y: number; z: number }
+    size: { x: number; y: number; z: number }
+  },
+  label?: string,
+): Ref<ManifoldSolidBrep> {
+  // Transform from GLTF (Y=up) to STEP (Z=up): swap Y and Z
+  const cx = box.center.x
+  const cy = box.center.z // GLTF Z becomes STEP Y
+  const cz = box.center.y // GLTF Y becomes STEP Z
+  const sx = box.size.x
+  const sy = box.size.z // GLTF Z becomes STEP Y
+  const sz = box.size.y // GLTF Y becomes STEP Z
 
-  // Define 8 corners of the box
-  const corners = [
-    { x: -halfX, y: -halfY, z: -halfZ },
-    { x: halfX, y: -halfY, z: -halfZ },
-    { x: halfX, y: halfY, z: -halfZ },
-    { x: -halfX, y: halfY, z: -halfZ },
-    { x: -halfX, y: -halfY, z: halfZ },
-    { x: halfX, y: -halfY, z: halfZ },
-    { x: halfX, y: halfY, z: halfZ },
-    { x: -halfX, y: halfY, z: halfZ },
-  ].map((p) => ({ x: p.x + center.x, y: p.y + center.y, z: p.z + center.z }))
+  const hx = sx / 2
+  const hy = sy / 2
+  const hz = sz / 2
 
-  // Define triangles for each face (2 triangles per face)
-  const triangles: GLTFTriangle[] = [
-    // Bottom face (z = -halfZ)
-    {
-      vertices: [corners[0]!, corners[1]!, corners[2]!],
-      normal: { x: 0, y: 0, z: -1 },
-    },
-    {
-      vertices: [corners[0]!, corners[2]!, corners[3]!],
-      normal: { x: 0, y: 0, z: -1 },
-    },
-    // Top face (z = halfZ)
-    {
-      vertices: [corners[4]!, corners[6]!, corners[5]!],
-      normal: { x: 0, y: 0, z: 1 },
-    },
-    {
-      vertices: [corners[4]!, corners[7]!, corners[6]!],
-      normal: { x: 0, y: 0, z: 1 },
-    },
-    // Front face (y = -halfY)
-    {
-      vertices: [corners[0]!, corners[5]!, corners[1]!],
-      normal: { x: 0, y: -1, z: 0 },
-    },
-    {
-      vertices: [corners[0]!, corners[4]!, corners[5]!],
-      normal: { x: 0, y: -1, z: 0 },
-    },
-    // Back face (y = halfY)
-    {
-      vertices: [corners[2]!, corners[6]!, corners[7]!],
-      normal: { x: 0, y: 1, z: 0 },
-    },
-    {
-      vertices: [corners[2]!, corners[7]!, corners[3]!],
-      normal: { x: 0, y: 1, z: 0 },
-    },
-    // Left face (x = -halfX)
-    {
-      vertices: [corners[0]!, corners[3]!, corners[7]!],
-      normal: { x: -1, y: 0, z: 0 },
-    },
-    {
-      vertices: [corners[0]!, corners[7]!, corners[4]!],
-      normal: { x: -1, y: 0, z: 0 },
-    },
-    // Right face (x = halfX)
-    {
-      vertices: [corners[1]!, corners[6]!, corners[2]!],
-      normal: { x: 1, y: 0, z: 0 },
-    },
-    {
-      vertices: [corners[1]!, corners[5]!, corners[6]!],
-      normal: { x: 1, y: 0, z: 0 },
-    },
+  // 8 corners: bottom face (z=cz-hz) then top face (z=cz+hz)
+  // Bottom: 0=(-x,-y,-z) 1=(+x,-y,-z) 2=(+x,+y,-z) 3=(-x,+y,-z)
+  // Top:    4=(-x,-y,+z) 5=(+x,-y,+z) 6=(+x,+y,+z) 7=(-x,+y,+z)
+  const pts: [number, number, number][] = [
+    [cx - hx, cy - hy, cz - hz],
+    [cx + hx, cy - hy, cz - hz],
+    [cx + hx, cy + hy, cz - hz],
+    [cx - hx, cy + hy, cz - hz],
+    [cx - hx, cy - hy, cz + hz],
+    [cx + hx, cy - hy, cz + hz],
+    [cx + hx, cy + hy, cz + hz],
+    [cx - hx, cy + hy, cz + hz],
   ]
 
-  return triangles
-}
+  const verts = pts.map(([x, y, z]) =>
+    repo.add(new VertexPoint("", repo.add(new CartesianPoint("", x!, y!, z!)))),
+  )
 
-/**
- * Creates STEP faces from GLTF triangles
- */
-function createStepFacesFromTriangles(
-  repo: Repository,
-  triangles: GLTFTriangle[],
-): Ref<AdvancedFace>[] {
-  const faces: Ref<AdvancedFace>[] = []
+  function mkEdge(
+    a: Ref<VertexPoint>,
+    b: Ref<VertexPoint>,
+  ): Ref<EdgeCurve> {
+    const pa = a.resolve(repo).pnt.resolve(repo)
+    const pb = b.resolve(repo).pnt.resolve(repo)
+    const dx = pb.x - pa.x
+    const dy = pb.y - pa.y
+    const dz = pb.z - pa.z
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    const dir = repo.add(new Direction("", dx / len, dy / len, dz / len))
+    const vec = repo.add(new Vector("", dir, len))
+    const line = repo.add(new Line("", a.resolve(repo).pnt, vec))
+    return repo.add(new EdgeCurve("", a, b, line, true))
+  }
 
-  for (const triangle of triangles) {
-    // Create vertices for triangle
-    const v1 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint(
-            "",
-            triangle.vertices[0]!.x,
-            triangle.vertices[0]!.y,
-            triangle.vertices[0]!.z,
-          ),
-        ),
-      ),
-    )
-    const v2 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint(
-            "",
-            triangle.vertices[1]!.x,
-            triangle.vertices[1]!.y,
-            triangle.vertices[1]!.z,
-          ),
-        ),
-      ),
-    )
-    const v3 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint(
-            "",
-            triangle.vertices[2]!.x,
-            triangle.vertices[2]!.y,
-            triangle.vertices[2]!.z,
-          ),
-        ),
-      ),
-    )
+  // 12 edges
+  // Bottom ring: 0-1, 1-2, 2-3, 3-0
+  const be = [
+    mkEdge(verts[0]!, verts[1]!),
+    mkEdge(verts[1]!, verts[2]!),
+    mkEdge(verts[2]!, verts[3]!),
+    mkEdge(verts[3]!, verts[0]!),
+  ]
+  // Top ring: 4-5, 5-6, 6-7, 7-4
+  const te = [
+    mkEdge(verts[4]!, verts[5]!),
+    mkEdge(verts[5]!, verts[6]!),
+    mkEdge(verts[6]!, verts[7]!),
+    mkEdge(verts[7]!, verts[4]!),
+  ]
+  // Vertical: 0-4, 1-5, 2-6, 3-7
+  const ve = [
+    mkEdge(verts[0]!, verts[4]!),
+    mkEdge(verts[1]!, verts[5]!),
+    mkEdge(verts[2]!, verts[6]!),
+    mkEdge(verts[3]!, verts[7]!),
+  ]
 
-    // Create edges between vertices
-    const p1 = v1.resolve(repo).pnt.resolve(repo)
-    const p2 = v2.resolve(repo).pnt.resolve(repo)
-
-    const createEdge = (
-      vStart: Ref<VertexPoint>,
-      vEnd: Ref<VertexPoint>,
-    ): Ref<EdgeCurve> => {
-      const pStart = vStart.resolve(repo).pnt.resolve(repo)
-      const pEnd = vEnd.resolve(repo).pnt.resolve(repo)
-      const dir = repo.add(
-        new Direction(
-          "",
-          pEnd.x - pStart.x,
-          pEnd.y - pStart.y,
-          pEnd.z - pStart.z,
-        ),
-      )
-      const vec = repo.add(new Vector("", dir, 1))
-      const line = repo.add(new Line("", vStart.resolve(repo).pnt, vec))
-      return repo.add(new EdgeCurve("", vStart, vEnd, line, true))
-    }
-
-    const edge1 = createEdge(v1, v2)
-    const edge2 = createEdge(v2, v3)
-    const edge3 = createEdge(v3, v1)
-
-    // Create edge loop for triangle
+  function mkFace(
+    loops: { edge: Ref<EdgeCurve>; fwd: boolean }[],
+    nx: number,
+    ny: number,
+    nz: number,
+    origin: Ref<VertexPoint>,
+    rx: number,
+    ry: number,
+    rz: number,
+  ): Ref<AdvancedFace> {
     const edgeLoop = repo.add(
-      new EdgeLoop("", [
-        repo.add(new OrientedEdge("", edge1, true)),
-        repo.add(new OrientedEdge("", edge2, true)),
-        repo.add(new OrientedEdge("", edge3, true)),
-      ]),
-    )
-
-    // Create planar surface using triangle normal
-    const normalDir = repo.add(
-      new Direction(
+      new EdgeLoop(
         "",
-        triangle.normal.x,
-        triangle.normal.y,
-        triangle.normal.z,
+        loops.map((l) => repo.add(new OrientedEdge("", l.edge, l.fwd))),
       ),
     )
-
-    // Use first vertex as origin, calculate reference direction from first edge
-    const refX = p2.x - p1.x
-    const refY = p2.y - p1.y
-    const refZ = p2.z - p1.z
-    const refDir = repo.add(new Direction("", refX, refY, refZ))
-
+    const normal = repo.add(new Direction("", nx, ny, nz))
+    const refDir = repo.add(new Direction("", rx, ry, rz))
     const placement = repo.add(
-      new Axis2Placement3D("", v1.resolve(repo).pnt, normalDir, refDir),
+      new Axis2Placement3D("", origin.resolve(repo).pnt, normal, refDir),
     )
     const plane = repo.add(new Plane("", placement))
-
-    // Create face
-    const face = repo.add(
+    return repo.add(
       new AdvancedFace(
         "",
         [repo.add(new FaceOuterBound("", edgeLoop, true))],
@@ -239,14 +150,95 @@ function createStepFacesFromTriangles(
         true,
       ),
     )
-    faces.push(face)
   }
 
-  return faces
+  // Bottom face (z=-hz, normal -Z): loop 0→1→2→3→0
+  const bottomFace = mkFace(
+    [
+      { edge: be[0]!, fwd: true },
+      { edge: be[1]!, fwd: true },
+      { edge: be[2]!, fwd: true },
+      { edge: be[3]!, fwd: true },
+    ],
+    0, 0, -1,
+    verts[0]!,
+    1, 0, 0,
+  )
+
+  // Top face (z=+hz, normal +Z): loop 4→7→6→5→4 (CCW from above)
+  const topFace = mkFace(
+    [
+      { edge: te[3]!, fwd: false },
+      { edge: te[2]!, fwd: false },
+      { edge: te[1]!, fwd: false },
+      { edge: te[0]!, fwd: false },
+    ],
+    0, 0, 1,
+    verts[4]!,
+    1, 0, 0,
+  )
+
+  // Front face (y=-hy, normal -Y): loop 0→4→5→1→0
+  const frontFace = mkFace(
+    [
+      { edge: ve[0]!, fwd: true },
+      { edge: te[0]!, fwd: true },
+      { edge: ve[1]!, fwd: false },
+      { edge: be[0]!, fwd: false },
+    ],
+    0, -1, 0,
+    verts[0]!,
+    1, 0, 0,
+  )
+
+  // Back face (y=+hy, normal +Y): loop 2→6→7→3→2
+  const backFace = mkFace(
+    [
+      { edge: ve[2]!, fwd: true },
+      { edge: te[2]!, fwd: true },
+      { edge: ve[3]!, fwd: false },
+      { edge: be[2]!, fwd: false },
+    ],
+    0, 1, 0,
+    verts[2]!,
+    -1, 0, 0,
+  )
+
+  // Left face (x=-hx, normal -X): loop 3→7→4→0→3
+  const leftFace = mkFace(
+    [
+      { edge: ve[3]!, fwd: true },
+      { edge: te[3]!, fwd: true },
+      { edge: ve[0]!, fwd: false },
+      { edge: be[3]!, fwd: false },
+    ],
+    -1, 0, 0,
+    verts[3]!,
+    0, 1, 0,
+  )
+
+  // Right face (x=+hx, normal +X): loop 1→5→6→2→1
+  const rightFace = mkFace(
+    [
+      { edge: ve[1]!, fwd: true },
+      { edge: te[1]!, fwd: true },
+      { edge: ve[2]!, fwd: false },
+      { edge: be[1]!, fwd: false },
+    ],
+    1, 0, 0,
+    verts[1]!,
+    0, -1, 0,
+  )
+
+  const shell = repo.add(
+    new ClosedShell("", [bottomFace, topFace, frontFace, backFace, leftFace, rightFace]),
+  )
+  return repo.add(new ManifoldSolidBrep(label ?? "Component", shell))
 }
 
 /**
- * Generates component meshes from circuit JSON and converts them to STEP solids
+ * Generates component meshes from circuit JSON and converts them to STEP solids.
+ * Each component box becomes its own ManifoldSolidBrep for valid STEP topology.
  *
  * By default, model_*_url fields are filtered out to prevent hanging on external
  * model fetches during conversion. Set includeExternalMeshes to true to allow
@@ -321,52 +313,16 @@ export async function generateComponentMeshes(
       /* @vite-ignore */ gltfModule
     )
 
-    // Convert circuit JSON to 3D scene
+    // Convert circuit JSON to 3D scene to get component boxes with size/position
     const scene3d = await convertCircuitJsonTo3D(filteredCircuitJson, {
       boardThickness,
       renderBoardTextures: false,
     })
 
-    // Extract or generate triangles from component boxes
-    const allTriangles: GLTFTriangle[] = []
+    // Create one B-Rep box solid per component box
     for (const box of scene3d.boxes) {
-      if (box.mesh && "triangles" in box.mesh) {
-        allTriangles.push(...box.mesh.triangles)
-      } else {
-        // Generate simple box mesh for this component
-        const boxTriangles = createBoxTriangles(box)
-        allTriangles.push(...boxTriangles)
-      }
-    }
-
-    // Create STEP faces from triangles if we have any
-    if (allTriangles.length > 0) {
-      // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
-      const transformedTriangles = allTriangles.map((tri) => ({
-        vertices: tri.vertices.map((v) => ({
-          x: v.x,
-          y: v.z, // GLTF Z becomes STEP Y
-          z: v.y, // GLTF Y becomes STEP Z
-        })),
-        normal: {
-          x: tri.normal.x,
-          y: tri.normal.z, // GLTF Z becomes STEP Y
-          z: tri.normal.y, // GLTF Y becomes STEP Z
-        },
-      }))
-      const componentFaces = createStepFacesFromTriangles(
-        repo,
-        transformedTriangles as any,
-      )
-
-      // Create closed shell and solid for components
-      const componentShell = repo.add(
-        new ClosedShell("", componentFaces as any),
-      )
-      const componentSolid = repo.add(
-        new ManifoldSolidBrep("Components", componentShell),
-      )
-      solids.push(componentSolid)
+      const solid = createBRepBoxSolid(repo, box, box.label ?? "Component")
+      solids.push(solid)
     }
   } catch (error) {
     console.warn("Failed to generate component mesh:", error)
