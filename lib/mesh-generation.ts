@@ -327,22 +327,20 @@ export async function generateComponentMeshes(
       renderBoardTextures: false,
     })
 
-    // Extract or generate triangles from component boxes
-    const allTriangles: GLTFTriangle[] = []
+    // Create one ManifoldSolidBrep per component box so each box forms a valid
+    // closed manifold surface. A ClosedShell requires a single connected closed
+    // surface — merging all boxes into one ClosedShell produces invalid STEP
+    // topology that viewers silently discard.
     for (const box of scene3d.boxes) {
-      if (box.mesh && "triangles" in box.mesh) {
-        allTriangles.push(...box.mesh.triangles)
-      } else {
-        // Generate simple box mesh for this component
-        const boxTriangles = createBoxTriangles(box)
-        allTriangles.push(...boxTriangles)
-      }
-    }
+      const boxTriangles =
+        box.mesh && "triangles" in box.mesh
+          ? box.mesh.triangles
+          : createBoxTriangles(box)
 
-    // Create STEP faces from triangles if we have any
-    if (allTriangles.length > 0) {
+      if (boxTriangles.length === 0) continue
+
       // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
-      const transformedTriangles = allTriangles.map((tri) => ({
+      const transformedTriangles = boxTriangles.map((tri) => ({
         vertices: tri.vertices.map((v) => ({
           x: v.x,
           y: v.z, // GLTF Z becomes STEP Y
@@ -354,17 +352,17 @@ export async function generateComponentMeshes(
           z: tri.normal.y, // GLTF Y becomes STEP Z
         },
       }))
+
       const componentFaces = createStepFacesFromTriangles(
         repo,
         transformedTriangles as any,
       )
 
-      // Create closed shell and solid for components
       const componentShell = repo.add(
         new ClosedShell("", componentFaces as any),
       )
       const componentSolid = repo.add(
-        new ManifoldSolidBrep("Components", componentShell),
+        new ManifoldSolidBrep("Component", componentShell),
       )
       solids.push(componentSolid)
     }
