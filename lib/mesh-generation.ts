@@ -340,8 +340,8 @@ export async function generateComponentMeshes(
       if (boxTriangles.length === 0) continue
 
       // Transform triangles from GLTF XZ plane (Y=up) to STEP XY plane (Z=up)
-      const transformedTriangles = boxTriangles.map((tri) => ({
-        vertices: tri.vertices.map((v) => ({
+      const transformedTriangles = boxTriangles.map((tri: GLTFTriangle) => ({
+        vertices: tri.vertices.map((v: { x: number; y: number; z: number }) => ({
           x: v.x,
           y: v.z, // GLTF Z becomes STEP Y
           z: v.y, // GLTF Y becomes STEP Z
