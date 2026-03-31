@@ -183,15 +183,21 @@ function createStepFacesFromTriangles(
     ): Ref<EdgeCurve> => {
       const pStart = vStart.resolve(repo).pnt.resolve(repo)
       const pEnd = vEnd.resolve(repo).pnt.resolve(repo)
-      const dir = repo.add(
-        new Direction(
-          "",
-          pEnd.x - pStart.x,
-          pEnd.y - pStart.y,
-          pEnd.z - pStart.z,
-        ),
-      )
-      const vec = repo.add(new Vector("", dir, 1))
+      const dx = pEnd.x - pStart.x
+      const dy = pEnd.y - pStart.y
+      const dz = pEnd.z - pStart.z
+      const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+      // Keep edge construction valid for tiny/degenerate triangles
+      if (length < 1e-10) {
+        const dir = repo.add(new Direction("", 1, 0, 0))
+        const vec = repo.add(new Vector("", dir, 1e-10))
+        const line = repo.add(new Line("", vStart.resolve(repo).pnt, vec))
+        return repo.add(new EdgeCurve("", vStart, vEnd, line, true))
+      }
+
+      const dir = repo.add(new Direction("", dx / length, dy / length, dz / length))
+      const vec = repo.add(new Vector("", dir, length))
       const line = repo.add(new Line("", vStart.resolve(repo).pnt, vec))
       return repo.add(new EdgeCurve("", vStart, vEnd, line, true))
     }
@@ -210,20 +216,33 @@ function createStepFacesFromTriangles(
     )
 
     // Create planar surface using triangle normal
+    const normalLen = Math.sqrt(
+      triangle.normal.x * triangle.normal.x +
+        triangle.normal.y * triangle.normal.y +
+        triangle.normal.z * triangle.normal.z,
+    )
     const normalDir = repo.add(
       new Direction(
         "",
-        triangle.normal.x,
-        triangle.normal.y,
-        triangle.normal.z,
+        normalLen > 1e-10 ? triangle.normal.x / normalLen : 0,
+        normalLen > 1e-10 ? triangle.normal.y / normalLen : 0,
+        normalLen > 1e-10 ? triangle.normal.z / normalLen : 1,
       ),
     )
 
-    // Use first vertex as origin, calculate reference direction from first edge
+    // Use first vertex as origin, calculate normalized reference direction from first edge
     const refX = p2.x - p1.x
     const refY = p2.y - p1.y
     const refZ = p2.z - p1.z
-    const refDir = repo.add(new Direction("", refX, refY, refZ))
+    const refLen = Math.sqrt(refX * refX + refY * refY + refZ * refZ)
+    const refDir = repo.add(
+      new Direction(
+        "",
+        refLen > 1e-10 ? refX / refLen : 1,
+        refLen > 1e-10 ? refY / refLen : 0,
+        refLen > 1e-10 ? refZ / refLen : 0,
+      ),
+    )
 
     const placement = repo.add(
       new Axis2Placement3D("", v1.resolve(repo).pnt, normalDir, refDir),
