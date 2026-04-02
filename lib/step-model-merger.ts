@@ -7,7 +7,7 @@ import {
   Unknown,
   parseRepository,
 } from "stepts"
-import { eid } from "stepts/lib/core/EntityId"
+import { eid } from "stepts"
 import { EXCLUDED_ENTITY_TYPES } from "./step-model-merger/excluded-entity-types"
 import {
   asVector3,
