@@ -34,6 +34,6 @@
     "circuit-json-to-gltf": "^0.0.91",
     "circuit-to-svg": "^0.0.327",
     "schematic-symbols": "^0.0.202",
-    "stepts": "^0.0.3"
+    "stepts": "^0.0.4"
   }
 }
