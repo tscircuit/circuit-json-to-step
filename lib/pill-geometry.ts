@@ -396,7 +396,8 @@ export function createPillHoleLoop(
 export function createPillCylindricalFaces(
   repo: Repository,
   hole: any,
-  boardThickness: number,
+  zMin: number,
+  zMax: number,
   xDir: Ref<Direction>,
   zDir: Ref<Direction>,
 ): Ref<AdvancedFace>[] {
@@ -428,7 +429,8 @@ export function createPillCylindricalFaces(
         rotation,
         centerX,
         centerY,
-        boardThickness,
+        zMin,
+        zMax,
         zDir,
         xDir,
       ),
@@ -445,7 +447,8 @@ export function createPillCylindricalFaces(
         rotation,
         centerX,
         centerY,
-        boardThickness,
+        zMin,
+        zMax,
         zDir,
       ),
     )
@@ -462,7 +465,8 @@ export function createPillCylindricalFaces(
         rotation,
         centerX,
         centerY,
-        boardThickness,
+        zMin,
+        zMax,
         zDir,
         xDir,
       ),
@@ -479,7 +483,8 @@ export function createPillCylindricalFaces(
         rotation,
         centerX,
         centerY,
-        boardThickness,
+        zMin,
+        zMax,
         zDir,
       ),
     )
@@ -499,7 +504,8 @@ export function createPillCylindricalFaces(
         rotation,
         centerX,
         centerY,
-        boardThickness,
+        zMin,
+        zMax,
         zDir,
         xDir,
       ),
@@ -516,7 +522,8 @@ export function createPillCylindricalFaces(
         rotation,
         centerX,
         centerY,
-        boardThickness,
+        zMin,
+        zMax,
         zDir,
       ),
     )
@@ -533,7 +540,8 @@ export function createPillCylindricalFaces(
         rotation,
         centerX,
         centerY,
-        boardThickness,
+        zMin,
+        zMax,
         zDir,
         xDir,
       ),
@@ -550,7 +558,8 @@ export function createPillCylindricalFaces(
         rotation,
         centerX,
         centerY,
-        boardThickness,
+        zMin,
+        zMax,
         zDir,
       ),
     )
@@ -572,7 +581,8 @@ function createCylindricalWall(
   rotation: number,
   centerX0: number,
   centerY0: number,
-  boardThickness: number,
+  zMin: number,
+  zMax: number,
   zDir: Ref<Direction>,
   xDir: Ref<Direction>,
 ): Ref<AdvancedFace> {
@@ -602,13 +612,13 @@ function createCylindricalWall(
   const bottomStartVertex = repo.add(
     new VertexPoint(
       "",
-      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, 0)),
+      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, zMin)),
     ),
   )
   const bottomEndVertex = repo.add(
     new VertexPoint(
       "",
-      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, 0)),
+      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, zMin)),
     ),
   )
 
@@ -616,17 +626,13 @@ function createCylindricalWall(
   const topStart = repo.add(
     new VertexPoint(
       "",
-      repo.add(
-        new CartesianPoint("", bottomStart.x, bottomStart.y, boardThickness),
-      ),
+      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, zMax)),
     ),
   )
   const topEnd = repo.add(
     new VertexPoint(
       "",
-      repo.add(
-        new CartesianPoint("", bottomEnd.x, bottomEnd.y, boardThickness),
-      ),
+      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, zMax)),
     ),
   )
 
@@ -639,7 +645,7 @@ function createCylindricalWall(
     rotation,
   )
   const bottomCenter = repo.add(
-    new CartesianPoint("", centerRotated.x, centerRotated.y, 0),
+    new CartesianPoint("", centerRotated.x, centerRotated.y, zMin),
   )
   const bottomPlacement = repo.add(
     new Axis2Placement3D(
@@ -656,7 +662,7 @@ function createCylindricalWall(
 
   // Create arc edge at top
   const topCenter = repo.add(
-    new CartesianPoint("", centerRotated.x, centerRotated.y, boardThickness),
+    new CartesianPoint("", centerRotated.x, centerRotated.y, zMax),
   )
   const topPlacement = repo.add(new Axis2Placement3D("", topCenter, zDir, xDir))
   const topCircle = repo.add(new Circle("", topPlacement, radius))
@@ -666,40 +672,37 @@ function createCylindricalWall(
   const v1 = repo.add(
     new VertexPoint(
       "",
-      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, 0)),
+      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, zMin)),
     ),
   )
   const v2 = repo.add(
     new VertexPoint(
       "",
-      repo.add(
-        new CartesianPoint("", bottomStart.x, bottomStart.y, boardThickness),
-      ),
+      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, zMax)),
     ),
   )
   const v3 = repo.add(
     new VertexPoint(
       "",
-      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, 0)),
+      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, zMin)),
     ),
   )
   const v4 = repo.add(
     new VertexPoint(
       "",
-      repo.add(
-        new CartesianPoint("", bottomEnd.x, bottomEnd.y, boardThickness),
-      ),
+      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, zMax)),
     ),
   )
 
   // Create vertical line edges
   const dir1 = repo.add(new Direction("", 0, 0, 1))
-  const vec1 = repo.add(new Vector("", dir1, boardThickness))
+  const height = zMax - zMin
+  const vec1 = repo.add(new Vector("", dir1, height))
   const line1 = repo.add(new Line("", v1.resolve(repo).pnt, vec1))
   const edge1 = repo.add(new EdgeCurve("", v1, v2, line1, true))
 
   const dir2 = repo.add(new Direction("", 0, 0, 1))
-  const vec2 = repo.add(new Vector("", dir2, boardThickness))
+  const vec2 = repo.add(new Vector("", dir2, height))
   const line2 = repo.add(new Line("", v3.resolve(repo).pnt, vec2))
   const edge2 = repo.add(new EdgeCurve("", v3, v4, line2, true))
 
@@ -743,7 +746,8 @@ function createPlanarWall(
   rotation: number,
   centerX0: number,
   centerY0: number,
-  boardThickness: number,
+  zMin: number,
+  zMax: number,
   zDir: Ref<Direction>,
 ): Ref<AdvancedFace> {
   // Rotate points
@@ -752,21 +756,21 @@ function createPlanarWall(
 
   // Create vertices
   const v1 = repo.add(
-    new VertexPoint("", repo.add(new CartesianPoint("", start.x, start.y, 0))),
-  )
-  const v2 = repo.add(
-    new VertexPoint("", repo.add(new CartesianPoint("", end.x, end.y, 0))),
-  )
-  const v3 = repo.add(
     new VertexPoint(
       "",
-      repo.add(new CartesianPoint("", end.x, end.y, boardThickness)),
+      repo.add(new CartesianPoint("", start.x, start.y, zMin)),
     ),
+  )
+  const v2 = repo.add(
+    new VertexPoint("", repo.add(new CartesianPoint("", end.x, end.y, zMin))),
+  )
+  const v3 = repo.add(
+    new VertexPoint("", repo.add(new CartesianPoint("", end.x, end.y, zMax))),
   )
   const v4 = repo.add(
     new VertexPoint(
       "",
-      repo.add(new CartesianPoint("", start.x, start.y, boardThickness)),
+      repo.add(new CartesianPoint("", start.x, start.y, zMax)),
     ),
   )
 
@@ -793,11 +797,12 @@ function createPlanarWall(
 
   // Create vertical edges
   const vertDir = repo.add(new Direction("", 0, 0, 1))
-  const vertVec1 = repo.add(new Vector("", vertDir, boardThickness))
+  const height = zMax - zMin
+  const vertVec1 = repo.add(new Vector("", vertDir, height))
   const vertLine1 = repo.add(new Line("", v2.resolve(repo).pnt, vertVec1))
   const vertEdge1 = repo.add(new EdgeCurve("", v2, v3, vertLine1, true))
 
-  const vertVec2 = repo.add(new Vector("", vertDir, boardThickness))
+  const vertVec2 = repo.add(new Vector("", vertDir, height))
   const vertLine2 = repo.add(new Line("", v1.resolve(repo).pnt, vertVec2))
   const vertEdge2 = repo.add(new EdgeCurve("", v1, v4, vertLine2, true))
 
@@ -819,7 +824,7 @@ function createPlanarWall(
   const refDir = repo.add(
     new Direction("", dx / edgeLength, dy / edgeLength, 0),
   )
-  const planeOrigin = repo.add(new CartesianPoint("", start.x, start.y, 0))
+  const planeOrigin = repo.add(new CartesianPoint("", start.x, start.y, zMin))
   const placement = repo.add(
     new Axis2Placement3D("", planeOrigin, normalDir, refDir),
   )
