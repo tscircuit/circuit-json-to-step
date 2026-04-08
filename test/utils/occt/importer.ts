@@ -70,7 +70,7 @@ let occtInstancePromise: Promise<OcctImport> | undefined
 
 async function loadOcct(): Promise<OcctImport> {
   if (!occtInstancePromise) {
-    const imported = (await import("occt-import-js")) as any
+    const imported = await import("occt-import-js")
     const factory = resolveFactory(imported)
     occtInstancePromise = factory()
   }

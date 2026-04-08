@@ -1,6 +1,7 @@
 import {
   CartesianPoint,
   Direction,
+  type Entity,
   ManifoldSolidBrep,
   Ref,
   Repository,
@@ -136,7 +137,7 @@ function mergeSingleStepModel(
   return solids
 }
 
-type RepositoryEntry = readonly [number, any]
+type RepositoryEntry = readonly [number, Entity]
 
 function adjustTransformForPlacement(
   entries: ReadonlyArray<RepositoryEntry>,

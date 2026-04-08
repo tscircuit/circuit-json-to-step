@@ -1,13 +1,18 @@
-import type { Ref, Repository } from "stepts"
+import type { Ref, Repository, StyledItem } from "stepts"
 import { ClosedShell, ManifoldSolidBrep } from "stepts"
-import type { SceneBox } from "./scene-geometry"
+import type {
+  GeneratedSceneSolid,
+  SceneBox,
+  TriangleColor,
+} from "./scene-geometry"
+import { createStyleCache, createStyledItem } from "./step-style-utils"
 import { rotatePoint3 } from "./scene-geometry"
 import { createFaceFromVertices, createVertex } from "./step-brep-utils"
 
 export function createSceneBoxSolid(
   repo: Repository,
   box: SceneBox,
-): Ref<ManifoldSolidBrep> {
+): GeneratedSceneSolid {
   if (box.mesh?.triangles?.length) {
     return createSceneMeshSolid(repo, box)
   }
@@ -65,13 +70,21 @@ export function createSceneBoxSolid(
   ].map((faceVertices) => createFaceFromVertices(repo, faceVertices))
 
   const shell = repo.add(new ClosedShell("", faces))
-  return repo.add(new ManifoldSolidBrep("Component", shell))
+  return {
+    solid: repo.add(new ManifoldSolidBrep(box.label ?? "Component", shell)),
+    styledItems: [],
+    usesIntrinsicFaceStyles: false,
+    styleTargets: faces,
+  }
 }
 
 function createSceneMeshSolid(
   repo: Repository,
   box: SceneBox,
-): Ref<ManifoldSolidBrep> {
+): GeneratedSceneSolid {
+  const styleCache = createStyleCache()
+  const styledItems: Ref<StyledItem>[] = []
+
   const faces = box.mesh!.triangles!.map((triangle) => {
     const vertices = triangle.vertices.map((vertex) => {
       const rotated = rotatePoint3(vertex, box.rotation)
@@ -83,9 +96,37 @@ function createSceneMeshSolid(
       return createVertex(repo, translated)
     })
 
-    return createFaceFromVertices(repo, vertices)
+    const face = createFaceFromVertices(repo, vertices)
+    const faceColor = normalizeTriangleColor(triangle.color)
+    if (faceColor) {
+      styledItems.push(createStyledItem(repo, face, faceColor, styleCache))
+    }
+    return face
   })
 
   const shell = repo.add(new ClosedShell("", faces))
-  return repo.add(new ManifoldSolidBrep("Component", shell))
+  return {
+    solid: repo.add(new ManifoldSolidBrep(box.label ?? "Component", shell)),
+    styledItems,
+    usesIntrinsicFaceStyles:
+      faces.length > 0 && styledItems.length === faces.length,
+    styleTargets: [],
+  }
+}
+
+function normalizeTriangleColor(
+  color: TriangleColor,
+): [number, number, number] | null {
+  if (!Array.isArray(color) || color.length < 3) return null
+
+  const scale = color.some((value: number) => value > 1) ? 255 : 1
+  return [
+    clampColorChannel(color[0]! / scale),
+    clampColorChannel(color[1]! / scale),
+    clampColorChannel(color[2]! / scale),
+  ]
+}
+
+function clampColorChannel(value: number): number {
+  return Math.max(0, Math.min(1, value))
 }

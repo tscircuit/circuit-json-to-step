@@ -2,7 +2,7 @@ import type { CircuitJson } from "circuit-json"
 import type { Ref, Repository } from "stepts"
 import { ManifoldSolidBrep } from "stepts"
 import { createSceneBoxSolid } from "./scene-box-to-step"
-import type { SceneBox } from "./scene-geometry"
+import type { GeneratedSceneSolid, SceneBox } from "./scene-geometry"
 
 export interface MeshGenerationOptions {
   /** Repository to add STEP entities to */
@@ -30,7 +30,7 @@ export interface MeshGenerationOptions {
  */
 export async function generateComponentMeshes(
   options: MeshGenerationOptions,
-): Promise<Ref<ManifoldSolidBrep>[]> {
+): Promise<GeneratedSceneSolid[]> {
   const {
     repo,
     circuitJson,
@@ -41,7 +41,7 @@ export async function generateComponentMeshes(
     pcbComponentIdsWithStepUrl,
   } = options
 
-  const solids: Ref<ManifoldSolidBrep>[] = []
+  const solids: GeneratedSceneSolid[] = []
 
   try {
     const filteredCircuitJson = circuitJson
