@@ -12,17 +12,29 @@ import {
 
 export type StyleCache = Map<string, Ref<PresentationStyleAssignment>>
 
+type StyledItemOptions = {
+  itemRef: Ref<Entity>
+  rgb: [number, number, number]
+  styleCache: StyleCache
+  name?: string
+}
+
+type StyledItemsOptions = {
+  itemRefs: ReadonlyArray<Ref<Entity>>
+  rgb: [number, number, number]
+  styleCache: StyleCache
+  name?: string
+}
+
 export function createStyleCache(): StyleCache {
   return new Map<string, Ref<PresentationStyleAssignment>>()
 }
 
 export function createStyledItem(
   repo: Repository,
-  itemRef: Ref<Entity>,
-  rgb: [number, number, number],
-  styleCache: StyleCache,
-  name = "color",
+  options: StyledItemOptions,
 ): Ref<StyledItem> {
+  const { itemRef, rgb, styleCache, name = "color" } = options
   const key = rgb.map((value) => value.toFixed(6)).join(",")
   let presStyle = styleCache.get(key)
 
@@ -42,12 +54,10 @@ export function createStyledItem(
 
 export function createStyledItems(
   repo: Repository,
-  itemRefs: ReadonlyArray<Ref<Entity>>,
-  rgb: [number, number, number],
-  styleCache: StyleCache,
-  name = "color",
+  options: StyledItemsOptions,
 ): Ref<StyledItem>[] {
+  const { itemRefs, rgb, styleCache, name } = options
   return itemRefs.map((itemRef) =>
-    createStyledItem(repo, itemRef, rgb, styleCache, name),
+    createStyledItem(repo, { itemRef, rgb, styleCache, name }),
   )
 }

@@ -603,12 +603,11 @@ export async function circuitJsonToStep(
   // Collect all faces
   const allFaces = [bottomFace, topFace, ...sideFaces, ...holeCylindricalFaces]
   const styleCache = createStyleCache()
-  const boardStyledItems = createStyledItems(
-    repo,
-    allFaces,
-    [0.2, 0.6, 0.2],
+  const boardStyledItems = createStyledItems(repo, {
+    itemRefs: allFaces,
+    rgb: [0.2, 0.6, 0.2],
     styleCache,
-  )
+  })
 
   // Create closed shell and solid
   const shell = repo.add(new ClosedShell("", allFaces))
@@ -711,12 +710,11 @@ export async function circuitJsonToStep(
           solidsWithIntrinsicFaceStyles.add(String(componentSolid.solid.id))
         } else if (componentSolid.styleTargets.length > 0) {
           componentStyledItems.push(
-            ...createStyledItems(
-              repo,
-              componentSolid.styleTargets,
-              [0.75, 0.75, 0.75],
+            ...createStyledItems(repo, {
+              itemRefs: componentSolid.styleTargets,
+              rgb: [0.75, 0.75, 0.75],
               styleCache,
-            ),
+            }),
           )
           solidsWithIntrinsicFaceStyles.add(String(componentSolid.solid.id))
         }
@@ -730,18 +728,17 @@ export async function circuitJsonToStep(
     ...componentStyledItems,
   ]
 
-  allSolids.forEach((solidRef, index) => {
+  allSolids.forEach((itemRef, index) => {
     const isBoard = index === 0
-    if (isBoard || solidsWithIntrinsicFaceStyles.has(String(solidRef.id))) {
+    if (isBoard || solidsWithIntrinsicFaceStyles.has(String(itemRef.id))) {
       return
     }
-    const styledItem = createStyledItem(
-      repo,
-      solidRef,
-      [0.75, 0.75, 0.75],
+    const styledItem = createStyledItem(repo, {
+      itemRef,
+      rgb: [0.75, 0.75, 0.75],
       styleCache,
-      "",
-    )
+      name: "",
+    })
     styledItems.push(styledItem)
   })
 

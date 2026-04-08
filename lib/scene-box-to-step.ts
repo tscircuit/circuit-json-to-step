@@ -99,7 +99,13 @@ function createSceneMeshSolid(
     const face = createFaceFromVertices(repo, vertices)
     const faceColor = normalizeTriangleColor(triangle.color)
     if (faceColor) {
-      styledItems.push(createStyledItem(repo, face, faceColor, styleCache))
+      styledItems.push(
+        createStyledItem(repo, {
+          itemRef: face,
+          rgb: faceColor,
+          styleCache,
+        }),
+      )
     }
     return face
   })
