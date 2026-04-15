@@ -20,6 +20,7 @@
     "@tscircuit/circuit-json-util": "^0.0.75",
     "@types/bun": "latest",
     "circuit-json": "^0.0.406",
+    "circuit-json-to-gltf": "^0.0.93",
     "looks-same": "^10.0.1",
     "occt-import-js": "^0.0.23",
     "poppygl": "^0.0.17",
@@ -27,11 +28,16 @@
   },
   "peerDependencies": {
     "@tscircuit/circuit-json-util": "*",
+    "circuit-json-to-gltf": "*",
     "typescript": "^5"
+  },
+  "peerDependenciesMeta": {
+    "circuit-json-to-gltf": {
+      "optional": true
+    }
   },
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
-    "circuit-json-to-gltf": "^0.0.93",
     "circuit-to-svg": "^0.0.327",
     "schematic-symbols": "^0.0.202",
     "stepts": "^0.0.4"

@@ -1,5 +1,8 @@
 [test]
-preload = ["./test/fixtures/step-snapshot.ts"]
+preload = [
+  "./test/fixtures/register-dynamic-modules.ts",
+  "./test/fixtures/step-snapshot.ts",
+]
 
 [install.lockfile]
 save = false
