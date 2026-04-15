@@ -1,11 +1,10 @@
 import { expect, test } from "bun:test"
 import {
   CIRCUIT_JSON_TO_GLTF_MODULE,
-  DynamicModuleRegistryError,
   getCircuitJsonToGltfModule,
 } from "../lib/dynamic-modules"
 
-test("dynamic modules: prefers registered global module", async () => {
+test("dynamic modules: prefers package import over registered global module", async () => {
   const originalRegistry = globalThis.tscircuitDynamicModules
   const stubModule = {
     convertCircuitJsonTo3D: async () => ({ boxes: [] }),
@@ -20,13 +19,15 @@ test("dynamic modules: prefers registered global module", async () => {
     }
 
     const mod = await getCircuitJsonToGltfModule()
-    expect(mod).toBe(stubModule)
+    expect(mod).not.toBe(stubModule)
+    expect(typeof mod.convertCircuitJsonTo3D).toBe("function")
+    expect(typeof mod.convertSceneToGLTF).toBe("function")
   } finally {
     globalThis.tscircuitDynamicModules = originalRegistry
   }
 })
 
-test("dynamic modules: falls back to package import when registry is empty", async () => {
+test("dynamic modules: caches package import in the global registry", async () => {
   const originalRegistry = globalThis.tscircuitDynamicModules
 
   try {
@@ -45,7 +46,7 @@ test("dynamic modules: falls back to package import when registry is empty", asy
   }
 })
 
-test("dynamic modules: rejects invalid registered module shape", async () => {
+test("dynamic modules: ignores invalid registered module when package import succeeds", async () => {
   const originalRegistry = globalThis.tscircuitDynamicModules
 
   try {
@@ -53,9 +54,9 @@ test("dynamic modules: rejects invalid registered module shape", async () => {
       [CIRCUIT_JSON_TO_GLTF_MODULE]: {} as any,
     }
 
-    await expect(getCircuitJsonToGltfModule()).rejects.toBeInstanceOf(
-      DynamicModuleRegistryError,
-    )
+    const mod = await getCircuitJsonToGltfModule()
+    expect(typeof mod.convertCircuitJsonTo3D).toBe("function")
+    expect(typeof mod.convertSceneToGLTF).toBe("function")
   } finally {
     globalThis.tscircuitDynamicModules = originalRegistry
   }

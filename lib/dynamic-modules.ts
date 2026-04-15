@@ -120,9 +120,20 @@ function assertCircuitJsonToGltfModule(
 
 export async function getCircuitJsonToGltfModule(): Promise<CircuitJsonToGltfModule> {
   const registry = getDynamicModuleRegistry()
-  const registeredModule = registry[CIRCUIT_JSON_TO_GLTF_MODULE]
+  try {
+    const importedModule = await importCircuitJsonToGltfModule()
+    assertCircuitJsonToGltfModule(importedModule)
+    registry[CIRCUIT_JSON_TO_GLTF_MODULE] = {
+      repo: () => importedModule,
+    }
+    return importedModule
+  } catch (importError) {
+    const registeredModule = registry[CIRCUIT_JSON_TO_GLTF_MODULE]
 
-  if (registeredModule !== undefined) {
+    if (registeredModule === undefined) {
+      throw importError
+    }
+
     assertDynamicModuleWithRepo<CircuitJsonToGltfModule>(
       CIRCUIT_JSON_TO_GLTF_MODULE,
       registeredModule,
@@ -131,14 +142,4 @@ export async function getCircuitJsonToGltfModule(): Promise<CircuitJsonToGltfMod
     assertCircuitJsonToGltfModule(mod)
     return mod
   }
-
-  const importedModule = await importCircuitJsonToGltfModule()
-  assertCircuitJsonToGltfModule(importedModule)
-  registry[CIRCUIT_JSON_TO_GLTF_MODULE] = {
-    repo: () => importedModule,
-  }
-
-  const mod = registry[CIRCUIT_JSON_TO_GLTF_MODULE]?.repo()
-  assertCircuitJsonToGltfModule(mod)
-  return mod
 }
