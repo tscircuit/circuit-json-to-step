@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import {
-  CIRCUIT_JSON_TO_GLTF_MODULE,
+  circuitJsonToGltfModuleName,
   getCircuitJsonToGltfModule,
 } from "../lib/dynamic-modules"
 
@@ -13,7 +13,7 @@ test("dynamic modules: prefers package import over registered global module", as
 
   try {
     globalThis.tscircuitDynamicModules = {
-      [CIRCUIT_JSON_TO_GLTF_MODULE]: stubModule,
+      [circuitJsonToGltfModuleName]: stubModule,
     }
 
     const mod = await getCircuitJsonToGltfModule()
@@ -44,7 +44,7 @@ test("dynamic modules: ignores invalid registered module when package import suc
 
   try {
     globalThis.tscircuitDynamicModules = {
-      [CIRCUIT_JSON_TO_GLTF_MODULE]: {} as any,
+      [circuitJsonToGltfModuleName]: {} as any,
     }
 
     const mod = await getCircuitJsonToGltfModule()

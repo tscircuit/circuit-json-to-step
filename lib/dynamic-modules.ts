@@ -1,7 +1,7 @@
 import type { CircuitJson } from "circuit-json"
 import type { SceneBox } from "./scene-geometry"
 
-export const CIRCUIT_JSON_TO_GLTF_MODULE = "circuit-json-to-gltf" as const
+export const circuitJsonToGltfModuleName = "circuit-json-to-gltf" as const
 
 export interface CircuitJsonToGltf3DOptions {
   boardThickness?: number
@@ -30,7 +30,7 @@ export interface CircuitJsonToGltfModule {
 }
 
 type DynamicModuleRegistry = {
-  [CIRCUIT_JSON_TO_GLTF_MODULE]?: CircuitJsonToGltfModule
+  [circuitJsonToGltfModuleName]?: CircuitJsonToGltfModule
 } & Record<string, unknown>
 
 declare global {
@@ -59,7 +59,7 @@ function assertCircuitJsonToGltfModule(
     typeof candidate.convertSceneToGLTF !== "function"
   ) {
     throw new DynamicModuleRegistryError(
-      `Invalid module: "${CIRCUIT_JSON_TO_GLTF_MODULE}". Expected an object with convertCircuitJsonTo3D() and convertSceneToGLTF().`,
+      `Invalid module: "${circuitJsonToGltfModuleName}". Expected an object with convertCircuitJsonTo3D() and convertSceneToGLTF().`,
     )
   }
 }
@@ -71,7 +71,7 @@ export async function getCircuitJsonToGltfModule(): Promise<CircuitJsonToGltfMod
     return importedModule
   } catch {
     const dynamicGlobal =
-      globalThis.tscircuitDynamicModules?.[CIRCUIT_JSON_TO_GLTF_MODULE]
+      globalThis.tscircuitDynamicModules?.[circuitJsonToGltfModuleName]
 
     if (dynamicGlobal) {
       assertCircuitJsonToGltfModule(dynamicGlobal)
@@ -79,7 +79,7 @@ export async function getCircuitJsonToGltfModule(): Promise<CircuitJsonToGltfMod
     }
 
     throw new DynamicModuleRegistryError(
-      `Missing module: "${CIRCUIT_JSON_TO_GLTF_MODULE}". Install the package or register globalThis.tscircuitDynamicModules["${CIRCUIT_JSON_TO_GLTF_MODULE}"].`,
+      `Missing module: "${circuitJsonToGltfModuleName}". Install the package or register globalThis.tscircuitDynamicModules["${circuitJsonToGltfModuleName}"].`,
     )
   }
 }
