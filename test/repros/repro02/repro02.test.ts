@@ -1,10 +1,6 @@
 import { expect, test } from "bun:test"
 import { renderGLTFToPNGBufferFromGLBBuffer } from "poppygl"
-import {
-  CIRCUIT_JSON_TO_GLTF_MODULE,
-  type CircuitJsonToGltfModule,
-  getDynamicModule,
-} from "../../../lib/dynamic-modules"
+import { getCircuitJsonToGltfModule } from "../../../lib/dynamic-modules"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./repro02.json"
@@ -16,9 +12,7 @@ test("repro02: convert circuit json with rotated pill holes to STEP", async () =
   })
 
   const { convertCircuitJsonTo3D, convertSceneToGLTF } =
-    getDynamicModule<CircuitJsonToGltfModule>(
-      CIRCUIT_JSON_TO_GLTF_MODULE,
-    ).repo()
+    await getCircuitJsonToGltfModule()
   const scene3d = await convertCircuitJsonTo3D(circuitJson as any, {
     renderBoardTextures: false,
     showBoundingBoxes: false,

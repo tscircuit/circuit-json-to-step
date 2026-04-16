@@ -1,7 +1,5 @@
 const gltfModuleName = "circuit-json-to-gltf"
-const circuitJsonToGltf = await import(/* @vite-ignore */ gltfModuleName)
+const circuitJsonToGltf = await import("circuit-json-to-gltf")
 
 globalThis.tscircuitDynamicModules ??= {}
-globalThis.tscircuitDynamicModules[gltfModuleName] = {
-  repo: () => circuitJsonToGltf,
-}
+globalThis.tscircuitDynamicModules[gltfModuleName] = circuitJsonToGltf

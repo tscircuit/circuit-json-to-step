@@ -3,10 +3,6 @@ import type { SceneBox } from "./scene-geometry"
 
 export const CIRCUIT_JSON_TO_GLTF_MODULE = "circuit-json-to-gltf" as const
 
-export interface DynamicModuleWithRepo<TModule> {
-  repo(): TModule
-}
-
 export interface CircuitJsonToGltf3DOptions {
   boardThickness?: number
   renderBoardTextures?: boolean
@@ -14,7 +10,7 @@ export interface CircuitJsonToGltf3DOptions {
 }
 
 export interface CircuitJsonToGltfScene {
-  boxes: SceneBox[]
+  boxes: unknown[]
   camera?: {
     position: { x: number; y: number; z: number }
     target: { x: number; y: number; z: number }
@@ -34,7 +30,7 @@ export interface CircuitJsonToGltfModule {
 }
 
 type DynamicModuleRegistry = {
-  [CIRCUIT_JSON_TO_GLTF_MODULE]?: DynamicModuleWithRepo<CircuitJsonToGltfModule>
+  [CIRCUIT_JSON_TO_GLTF_MODULE]?: CircuitJsonToGltfModule
 } & Record<string, unknown>
 
 declare global {
@@ -45,56 +41,6 @@ export class DynamicModuleRegistryError extends Error {
   constructor(message: string) {
     super(message)
     this.name = "DynamicModuleRegistryError"
-  }
-}
-
-function getDynamicModuleRegistry(): DynamicModuleRegistry {
-  return (
-    globalThis.tscircuitDynamicModules ??
-    (globalThis.tscircuitDynamicModules = {})
-  )
-}
-
-function assertDynamicModuleWithRepo<TModule>(
-  name: string,
-  mod: unknown,
-): asserts mod is DynamicModuleWithRepo<TModule> {
-  if (
-    typeof mod !== "object" ||
-    mod === null ||
-    !("repo" in mod) ||
-    typeof mod.repo !== "function"
-  ) {
-    throw new DynamicModuleRegistryError(
-      `Invalid dynamic module: "${name}". Expected globalThis.tscircuitDynamicModules["${name}"] to expose a repo() function.`,
-    )
-  }
-}
-
-export function getDynamicModule<TModule>(
-  name: string,
-): DynamicModuleWithRepo<TModule> {
-  const registry = getDynamicModuleRegistry()
-  const mod = registry[name]
-
-  if (!mod) {
-    throw new DynamicModuleRegistryError(
-      `Missing dynamic module: "${name}". Ensure it is registered via the dynamic importer before use.`,
-    )
-  }
-
-  assertDynamicModuleWithRepo<TModule>(name, mod)
-  return mod
-}
-
-async function importCircuitJsonToGltfModule(): Promise<CircuitJsonToGltfModule> {
-  try {
-    const mod = await import(/* @vite-ignore */ CIRCUIT_JSON_TO_GLTF_MODULE)
-    return mod as CircuitJsonToGltfModule
-  } catch {
-    throw new DynamicModuleRegistryError(
-      `Missing module: "${CIRCUIT_JSON_TO_GLTF_MODULE}". Either register it in globalThis.tscircuitDynamicModules["${CIRCUIT_JSON_TO_GLTF_MODULE}"] with a repo() function, or install the "${CIRCUIT_JSON_TO_GLTF_MODULE}" package so it can be loaded directly.`,
-    )
   }
 }
 
@@ -113,33 +59,27 @@ function assertCircuitJsonToGltfModule(
     typeof candidate.convertSceneToGLTF !== "function"
   ) {
     throw new DynamicModuleRegistryError(
-      `Invalid dynamic module repo: "${CIRCUIT_JSON_TO_GLTF_MODULE}". Expected repo() to return an object with convertCircuitJsonTo3D() and convertSceneToGLTF().`,
+      `Invalid module: "${CIRCUIT_JSON_TO_GLTF_MODULE}". Expected an object with convertCircuitJsonTo3D() and convertSceneToGLTF().`,
     )
   }
 }
 
 export async function getCircuitJsonToGltfModule(): Promise<CircuitJsonToGltfModule> {
-  const registry = getDynamicModuleRegistry()
   try {
-    const importedModule = await importCircuitJsonToGltfModule()
+    const importedModule = await import("circuit-json-to-gltf")
     assertCircuitJsonToGltfModule(importedModule)
-    registry[CIRCUIT_JSON_TO_GLTF_MODULE] = {
-      repo: () => importedModule,
-    }
     return importedModule
-  } catch (importError) {
-    const registeredModule = registry[CIRCUIT_JSON_TO_GLTF_MODULE]
+  } catch {
+    const dynamicGlobal =
+      globalThis.tscircuitDynamicModules?.[CIRCUIT_JSON_TO_GLTF_MODULE]
 
-    if (registeredModule === undefined) {
-      throw importError
+    if (dynamicGlobal) {
+      assertCircuitJsonToGltfModule(dynamicGlobal)
+      return dynamicGlobal
     }
 
-    assertDynamicModuleWithRepo<CircuitJsonToGltfModule>(
-      CIRCUIT_JSON_TO_GLTF_MODULE,
-      registeredModule,
+    throw new DynamicModuleRegistryError(
+      `Missing module: "${CIRCUIT_JSON_TO_GLTF_MODULE}". Install the package or register globalThis.tscircuitDynamicModules["${CIRCUIT_JSON_TO_GLTF_MODULE}"].`,
     )
-    const mod = registeredModule.repo()
-    assertCircuitJsonToGltfModule(mod)
-    return mod
   }
 }

@@ -13,9 +13,7 @@ test("dynamic modules: prefers package import over registered global module", as
 
   try {
     globalThis.tscircuitDynamicModules = {
-      [CIRCUIT_JSON_TO_GLTF_MODULE]: {
-        repo: () => stubModule,
-      },
+      [CIRCUIT_JSON_TO_GLTF_MODULE]: stubModule,
     }
 
     const mod = await getCircuitJsonToGltfModule()
@@ -27,7 +25,7 @@ test("dynamic modules: prefers package import over registered global module", as
   }
 })
 
-test("dynamic modules: caches package import in the global registry", async () => {
+test("dynamic modules: imports package when registry is empty", async () => {
   const originalRegistry = globalThis.tscircuitDynamicModules
 
   try {
@@ -36,11 +34,6 @@ test("dynamic modules: caches package import in the global registry", async () =
     const mod = await getCircuitJsonToGltfModule()
     expect(typeof mod.convertCircuitJsonTo3D).toBe("function")
     expect(typeof mod.convertSceneToGLTF).toBe("function")
-    const registry = globalThis.tscircuitDynamicModules as
-      | Record<string, { repo?: unknown }>
-      | undefined
-    const registeredModule = registry?.[CIRCUIT_JSON_TO_GLTF_MODULE]
-    expect(typeof registeredModule?.repo).toBe("function")
   } finally {
     globalThis.tscircuitDynamicModules = originalRegistry
   }
