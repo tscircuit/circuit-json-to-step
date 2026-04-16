@@ -760,3 +760,5 @@ export async function circuitJsonToStep(
   const stepText = repo.toPartFile({ name: productName })
   return normalizeStepNumericExponents(stepText)
 }
+
+export { getCircuitJsonToGltfModule } from "./get-circuit-json-to-gltf-module"

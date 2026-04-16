@@ -1,6 +1,7 @@
 import type { CircuitJson } from "circuit-json"
 import type { Ref, Repository } from "stepts"
 import { ManifoldSolidBrep } from "stepts"
+import { getCircuitJsonToGltfModule } from "./get-circuit-json-to-gltf-module"
 import { createSceneBoxSolid } from "./scene-box-to-step"
 import type { GeneratedSceneSolid, SceneBox } from "./scene-geometry"
 
@@ -93,10 +94,7 @@ export async function generateComponentMeshes(
         return element
       })
 
-    const gltfModule = "circuit-json-to-gltf"
-    const { convertCircuitJsonTo3D } = await import(
-      /* @vite-ignore */ gltfModule
-    )
+    const { convertCircuitJsonTo3D } = await getCircuitJsonToGltfModule()
 
     const scene3d = await convertCircuitJsonTo3D(filteredCircuitJson, {
       boardThickness,
