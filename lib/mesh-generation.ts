@@ -98,11 +98,51 @@ export async function generateComponentMeshes(
 
     const scene3d = await convertCircuitJsonTo3D(filteredCircuitJson, {
       boardThickness,
-      renderBoardTextures: false,
+      renderBoardTextures: true,
     })
 
     for (const box of scene3d.boxes as SceneBox[]) {
       solids.push(createSceneBoxSolid(repo, box))
+    }
+
+    // Manually add pads as thin boxes if they are not returned by convertCircuitJsonTo3D
+    const pads = filteredCircuitJson.filter((e) => e.type === "pcb_smtpad")
+    for (const pad of pads as any[]) {
+      if (pad.shape === "rect") {
+        const thickness = 0.02
+        const zPos =
+          pad.layer === "top"
+            ? boardThickness / 2 + thickness / 2
+            : -boardThickness / 2 - thickness / 2
+
+        solids.push(
+          createSceneBoxSolid(repo, {
+            center: { x: pad.x, y: pad.y, z: zPos },
+            size: { x: pad.width, y: pad.height, z: thickness },
+            label: `Pad ${pad.pcb_smtpad_id}`,
+          }),
+        )
+      }
+    }
+
+    // Manually add silkscreen rectangles
+    const silkscreenRects = filteredCircuitJson.filter(
+      (e) => e.type === "pcb_silkscreen_rect",
+    )
+    for (const rect of silkscreenRects as any[]) {
+      const thickness = 0.02
+      const zPos =
+        rect.layer === "top"
+          ? boardThickness / 2 + thickness / 2
+          : -boardThickness / 2 - thickness / 2
+
+      solids.push(
+        createSceneBoxSolid(repo, {
+          center: { x: rect.center.x, y: rect.center.y, z: zPos },
+          size: { x: rect.width, y: rect.height, z: thickness },
+          label: `Silkscreen Rect`,
+        }),
+      )
     }
   } catch (error) {
     console.warn("Failed to generate component mesh:", error)
