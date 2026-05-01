@@ -22,9 +22,16 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Verify we have multiple solids (board + components)
+  // Verify we have multiple solids (board + one per component)
+  // Regression test for issue #6: component rectangles were missing because all
+  // component boxes were merged into a single ManifoldSolidBrep (invalid STEP
+  // topology). Now each component box gets its own solid.
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
-  expect(solidCount).toBeGreaterThanOrEqual(1)
+  const pcbComponentCount = (circuitJson as any[]).filter(
+    (e) => e.type === "pcb_component",
+  ).length
+  // Expect: 1 board solid + 1 solid per pcb_component
+  expect(solidCount).toBeGreaterThanOrEqual(pcbComponentCount + 1)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics04.step"
@@ -38,13 +45,18 @@ test("basics04: convert circuit json with components to STEP", async () => {
   // Validate STEP file can be imported with occt-import-js
   const occtResult = await importStepWithOcct(stepText)
   expect(occtResult.success).toBe(true)
-  expect(occtResult.meshes.length).toBeGreaterThan(0)
+  // Each solid should produce at least one mesh in occt — verifies components
+  // are individually visible (not silently discarded as invalid topology)
+  expect(occtResult.meshes.length).toBeGreaterThanOrEqual(pcbComponentCount + 1)
 
   const [firstMesh] = occtResult.meshes
   expect(firstMesh.attributes.position.array.length).toBeGreaterThan(0)
   expect(firstMesh.index.array.length).toBeGreaterThan(0)
 
   console.log("✓ STEP file successfully validated with occt-import-js")
+  console.log(
+    `  - occt meshes: ${occtResult.meshes.length} (expected ≥ ${pcbComponentCount + 1})`,
+  )
 
   await expect(stepText).toMatchStepSnapshot(import.meta.path, "basics04")
 }, 30000)
