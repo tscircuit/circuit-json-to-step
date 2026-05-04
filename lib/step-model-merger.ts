@@ -1,13 +1,14 @@
 import {
   CartesianPoint,
   Direction,
+  type Entity,
   ManifoldSolidBrep,
   Ref,
   Repository,
   Unknown,
   parseRepository,
 } from "stepts"
-import { eid } from "stepts/lib/core/EntityId"
+import { eid } from "stepts"
 import { EXCLUDED_ENTITY_TYPES } from "./step-model-merger/excluded-entity-types"
 import {
   asVector3,
@@ -136,7 +137,7 @@ function mergeSingleStepModel(
   return solids
 }
 
-type RepositoryEntry = readonly [number, any]
+type RepositoryEntry = readonly [number, Entity]
 
 function adjustTransformForPlacement(
   entries: ReadonlyArray<RepositoryEntry>,
@@ -203,20 +204,20 @@ function adjustTransformForPlacement(
 
   if (isThroughHoleComponent) {
     // Place model's z=0 at board top surface.
-    // For through-hole components, the flange should always sit at board top (z=boardThickness),
+    // For through-hole components, the flange should always sit at board top (z=boardThickness/2),
     // regardless of position.z from circuit JSON (which may include absolute coordinates or offsets
     // that shouldn't affect the flange placement).
-    transform.translation.z = boardThickness
+    transform.translation.z = boardThickness / 2
   }
 
   if (!isThroughHoleComponent && boardThickness > 0) {
     const halfThickness = boardThickness / 2
-    const offsetZ = targetZ - halfThickness
+    const offsetZ = targetZ
     if (normalizedLayer === "bottom") {
       transform.translation.z = -maxZ + offsetZ
       transform.rotation.x = normalizeDegrees(transform.rotation.x + 180)
     } else {
-      transform.translation.z = boardThickness - minZ + offsetZ
+      transform.translation.z = halfThickness - minZ + offsetZ
     }
   } else if (!isThroughHoleComponent) {
     // Only apply center-based Z for non-through-hole components without board thickness

@@ -11,12 +11,27 @@ import type { OcctMesh } from "../utils/occt/importer"
 // Ensure PNG matcher is loaded so we can reuse it
 import "./png-matcher"
 
+type GLTFPrimitive = {
+  attributes: Record<string, number>
+  indices: number
+  material: number
+  mode: 4
+}
+
+type GLTFMaterial = {
+  pbrMetallicRoughness: {
+    baseColorFactor: [number, number, number, number]
+    metallicFactor: number
+    roughnessFactor: number
+  }
+}
+
 type GLTF = {
   asset: { version: "2.0"; generator?: string }
   scene: number
   scenes: { nodes: number[] }[]
   nodes: { mesh: number }[]
-  meshes: { primitives: any[] }[]
+  meshes: { primitives: GLTFPrimitive[] }[]
   buffers: { byteLength: number }[]
   bufferViews: {
     buffer: number
@@ -33,7 +48,7 @@ type GLTF = {
     min?: number[]
     max?: number[]
   }[]
-  materials: any[]
+  materials: GLTFMaterial[]
 }
 
 function createFloat32Buffer(data: number[]): Uint8Array {
@@ -89,6 +104,25 @@ function gltfFromOcctMeshes(meshes: OcctMesh[]) {
   }
 
   const defaultColor: [number, number, number] = [0.82, 0.82, 0.82]
+  const materialCache = new Map<string, number>()
+
+  const getMaterialIndex = (color: [number, number, number]) => {
+    const key = color.map((value) => value.toFixed(6)).join(",")
+    const existing = materialCache.get(key)
+    if (typeof existing === "number") return existing
+
+    const matIndex =
+      gltf.materials.push({
+        pbrMetallicRoughness: {
+          baseColorFactor: [color[0], color[1], color[2], 1],
+          metallicFactor: 0,
+          roughnessFactor: 0.9,
+        },
+      }) - 1
+
+    materialCache.set(key, matIndex)
+    return matIndex
+  }
 
   for (const m of meshes) {
     const positions = (m.attributes.position?.array ?? []) as number[]
@@ -99,17 +133,6 @@ function gltfFromOcctMeshes(meshes: OcctMesh[]) {
       // skip empty meshes
       continue
     }
-
-    // Material
-    const [r, g, b] = (m.color ?? defaultColor) as [number, number, number]
-    const matIndex =
-      gltf.materials.push({
-        pbrMetallicRoughness: {
-          baseColorFactor: [r, g, b, 1],
-          metallicFactor: 0,
-          roughnessFactor: 0.9,
-        },
-      }) - 1
 
     // POSITION
     const posBufIdx = addBuffer(createFloat32Buffer(positions))
@@ -168,16 +191,55 @@ function gltfFromOcctMeshes(meshes: OcctMesh[]) {
     const attributes: Record<string, number> = { POSITION: posAccIdx }
     if (typeof normAccIdx === "number") attributes.NORMAL = normAccIdx
 
-    const meshIndex =
-      gltf.meshes.push({
-        primitives: [
+    const hasFaceColors = m.brep_faces.some((face) => face.color !== null)
+    const primitives: GLTFPrimitive[] = hasFaceColors
+      ? m.brep_faces.flatMap((face) => {
+          const color = (face.color ?? m.color ?? defaultColor) as [
+            number,
+            number,
+            number,
+          ]
+          const faceIndices = indices.slice(face.first * 3, (face.last + 1) * 3)
+          if (!faceIndices.length) return []
+
+          const faceIdxBufIdx = addBuffer(createUint32Buffer(faceIndices))
+          const faceIdxBVIdx =
+            gltf.bufferViews.push({
+              buffer: faceIdxBufIdx,
+              byteLength: faceIndices.length * 4,
+              target: 34963, // ELEMENT_ARRAY_BUFFER
+            }) - 1
+          const faceIdxAccIdx =
+            gltf.accessors.push({
+              bufferView: faceIdxBVIdx,
+              componentType: 5125, // UNSIGNED_INT
+              count: faceIndices.length,
+              type: "SCALAR",
+            }) - 1
+
+          return [
+            {
+              attributes,
+              indices: faceIdxAccIdx,
+              material: getMaterialIndex(color),
+              mode: 4, // TRIANGLES
+            },
+          ]
+        })
+      : [
           {
             attributes,
             indices: idxAccIdx,
-            material: matIndex,
+            material: getMaterialIndex(
+              (m.color ?? defaultColor) as [number, number, number],
+            ),
             mode: 4, // TRIANGLES
           },
-        ],
+        ]
+
+    const meshIndex =
+      gltf.meshes.push({
+        primitives,
       }) - 1
 
     const nodeIndex = gltf.nodes.push({ mesh: meshIndex }) - 1
@@ -199,7 +261,7 @@ async function renderStepToPNG(
   }
 
   const { gltf, buffers } = gltfFromOcctMeshes(result.meshes)
-  const scene = createSceneFromGLTF(gltf as any, { buffers, images: [] })
+  const scene = createSceneFromGLTF(gltf, { buffers, images: [] })
 
   const { bitmap } = renderSceneFromGLTF(
     scene,
@@ -224,19 +286,28 @@ async function renderStepToPNG(
  *   await expect(stepContent).toMatchStepSnapshot(import.meta.path, "optionalName")
  */
 async function toMatchStepSnapshot(
-  // biome-ignore lint/suspicious/noExplicitAny: bun doesn't expose
-  this: any,
-  stepContent: string | Uint8Array | ArrayBuffer,
+  this: unknown,
+  received: unknown,
   testPathOriginal: string,
   pngName?: string,
 ) {
-  const png = await renderStepToPNG(stepContent)
+  if (
+    typeof received !== "string" &&
+    !(received instanceof Uint8Array) &&
+    !(received instanceof ArrayBuffer)
+  ) {
+    throw new Error(
+      "Expected STEP content to be a string, Uint8Array, or ArrayBuffer",
+    )
+  }
+
+  const png = await renderStepToPNG(received)
   // Delegate to existing PNG matcher for snapshot compare/update UX
   return await expect(png).toMatchPngSnapshot(testPathOriginal, pngName)
 }
 
 expect.extend({
-  toMatchStepSnapshot: toMatchStepSnapshot as any,
+  toMatchStepSnapshot,
 })
 
 declare module "bun:test" {

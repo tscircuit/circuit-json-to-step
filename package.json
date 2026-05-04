@@ -1,7 +1,7 @@
 {
   "name": "circuit-json-to-step",
   "main": "dist/index.js",
-  "version": "0.0.20",
+  "version": "0.0.23",
   "type": "module",
   "scripts": {
     "pull-reference": "git clone https://github.com/tscircuit/circuit-json.git && find circuit-json/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\; && git clone https://github.com/tscircuit/stepts.git && find stepts/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\;",
@@ -19,11 +19,10 @@
     "@resvg/resvg-wasm": "^2.6.2",
     "@tscircuit/circuit-json-util": "^0.0.75",
     "@types/bun": "latest",
-    "circuit-json": "^0.0.286",
+    "circuit-json": "^0.0.406",
     "looks-same": "^10.0.1",
     "occt-import-js": "^0.0.23",
     "poppygl": "^0.0.17",
-    "stepts": "^0.0.3",
     "tsup": "^8.5.0"
   },
   "peerDependencies": {
@@ -32,8 +31,9 @@
   },
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
-    "circuit-json-to-gltf": "^0.0.91",
+    "circuit-json-to-gltf": "^0.0.93",
     "circuit-to-svg": "^0.0.327",
-    "schematic-symbols": "^0.0.202"
+    "schematic-symbols": "^0.0.202",
+    "stepts": "^0.0.4"
   }
 }
