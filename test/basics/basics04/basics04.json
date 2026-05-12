@@ -33,6 +33,17 @@
     "rotation": 0
   },
   {
+    "type": "cad_component",
+    "cad_component_id": "cad_component_1",
+    "pcb_component_id": "pcb_component_1",
+    "source_component_id": "source_component_1",
+    "position": { "x": 15, "y": 10, "z": 0.8 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "model_origin_alignment": "center_of_component_on_board_surface",
+    "anchor_alignment": "center_of_component_on_board_surface",
+    "show_as_bounding_box": true
+  },
+  {
     "type": "source_component",
     "source_component_id": "source_component_2",
     "name": "C1",
@@ -48,5 +59,16 @@
     "height": 1.25,
     "layer": "top",
     "rotation": 90
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_component_2",
+    "pcb_component_id": "pcb_component_2",
+    "source_component_id": "source_component_2",
+    "position": { "x": 20, "y": 10, "z": 0.8 },
+    "rotation": { "x": 0, "y": 0, "z": 90 },
+    "model_origin_alignment": "center_of_component_on_board_surface",
+    "anchor_alignment": "center_of_component_on_board_surface",
+    "show_as_bounding_box": true
   }
 ]
