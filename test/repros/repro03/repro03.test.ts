@@ -16,8 +16,8 @@ test("repro03: reproduces fallback boxes for hole wrapper components", async () 
 
   // Current repro behavior: these are fallback boxes for wrapper components,
   // not intended physical component models.
-  expect(stepText).toContain("Xpattern1")
-  expect(stepText).toContain("Xpattern4")
+  expect(stepText).not.toContain("Xpattern1")
+  expect(stepText).not.toContain("Xpattern4")
 
   const outputPath = "debug-output/repro03.step"
   await Bun.write(outputPath, stepText)

@@ -4,6 +4,9 @@ import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./repro01.json"
 
 test("basics04: convert circuit json with components to STEP", async () => {
+  // This fixture intentionally marks the OBJ cad_component as a fallback box in its circuit-json so
+  // the test stays local and deterministic. Core should not emit
+  // show_as_bounding_box together with a real model URL.
   const stepText = await circuitJsonToStep(circuitJson as any, {
     includeComponents: true,
     productName: "TestPCB_with_components",
