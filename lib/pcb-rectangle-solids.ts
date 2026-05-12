@@ -98,35 +98,36 @@ function createSilkscreenRectSolids(
   if (!center || width <= 0 || height <= 0 || strokeWidth <= 0) return []
 
   const id = element.pcb_silkscreen_rect_id ?? "pcb_silkscreen_rect"
+  const rotationDegrees = element.rotation ?? element.ccw_rotation ?? 0
   const halfWidth = width / 2
   const halfHeight = height / 2
   const halfStroke = strokeWidth / 2
   const bars = [
     {
       label: `${id}_top`,
-      x: center.x,
-      y: center.y + halfHeight - halfStroke,
+      x: 0,
+      y: halfHeight - halfStroke,
       width,
       height: strokeWidth,
     },
     {
       label: `${id}_bottom`,
-      x: center.x,
-      y: center.y - halfHeight + halfStroke,
+      x: 0,
+      y: -halfHeight + halfStroke,
       width,
       height: strokeWidth,
     },
     {
       label: `${id}_left`,
-      x: center.x - halfWidth + halfStroke,
-      y: center.y,
+      x: -halfWidth + halfStroke,
+      y: 0,
       width: strokeWidth,
       height,
     },
     {
       label: `${id}_right`,
-      x: center.x + halfWidth - halfStroke,
-      y: center.y,
+      x: halfWidth - halfStroke,
+      y: 0,
       width: strokeWidth,
       height,
     },
@@ -134,13 +135,14 @@ function createSilkscreenRectSolids(
 
   const solids: PcbRectangleSolid[] = []
   for (const bar of bars) {
+    const barCenter = rotateOffset(bar.x, bar.y, rotationDegrees)
     const solid = createRectSolid(options, {
       label: bar.label,
-      center: { x: bar.x, y: bar.y },
+      center: { x: center.x + barCenter.x, y: center.y + barCenter.y },
       width: bar.width,
       height: bar.height,
       layer: element.layer,
-      rotationDegrees: element.rotation ?? element.ccw_rotation ?? 0,
+      rotationDegrees,
       thickness: SILKSCREEN_THICKNESS,
       rgb: SILKSCREEN_RGB,
     })
@@ -227,6 +229,22 @@ function getLayerName(layer: LayerRef | undefined): string {
   if (!layer) return "top"
   if (typeof layer === "string") return layer
   return layer.name ?? "top"
+}
+
+function rotateOffset(
+  x: number,
+  y: number,
+  degrees: number,
+): { x: number; y: number } {
+  if (!degrees) return { x, y }
+
+  const radians = degreesToRadians(degrees)
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  return {
+    x: x * cos - y * sin,
+    y: x * sin + y * cos,
+  }
 }
 
 function degreesToRadians(degrees: number): number {
