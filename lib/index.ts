@@ -27,20 +27,15 @@ import {
   Circle,
   ClosedShell,
   ManifoldSolidBrep,
-  ColourRgb,
-  FillAreaStyleColour,
-  FillAreaStyle,
-  SurfaceStyleFillArea,
-  SurfaceSideStyle,
-  SurfaceStyleUsage,
-  PresentationStyleAssignment,
-  StyledItem,
+  type StyledItem,
   MechanicalDesignGeometricPresentationRepresentation,
   AdvancedBrepShapeRepresentation,
   ShapeDefinitionRepresentation,
   type Ref,
 } from "stepts"
 import { generateComponentMeshes } from "./mesh-generation"
+import { generatePcbRectangleSolids } from "./pcb-rectangle-solids"
+import { createPillCylindricalFaces, createPillHoleLoop } from "./pill-geometry"
 import { mergeExternalStepModels } from "./step-model-merger"
 import {
   createStyleCache,
@@ -49,7 +44,6 @@ import {
 } from "./step-style-utils"
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
-import { createPillCylindricalFaces, createPillHoleLoop } from "./pill-geometry"
 
 type Hole = Extract<
   CircuitJson[number],
@@ -618,6 +612,25 @@ export async function circuitJsonToStep(
   const componentStyledItems: Ref<StyledItem>[] = []
   const solidsWithIntrinsicFaceStyles = new Set<string>()
 
+  const pcbRectangleSolids = generatePcbRectangleSolids({
+    repo,
+    circuitJson,
+    boardThickness,
+  })
+  for (const rectangleSolid of pcbRectangleSolids) {
+    allSolids.push(rectangleSolid.solid)
+    if (rectangleSolid.styleTargets.length > 0) {
+      componentStyledItems.push(
+        ...createStyledItems(repo, {
+          itemRefs: rectangleSolid.styleTargets,
+          rgb: rectangleSolid.rgb,
+          styleCache,
+        }),
+      )
+      solidsWithIntrinsicFaceStyles.add(String(rectangleSolid.solid.id))
+    }
+  }
+
   let handledComponentIds = new Set<string>()
   let handledPcbComponentIds = new Set<string>()
 
@@ -631,9 +644,9 @@ export async function circuitJsonToStep(
     handledComponentIds = mergeResult.handledComponentIds
     handledPcbComponentIds = mergeResult.handledPcbComponentIds
     allSolids.push(...mergeResult.solids)
-    mergeResult.solids.forEach((solidRef) => {
+    for (const solidRef of mergeResult.solids) {
       solidsWithIntrinsicFaceStyles.add(String(solidRef.id))
-    })
+    }
   }
 
   // Generate component mesh fallback if requested
