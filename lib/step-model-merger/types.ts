@@ -1,5 +1,5 @@
 import type { CircuitJson } from "circuit-json"
-import type { ManifoldSolidBrep, Ref, Repository } from "stepts"
+import type { Entity, Ref, Repository } from "stepts"
 
 export type CadComponent = {
   type: "cad_component"
@@ -28,7 +28,7 @@ export type MergeTransform = {
 }
 
 export type MergeStepModelResult = {
-  solids: Ref<ManifoldSolidBrep>[]
+  solids: Ref<Entity>[]
   handledComponentIds: Set<string>
   handledPcbComponentIds: Set<string>
 }
