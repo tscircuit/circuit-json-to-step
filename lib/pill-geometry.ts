@@ -101,6 +101,24 @@ function createVertexAt(
   )
 }
 
+function createVertexCache(repo: Repository, z: number) {
+  const vertices = new Map<string, Ref<VertexPoint>>()
+  const normalize = (value: number) => {
+    const rounded = Number(value.toFixed(9))
+    return Object.is(rounded, -0) ? 0 : rounded
+  }
+
+  return (x: number, y: number) => {
+    const key = `${normalize(x)},${normalize(y)},${normalize(z)}`
+    const existing = vertices.get(key)
+    if (existing) return existing
+
+    const vertex = createVertexAt(repo, x, y, z)
+    vertices.set(key, vertex)
+    return vertex
+  }
+}
+
 function createLineEdge(
   repo: Repository,
   v1: Ref<VertexPoint>,
@@ -130,10 +148,10 @@ function createLineSegment(
   repo: Repository,
   start: { x: number; y: number },
   end: { x: number; y: number },
-  z: number,
+  getVertex: (x: number, y: number) => Ref<VertexPoint>,
 ): PillBoundarySegment {
-  const startVertex = createVertexAt(repo, start.x, start.y, z)
-  const endVertex = createVertexAt(repo, end.x, end.y, z)
+  const startVertex = getVertex(start.x, start.y)
+  const endVertex = getVertex(end.x, end.y)
   return {
     kind: "line",
     edge: createLineEdge(repo, startVertex, endVertex),
@@ -153,6 +171,7 @@ function createArcSegment(
   rotation: number,
   centerX0: number,
   centerY0: number,
+  getVertex: (x: number, y: number) => Ref<VertexPoint>,
 ): PillBoundarySegment {
   const start = rotatePoint(
     centerX + radius * Math.cos(startAngle),
@@ -169,8 +188,8 @@ function createArcSegment(
     rotation,
   )
   const center = rotatePoint(centerX, centerY, centerX0, centerY0, rotation)
-  const startVertex = createVertexAt(repo, start.x, start.y, z)
-  const endVertex = createVertexAt(repo, end.x, end.y, z)
+  const startVertex = getVertex(start.x, start.y)
+  const endVertex = getVertex(end.x, end.y)
   const centerPoint = repo.add(new CartesianPoint("", center.x, center.y, z))
   const normalDir = repo.add(new Direction("", 0, 0, -1))
   const refDir = repo.add(
@@ -207,6 +226,7 @@ function createPillBoundarySegments(
     isHorizontal,
   } = geom
   const capOffset = straightHalfLength
+  const getVertex = createVertexCache(repo, z)
 
   if (isHorizontal) {
     return [
@@ -221,6 +241,7 @@ function createPillBoundarySegments(
         rotation,
         centerX,
         centerY,
+        getVertex,
       ),
       createLineSegment(
         repo,
@@ -238,7 +259,7 @@ function createPillBoundarySegments(
           centerY,
           rotation,
         ),
-        z,
+        getVertex,
       ),
       createArcSegment(
         repo,
@@ -251,6 +272,7 @@ function createPillBoundarySegments(
         rotation,
         centerX,
         centerY,
+        getVertex,
       ),
       createLineSegment(
         repo,
@@ -268,7 +290,7 @@ function createPillBoundarySegments(
           centerY,
           rotation,
         ),
-        z,
+        getVertex,
       ),
     ]
   }
@@ -285,6 +307,7 @@ function createPillBoundarySegments(
       rotation,
       centerX,
       centerY,
+      getVertex,
     ),
     createLineSegment(
       repo,
@@ -302,7 +325,7 @@ function createPillBoundarySegments(
         centerY,
         rotation,
       ),
-      z,
+      getVertex,
     ),
     createArcSegment(
       repo,
@@ -315,6 +338,7 @@ function createPillBoundarySegments(
       rotation,
       centerX,
       centerY,
+      getVertex,
     ),
     createLineSegment(
       repo,
@@ -332,7 +356,7 @@ function createPillBoundarySegments(
         centerY,
         rotation,
       ),
-      z,
+      getVertex,
     ),
   ]
 }
@@ -365,16 +389,25 @@ export function createPillHoleGeometry(
   const bottomLoop = createLoopFromSegments(repo, bottomSegments, true)
   const topLoop = createLoopFromSegments(repo, topSegments, true)
   const wallFaces: Ref<AdvancedFace>[] = []
+  const verticalEdges = new Map<string, Ref<EdgeCurve>>()
+  const getVerticalEdge = (
+    bottomVertex: Ref<VertexPoint>,
+    topVertex: Ref<VertexPoint>,
+  ) => {
+    const key = `${bottomVertex.id}:${topVertex.id}`
+    const existing = verticalEdges.get(key)
+    if (existing) return existing
+
+    const edge = createLineEdge(repo, bottomVertex, topVertex)
+    verticalEdges.set(key, edge)
+    return edge
+  }
 
   for (let i = 0; i < bottomSegments.length; i++) {
     const bottomSegment = bottomSegments[i]!
     const topSegment = topSegments[i]!
-    const startVertical = createLineEdge(
-      repo,
-      bottomSegment.start,
-      topSegment.start,
-    )
-    const endVertical = createLineEdge(repo, bottomSegment.end, topSegment.end)
+    const startVertical = getVerticalEdge(bottomSegment.start, topSegment.start)
+    const endVertical = getVerticalEdge(bottomSegment.end, topSegment.end)
     const loop = repo.add(
       new EdgeLoop("", [
         repo.add(new OrientedEdge("", bottomSegment.edge, true)),
