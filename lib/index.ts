@@ -30,7 +30,9 @@ import {
   type StyledItem,
   MechanicalDesignGeometricPresentationRepresentation,
   AdvancedBrepShapeRepresentation,
+  ShapeRepresentation,
   ShapeDefinitionRepresentation,
+  type Entity,
   type Ref,
 } from "stepts"
 import { generateComponentMeshes } from "./mesh-generation"
@@ -608,7 +610,7 @@ export async function circuitJsonToStep(
   const solid = repo.add(new ManifoldSolidBrep(productName, shell))
 
   // Array to hold all solids (board + optional components)
-  const allSolids: Ref<ManifoldSolidBrep>[] = [solid]
+  const allSolids: Ref<Entity>[] = [solid]
   const componentStyledItems: Ref<StyledItem>[] = []
   const solidsWithIntrinsicFaceStyles = new Set<string>()
 
@@ -763,9 +765,17 @@ export async function circuitJsonToStep(
     ),
   )
 
-  // Shape representation with all solids
+  const hasMappedItems = allSolids.some(
+    (itemRef) => itemRef.resolve(repo).type === "MAPPED_ITEM",
+  )
   const shapeRep = repo.add(
-    new AdvancedBrepShapeRepresentation(productName, allSolids, geomContext),
+    hasMappedItems
+      ? new ShapeRepresentation(productName, allSolids, geomContext)
+      : new AdvancedBrepShapeRepresentation(
+          productName,
+          allSolids,
+          geomContext,
+        ),
   )
   repo.add(new ShapeDefinitionRepresentation(productDefShape, shapeRep))
 

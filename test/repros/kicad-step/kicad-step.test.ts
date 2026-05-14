@@ -20,6 +20,11 @@ const EXPECTED_COMPONENT_CENTERS = (circuitJson as CadComponentJson[])
     x: item.position?.x ?? 0,
     y: item.position?.y ?? 0,
   }))
+const EXPECTED_UNIQUE_STEP_MODEL_COUNT = new Set(
+  (circuitJson as CadComponentJson[])
+    .filter((item) => item.type === "cad_component" && item.model_step_url)
+    .map((item) => item.model_step_url),
+).size
 
 const fixturesDir = fileURLToPath(
   new URL("../../fixtures/kicad-models/", import.meta.url),
@@ -99,6 +104,9 @@ test("kicad-step: merges KiCad STEP models referenced via model_step_url", async
     fsMap,
   })
 
+  const outputPath = "debug-output/kicad-step.step"
+  await Bun.write(outputPath, stepText)
+
   expect(stepText).toContain("KiCadStepMerge")
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
   expect(solidCount).toBeGreaterThanOrEqual(3)
@@ -114,9 +122,15 @@ test("kicad-step: merges KiCad STEP models referenced via model_step_url", async
     (entity) => entity.name === "KiCadStepMerge",
   )
   expect(boardSolids.length).toBe(1)
-  const componentSolids = solids.length - boardSolids.length
-  expect(componentSolids).toBeGreaterThanOrEqual(
+  const uniqueComponentSolids = solids.length - boardSolids.length
+  expect(uniqueComponentSolids).toBeGreaterThanOrEqual(
+    EXPECTED_UNIQUE_STEP_MODEL_COUNT,
+  )
+  expect(stepText.match(/MAPPED_ITEM/g) ?? []).toHaveLength(
     EXPECTED_COMPONENT_CENTERS.length,
+  )
+  expect(stepText.match(/REPRESENTATION_MAP/g) ?? []).toHaveLength(
+    EXPECTED_UNIQUE_STEP_MODEL_COUNT,
   )
 
   try {

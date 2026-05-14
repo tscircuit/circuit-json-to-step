@@ -2479,6 +2479,7 @@
     },
     "pcb_component_id": "pcb_component_0",
     "source_component_id": "source_component_0",
+    "show_as_bounding_box": true,
     "model_obj_url": "https://modelcdn.tscircuit.com/easyeda_models/download?uuid=2a4bc2358b36497d9ab2a66ab6419ba3&pn=C165948&cachebust_origin="
   },
   {

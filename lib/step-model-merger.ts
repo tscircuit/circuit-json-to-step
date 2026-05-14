@@ -1,12 +1,15 @@
 import {
+  AdvancedBrepShapeRepresentation,
+  Axis2Placement3D,
   CartesianPoint,
   Direction,
-  type Entity,
+  Entity,
   ManifoldSolidBrep,
   Ref,
   Repository,
   Unknown,
   parseRepository,
+  stepStr,
 } from "stepts"
 import { eid } from "stepts"
 import { EXCLUDED_ENTITY_TYPES } from "./step-model-merger/excluded-entity-types"
@@ -47,18 +50,24 @@ export async function mergeExternalStepModels(
     }
   }
 
-  const solids: Ref<ManifoldSolidBrep>[] = []
+  const solids: Ref<Entity>[] = []
   const handledComponentIds = new Set<string>()
   const handledPcbComponentIds = new Set<string>()
+  const importedModels = new Map<string, ImportedStepModel>()
 
   for (const component of cadComponents) {
     const componentId = component.cad_component_id ?? ""
     const stepUrl = component.model_step_url!
 
     try {
-      const stepText = fsMap?.[stepUrl] ?? (await readStepFile(stepUrl))
-      if (!stepText.trim()) {
-        throw new Error("STEP file is empty")
+      let importedModel = importedModels.get(stepUrl)
+      if (!importedModel) {
+        const stepText = fsMap?.[stepUrl] ?? (await readStepFile(stepUrl))
+        if (!stepText.trim()) {
+          throw new Error("STEP file is empty")
+        }
+        importedModel = importStepModelOnce(repo, stepText, stepUrl)
+        importedModels.set(stepUrl, importedModel)
       }
 
       const pcbComponent = component.pcb_component_id
@@ -71,9 +80,14 @@ export async function mergeExternalStepModels(
         rotation: asVector3(component.rotation),
       }
 
-      const componentSolids = mergeSingleStepModel(repo, stepText, transform, {
-        layer,
-        boardThickness,
+      const componentSolids = createMappedStepModelInstance({
+        repo,
+        importedModel,
+        transform,
+        placement: {
+          layer,
+          boardThickness,
+        },
       })
       if (componentSolids.length > 0) {
         if (componentId) {
@@ -98,12 +112,47 @@ type PlacementOptions = {
   boardThickness?: number
 }
 
-function mergeSingleStepModel(
+type ImportedStepModel = {
+  entries: RepositoryEntry[]
+  representationMap: Ref<RepresentationMap>
+}
+
+class RepresentationMap extends Entity {
+  readonly type = "REPRESENTATION_MAP"
+
+  constructor(
+    public mappingOrigin: Ref<Entity>,
+    public mappedRepresentation: Ref<Entity>,
+  ) {
+    super()
+  }
+
+  toStep(): string {
+    return `REPRESENTATION_MAP(${this.mappingOrigin},${this.mappedRepresentation})`
+  }
+}
+
+class MappedItem extends Entity {
+  readonly type = "MAPPED_ITEM"
+
+  constructor(
+    public name: string,
+    public mappingSource: Ref<RepresentationMap>,
+    public mappingTarget: Ref<Entity>,
+  ) {
+    super()
+  }
+
+  toStep(): string {
+    return `MAPPED_ITEM(${stepStr(this.name)},${this.mappingSource},${this.mappingTarget})`
+  }
+}
+
+function importStepModelOnce(
   targetRepo: Repository,
   stepText: string,
-  transform: MergeTransform,
-  placement?: PlacementOptions,
-): Ref<ManifoldSolidBrep>[] {
+  modelName: string,
+): ImportedStepModel {
   const sourceRepo = parseRepository(stepText)
   let entries: RepositoryEntry[] = sourceRepo
     .entries()
@@ -111,9 +160,6 @@ function mergeSingleStepModel(
     .filter(([, entity]) => !EXCLUDED_ENTITY_TYPES.has(entity.type))
 
   entries = pruneInvalidEntries(entries)
-
-  adjustTransformForPlacement(entries, transform, placement)
-  applyTransform(entries, transform)
 
   const idMapping = allocateIds(targetRepo, entries)
   remapReferences(entries, idMapping)
@@ -134,7 +180,84 @@ function mergeSingleStepModel(
     }
   }
 
-  return solids
+  const originPoint = targetRepo.add(new CartesianPoint("", 0, 0, 0))
+  const zDirection = targetRepo.add(new Direction("", 0, 0, 1))
+  const xDirection = targetRepo.add(new Direction("", 1, 0, 0))
+  const mappingOrigin = targetRepo.add(
+    new Axis2Placement3D("", originPoint, zDirection, xDirection),
+  )
+  const representation = targetRepo.add(
+    new AdvancedBrepShapeRepresentation(
+      modelName,
+      solids,
+      getGeomContext(targetRepo),
+    ),
+  )
+  const representationMap = targetRepo.add(
+    new RepresentationMap(mappingOrigin, representation),
+  )
+
+  return { entries, representationMap }
+}
+
+function createMappedStepModelInstance({
+  repo,
+  importedModel,
+  transform,
+  placement,
+}: {
+  repo: Repository
+  importedModel: ImportedStepModel
+  transform: MergeTransform
+  placement?: PlacementOptions
+}): Ref<Entity>[] {
+  adjustTransformForPlacement(importedModel.entries, transform, placement)
+
+  const placementTarget = createPlacementTarget(repo, transform)
+  const mappedItem = repo.add(
+    new MappedItem("", importedModel.representationMap, placementTarget),
+  )
+
+  return [mappedItem]
+}
+
+function createPlacementTarget(
+  repo: Repository,
+  transform: MergeTransform,
+): Ref<Axis2Placement3D> {
+  const rotation = toRadians(transform.rotation)
+  const [refX, refY, refZ] = transformDirection([1, 0, 0], rotation)
+  const [axisX, axisY, axisZ] = transformDirection([0, 0, 1], rotation)
+
+  const axis = repo.add(new Direction("", axisX, axisY, axisZ))
+  const refDirection = repo.add(new Direction("", refX, refY, refZ))
+  const origin = repo.add(
+    new CartesianPoint(
+      "",
+      transform.translation.x,
+      transform.translation.y,
+      transform.translation.z,
+    ),
+  )
+
+  return repo.add(new Axis2Placement3D("", origin, axis, refDirection))
+}
+
+function getGeomContext(repo: Repository): Ref<Entity> {
+  for (const [id, entity] of repo.entries()) {
+    if (entity.type === "GEOMETRIC_REPRESENTATION_CONTEXT") {
+      return new Ref<Entity>(id)
+    }
+    if (
+      entity instanceof Unknown &&
+      entity.args.some((arg) =>
+        arg.includes("GEOMETRIC_REPRESENTATION_CONTEXT"),
+      )
+    ) {
+      return new Ref<Entity>(id)
+    }
+  }
+  throw new Error("GEOMETRIC_REPRESENTATION_CONTEXT is missing")
 }
 
 type RepositoryEntry = readonly [number, Entity]
