@@ -16,23 +16,40 @@ import {
   VertexPoint,
 } from "stepts"
 
-/**
- * Pill geometry parameters
- */
 export interface PillGeometry {
   centerX: number
   centerY: number
   width: number
   height: number
-  rotation: number // radians, counter-clockwise
-  radius: number // end cap radius (half of min(width, height))
-  straightHalfLength: number // half of |width - height|
-  isHorizontal: boolean // true if width >= height (semicircles on left/right)
+  rotation: number
+  radius: number
+  straightHalfLength: number
+  isHorizontal: boolean
 }
 
-/**
- * Calculate pill geometry parameters from hole data
- */
+type PillBoundarySegment =
+  | {
+      kind: "arc"
+      edge: Ref<EdgeCurve>
+      start: Ref<VertexPoint>
+      end: Ref<VertexPoint>
+      centerX: number
+      centerY: number
+      radius: number
+    }
+  | {
+      kind: "line"
+      edge: Ref<EdgeCurve>
+      start: Ref<VertexPoint>
+      end: Ref<VertexPoint>
+    }
+
+export interface PillHoleGeometry {
+  bottomLoop: Ref<EdgeLoop>
+  topLoop: Ref<EdgeLoop>
+  wallFaces: Ref<AdvancedFace>[]
+}
+
 export function getPillGeometry(hole: any): PillGeometry {
   const centerX = typeof hole.x === "number" ? hole.x : (hole.x as any).value
   const centerY = typeof hole.y === "number" ? hole.y : (hole.y as any).value
@@ -56,9 +73,6 @@ export function getPillGeometry(hole: any): PillGeometry {
   }
 }
 
-/**
- * Rotate a point around a center by a given angle
- */
 export function rotatePoint(
   x: number,
   y: number,
@@ -76,9 +90,35 @@ export function rotatePoint(
   }
 }
 
-/**
- * Helper to create an edge between two vertices
- */
+function createVertexAt(
+  repo: Repository,
+  x: number,
+  y: number,
+  z: number,
+): Ref<VertexPoint> {
+  return repo.add(
+    new VertexPoint("", repo.add(new CartesianPoint("", x, y, z))),
+  )
+}
+
+function createVertexCache(repo: Repository, z: number) {
+  const vertices = new Map<string, Ref<VertexPoint>>()
+  const normalize = (value: number) => {
+    const rounded = Number(value.toFixed(9))
+    return Object.is(rounded, -0) ? 0 : rounded
+  }
+
+  return (x: number, y: number) => {
+    const key = `${normalize(x)},${normalize(y)},${normalize(z)}`
+    const existing = vertices.get(key)
+    if (existing) return existing
+
+    const vertex = createVertexAt(repo, x, y, z)
+    vertices.set(key, vertex)
+    return vertex
+  }
+}
+
 function createLineEdge(
   repo: Repository,
   v1: Ref<VertexPoint>,
@@ -104,10 +144,23 @@ function createLineEdge(
   return repo.add(new EdgeCurve("", v1, v2, line, true))
 }
 
-/**
- * Create a semicircular arc edge
- */
-function createArcEdge(
+function createLineSegment(
+  repo: Repository,
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  getVertex: (x: number, y: number) => Ref<VertexPoint>,
+): PillBoundarySegment {
+  const startVertex = getVertex(start.x, start.y)
+  const endVertex = getVertex(end.x, end.y)
+  return {
+    kind: "line",
+    edge: createLineEdge(repo, startVertex, endVertex),
+    start: startVertex,
+    end: endVertex,
+  }
+}
+
+function createArcSegment(
   repo: Repository,
   centerX: number,
   centerY: number,
@@ -118,73 +171,51 @@ function createArcEdge(
   rotation: number,
   centerX0: number,
   centerY0: number,
-): Ref<EdgeCurve> {
-  // Calculate start and end points
-  const startX = centerX + radius * Math.cos(startAngle)
-  const startY = centerY + radius * Math.sin(startAngle)
-  const endX = centerX + radius * Math.cos(endAngle)
-  const endY = centerY + radius * Math.sin(endAngle)
-
-  // Rotate points
-  const startRotated = rotatePoint(startX, startY, centerX0, centerY0, rotation)
-  const endRotated = rotatePoint(endX, endY, centerX0, centerY0, rotation)
-
-  // Create vertices
-  const startVertex = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", startRotated.x, startRotated.y, z)),
-    ),
-  )
-  const endVertex = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", endRotated.x, endRotated.y, z)),
-    ),
-  )
-
-  // Create circle placement (center needs to be rotated too)
-  const centerRotated = rotatePoint(
-    centerX,
-    centerY,
+  getVertex: (x: number, y: number) => Ref<VertexPoint>,
+): PillBoundarySegment {
+  const start = rotatePoint(
+    centerX + radius * Math.cos(startAngle),
+    centerY + radius * Math.sin(startAngle),
     centerX0,
     centerY0,
     rotation,
   )
-  const centerPoint = repo.add(
-    new CartesianPoint("", centerRotated.x, centerRotated.y, z),
+  const end = rotatePoint(
+    centerX + radius * Math.cos(endAngle),
+    centerY + radius * Math.sin(endAngle),
+    centerX0,
+    centerY0,
+    rotation,
   )
-
-  // Determine circle orientation based on rotation
-  // For holes in the board (facing down at z=0, up at z=thickness)
-  // The normal should point in -Z direction for the edge to be oriented correctly
+  const center = rotatePoint(centerX, centerY, centerX0, centerY0, rotation)
+  const startVertex = getVertex(start.x, start.y)
+  const endVertex = getVertex(end.x, end.y)
+  const centerPoint = repo.add(new CartesianPoint("", center.x, center.y, z))
   const normalDir = repo.add(new Direction("", 0, 0, -1))
-
-  // Reference direction - this determines the starting point of the circle
-  // We need to account for the rotation in the reference direction
-  const refAngle = rotation
   const refDir = repo.add(
-    new Direction("", Math.cos(refAngle), Math.sin(refAngle), 0),
+    new Direction("", Math.cos(rotation), Math.sin(rotation), 0),
   )
-
   const placement = repo.add(
     new Axis2Placement3D("", centerPoint, normalDir, refDir),
   )
   const circle = repo.add(new Circle("", placement, radius))
 
-  return repo.add(new EdgeCurve("", startVertex, endVertex, circle, false))
+  return {
+    kind: "arc",
+    edge: repo.add(new EdgeCurve("", startVertex, endVertex, circle, false)),
+    start: startVertex,
+    end: endVertex,
+    centerX,
+    centerY,
+    radius,
+  }
 }
 
-/**
- * Create STEP EdgeLoop for pill hole boundary at given Z
- * Returns EdgeLoop with 4 edges: 2 semicircular arcs + 2 straight lines
- */
-export function createPillHoleLoop(
+function createPillBoundarySegments(
   repo: Repository,
   hole: any,
   z: number,
-  xDir: Ref<Direction>,
-): Ref<EdgeLoop> {
+): PillBoundarySegment[] {
   const geom = getPillGeometry(hole)
   const {
     centerX,
@@ -194,648 +225,262 @@ export function createPillHoleLoop(
     rotation,
     isHorizontal,
   } = geom
-
-  const edges: Ref<EdgeCurve>[] = []
-
-  if (isHorizontal) {
-    // Horizontal pill: semicircles on left and right
-    const capOffset = straightHalfLength
-
-    // Right semicircle (top to bottom, clockwise when viewed from above)
-    const rightArc = createArcEdge(
-      repo,
-      centerX + capOffset,
-      centerY,
-      z,
-      radius,
-      -Math.PI / 2,
-      Math.PI / 2,
-      rotation,
-      centerX,
-      centerY,
-    )
-    edges.push(rightArc)
-
-    // Bottom straight edge (right to left)
-    const bottomStart = rotatePoint(
-      centerX + capOffset,
-      centerY - radius,
-      centerX,
-      centerY,
-      rotation,
-    )
-    const bottomEnd = rotatePoint(
-      centerX - capOffset,
-      centerY - radius,
-      centerX,
-      centerY,
-      rotation,
-    )
-    const bottomV1 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, z)),
-      ),
-    )
-    const bottomV2 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, z)),
-      ),
-    )
-    edges.push(createLineEdge(repo, bottomV1, bottomV2))
-
-    // Left semicircle (bottom to top)
-    const leftArc = createArcEdge(
-      repo,
-      centerX - capOffset,
-      centerY,
-      z,
-      radius,
-      Math.PI / 2,
-      (3 * Math.PI) / 2,
-      rotation,
-      centerX,
-      centerY,
-    )
-    edges.push(leftArc)
-
-    // Top straight edge (left to right)
-    const topStart = rotatePoint(
-      centerX - capOffset,
-      centerY + radius,
-      centerX,
-      centerY,
-      rotation,
-    )
-    const topEnd = rotatePoint(
-      centerX + capOffset,
-      centerY + radius,
-      centerX,
-      centerY,
-      rotation,
-    )
-    const topV1 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(new CartesianPoint("", topStart.x, topStart.y, z)),
-      ),
-    )
-    const topV2 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(new CartesianPoint("", topEnd.x, topEnd.y, z)),
-      ),
-    )
-    edges.push(createLineEdge(repo, topV1, topV2))
-  } else {
-    // Vertical pill: semicircles on top and bottom
-    const capOffset = straightHalfLength
-
-    // Top semicircle (left to right)
-    const topArc = createArcEdge(
-      repo,
-      centerX,
-      centerY - capOffset,
-      z,
-      radius,
-      Math.PI,
-      0,
-      rotation,
-      centerX,
-      centerY,
-    )
-    edges.push(topArc)
-
-    // Right straight edge (top to bottom)
-    const rightStart = rotatePoint(
-      centerX + radius,
-      centerY - capOffset,
-      centerX,
-      centerY,
-      rotation,
-    )
-    const rightEnd = rotatePoint(
-      centerX + radius,
-      centerY + capOffset,
-      centerX,
-      centerY,
-      rotation,
-    )
-    const rightV1 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(new CartesianPoint("", rightStart.x, rightStart.y, z)),
-      ),
-    )
-    const rightV2 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(new CartesianPoint("", rightEnd.x, rightEnd.y, z)),
-      ),
-    )
-    edges.push(createLineEdge(repo, rightV1, rightV2))
-
-    // Bottom semicircle (right to left)
-    const bottomArc = createArcEdge(
-      repo,
-      centerX,
-      centerY + capOffset,
-      z,
-      radius,
-      0,
-      Math.PI,
-      rotation,
-      centerX,
-      centerY,
-    )
-    edges.push(bottomArc)
-
-    // Left straight edge (bottom to top)
-    const leftStart = rotatePoint(
-      centerX - radius,
-      centerY + capOffset,
-      centerX,
-      centerY,
-      rotation,
-    )
-    const leftEnd = rotatePoint(
-      centerX - radius,
-      centerY - capOffset,
-      centerX,
-      centerY,
-      rotation,
-    )
-    const leftV1 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(new CartesianPoint("", leftStart.x, leftStart.y, z)),
-      ),
-    )
-    const leftV2 = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(new CartesianPoint("", leftEnd.x, leftEnd.y, z)),
-      ),
-    )
-    edges.push(createLineEdge(repo, leftV1, leftV2))
-  }
-
-  // Create oriented edges (all in forward direction for proper loop orientation)
-  const orientedEdges = edges.map((edge) =>
-    repo.add(new OrientedEdge("", edge, true)),
-  )
-
-  return repo.add(new EdgeLoop("", orientedEdges))
-}
-
-/**
- * Create cylindrical and planar faces for pill hole walls
- * Returns 4 AdvancedFaces: 2 cylindrical (end caps) + 2 planar (straight sides)
- */
-export function createPillCylindricalFaces(
-  repo: Repository,
-  hole: any,
-  zMin: number,
-  zMax: number,
-  xDir: Ref<Direction>,
-  zDir: Ref<Direction>,
-): Ref<AdvancedFace>[] {
-  const geom = getPillGeometry(hole)
-  const {
-    centerX,
-    centerY,
-    radius,
-    straightHalfLength,
-    rotation,
-    isHorizontal,
-  } = geom
-
-  const faces: Ref<AdvancedFace>[] = []
+  const capOffset = straightHalfLength
+  const getVertex = createVertexCache(repo, z)
 
   if (isHorizontal) {
-    // Horizontal pill: cylindrical walls on left and right, planar on top and bottom
-    const capOffset = straightHalfLength
-
-    // Right cylindrical face
-    faces.push(
-      createCylindricalWall(
+    return [
+      createArcSegment(
         repo,
         centerX + capOffset,
         centerY,
+        z,
         radius,
         -Math.PI / 2,
         Math.PI / 2,
         rotation,
         centerX,
         centerY,
-        zMin,
-        zMax,
-        zDir,
-        xDir,
+        getVertex,
       ),
-    )
-
-    // Bottom planar face
-    faces.push(
-      createPlanarWall(
+      createLineSegment(
         repo,
-        centerX - capOffset,
-        centerY - radius,
-        centerX + capOffset,
-        centerY - radius,
-        rotation,
-        centerX,
-        centerY,
-        zMin,
-        zMax,
-        zDir,
+        rotatePoint(
+          centerX + capOffset,
+          centerY - radius,
+          centerX,
+          centerY,
+          rotation,
+        ),
+        rotatePoint(
+          centerX - capOffset,
+          centerY - radius,
+          centerX,
+          centerY,
+          rotation,
+        ),
+        getVertex,
       ),
-    )
-
-    // Left cylindrical face
-    faces.push(
-      createCylindricalWall(
+      createArcSegment(
         repo,
         centerX - capOffset,
         centerY,
+        z,
         radius,
         Math.PI / 2,
         (3 * Math.PI) / 2,
         rotation,
         centerX,
         centerY,
-        zMin,
-        zMax,
-        zDir,
-        xDir,
+        getVertex,
       ),
-    )
-
-    // Top planar face
-    faces.push(
-      createPlanarWall(
+      createLineSegment(
         repo,
-        centerX + capOffset,
-        centerY + radius,
-        centerX - capOffset,
-        centerY + radius,
-        rotation,
-        centerX,
-        centerY,
-        zMin,
-        zMax,
-        zDir,
+        rotatePoint(
+          centerX - capOffset,
+          centerY + radius,
+          centerX,
+          centerY,
+          rotation,
+        ),
+        rotatePoint(
+          centerX + capOffset,
+          centerY + radius,
+          centerX,
+          centerY,
+          rotation,
+        ),
+        getVertex,
       ),
-    )
-  } else {
-    // Vertical pill: cylindrical walls on top and bottom, planar on left and right
-    const capOffset = straightHalfLength
+    ]
+  }
 
-    // Top cylindrical face
-    faces.push(
-      createCylindricalWall(
-        repo,
-        centerX,
-        centerY - capOffset,
-        radius,
-        Math.PI,
-        0,
-        rotation,
-        centerX,
-        centerY,
-        zMin,
-        zMax,
-        zDir,
-        xDir,
-      ),
-    )
-
-    // Right planar face
-    faces.push(
-      createPlanarWall(
-        repo,
+  return [
+    createArcSegment(
+      repo,
+      centerX,
+      centerY - capOffset,
+      z,
+      radius,
+      Math.PI,
+      0,
+      rotation,
+      centerX,
+      centerY,
+      getVertex,
+    ),
+    createLineSegment(
+      repo,
+      rotatePoint(
         centerX + radius,
         centerY - capOffset,
+        centerX,
+        centerY,
+        rotation,
+      ),
+      rotatePoint(
         centerX + radius,
         centerY + capOffset,
-        rotation,
         centerX,
         centerY,
-        zMin,
-        zMax,
-        zDir,
-      ),
-    )
-
-    // Bottom cylindrical face
-    faces.push(
-      createCylindricalWall(
-        repo,
-        centerX,
-        centerY + capOffset,
-        radius,
-        0,
-        Math.PI,
         rotation,
-        centerX,
-        centerY,
-        zMin,
-        zMax,
-        zDir,
-        xDir,
       ),
-    )
-
-    // Left planar face
-    faces.push(
-      createPlanarWall(
-        repo,
+      getVertex,
+    ),
+    createArcSegment(
+      repo,
+      centerX,
+      centerY + capOffset,
+      z,
+      radius,
+      0,
+      Math.PI,
+      rotation,
+      centerX,
+      centerY,
+      getVertex,
+    ),
+    createLineSegment(
+      repo,
+      rotatePoint(
         centerX - radius,
         centerY + capOffset,
+        centerX,
+        centerY,
+        rotation,
+      ),
+      rotatePoint(
         centerX - radius,
         centerY - capOffset,
-        rotation,
         centerX,
         centerY,
-        zMin,
-        zMax,
-        zDir,
+        rotation,
+      ),
+      getVertex,
+    ),
+  ]
+}
+
+function createLoopFromSegments(
+  repo: Repository,
+  segments: PillBoundarySegment[],
+  orientation: boolean,
+): Ref<EdgeLoop> {
+  return repo.add(
+    new EdgeLoop(
+      "",
+      segments.map((segment) =>
+        repo.add(new OrientedEdge("", segment.edge, orientation)),
+      ),
+    ),
+  )
+}
+
+export function createPillHoleGeometry(
+  repo: Repository,
+  hole: any,
+  zMin: number,
+  zMax: number,
+  zDir: Ref<Direction>,
+): PillHoleGeometry {
+  const geom = getPillGeometry(hole)
+  const bottomSegments = createPillBoundarySegments(repo, hole, zMin)
+  const topSegments = createPillBoundarySegments(repo, hole, zMax)
+  const bottomLoop = createLoopFromSegments(repo, bottomSegments, true)
+  const topLoop = createLoopFromSegments(repo, topSegments, true)
+  const wallFaces: Ref<AdvancedFace>[] = []
+  const verticalEdges = new Map<string, Ref<EdgeCurve>>()
+  const getVerticalEdge = (
+    bottomVertex: Ref<VertexPoint>,
+    topVertex: Ref<VertexPoint>,
+  ) => {
+    const key = `${bottomVertex.id}:${topVertex.id}`
+    const existing = verticalEdges.get(key)
+    if (existing) return existing
+
+    const edge = createLineEdge(repo, bottomVertex, topVertex)
+    verticalEdges.set(key, edge)
+    return edge
+  }
+
+  for (let i = 0; i < bottomSegments.length; i++) {
+    const bottomSegment = bottomSegments[i]!
+    const topSegment = topSegments[i]!
+    const startVertical = getVerticalEdge(bottomSegment.start, topSegment.start)
+    const endVertical = getVerticalEdge(bottomSegment.end, topSegment.end)
+    const loop = repo.add(
+      new EdgeLoop("", [
+        repo.add(new OrientedEdge("", bottomSegment.edge, true)),
+        repo.add(new OrientedEdge("", endVertical, true)),
+        repo.add(new OrientedEdge("", topSegment.edge, false)),
+        repo.add(new OrientedEdge("", startVertical, false)),
+      ]),
+    )
+
+    if (bottomSegment.kind === "arc") {
+      const center = rotatePoint(
+        bottomSegment.centerX,
+        bottomSegment.centerY,
+        geom.centerX,
+        geom.centerY,
+        geom.rotation,
+      )
+      const bottomCenter = repo.add(
+        new CartesianPoint("", center.x, center.y, zMin),
+      )
+      const refDir = repo.add(
+        new Direction("", Math.cos(geom.rotation), Math.sin(geom.rotation), 0),
+      )
+      const cylinderPlacement = repo.add(
+        new Axis2Placement3D("", bottomCenter, zDir, refDir),
+      )
+      const cylinderSurface = repo.add(
+        new CylindricalSurface("", cylinderPlacement, bottomSegment.radius),
+      )
+      wallFaces.push(
+        repo.add(
+          new AdvancedFace(
+            "",
+            [repo.add(new FaceOuterBound("", loop, true))],
+            cylinderSurface,
+            false,
+          ),
+        ),
+      )
+      continue
+    }
+
+    const startPoint = bottomSegment.start.resolve(repo).pnt.resolve(repo)
+    const endPoint = bottomSegment.end.resolve(repo).pnt.resolve(repo)
+    const dx = endPoint.x - startPoint.x
+    const dy = endPoint.y - startPoint.y
+    const edgeLength = Math.sqrt(dx * dx + dy * dy)
+    const normalDir = repo.add(
+      new Direction("", dy / edgeLength, -dx / edgeLength, 0),
+    )
+    const refDir = repo.add(
+      new Direction("", dx / edgeLength, dy / edgeLength, 0),
+    )
+    const placement = repo.add(
+      new Axis2Placement3D(
+        "",
+        bottomSegment.start.resolve(repo).pnt,
+        normalDir,
+        refDir,
+      ),
+    )
+    const plane = repo.add(new Plane("", placement))
+    wallFaces.push(
+      repo.add(
+        new AdvancedFace(
+          "",
+          [repo.add(new FaceOuterBound("", loop, true))],
+          plane,
+          true,
+        ),
       ),
     )
   }
 
-  return faces
-}
-
-/**
- * Create a cylindrical wall face (semicircular extrusion)
- */
-function createCylindricalWall(
-  repo: Repository,
-  centerX: number,
-  centerY: number,
-  radius: number,
-  startAngle: number,
-  endAngle: number,
-  rotation: number,
-  centerX0: number,
-  centerY0: number,
-  zMin: number,
-  zMax: number,
-  zDir: Ref<Direction>,
-  xDir: Ref<Direction>,
-): Ref<AdvancedFace> {
-  // Calculate edge points at bottom
-  const bottomStartX = centerX + radius * Math.cos(startAngle)
-  const bottomStartY = centerY + radius * Math.sin(startAngle)
-  const bottomEndX = centerX + radius * Math.cos(endAngle)
-  const bottomEndY = centerY + radius * Math.sin(endAngle)
-
-  // Rotate bottom points
-  const bottomStart = rotatePoint(
-    bottomStartX,
-    bottomStartY,
-    centerX0,
-    centerY0,
-    rotation,
-  )
-  const bottomEnd = rotatePoint(
-    bottomEndX,
-    bottomEndY,
-    centerX0,
-    centerY0,
-    rotation,
-  )
-
-  // Create bottom edge vertices
-  const bottomStartVertex = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, zMin)),
-    ),
-  )
-  const bottomEndVertex = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, zMin)),
-    ),
-  )
-
-  // Create top edge vertices
-  const topStart = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, zMax)),
-    ),
-  )
-  const topEnd = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, zMax)),
-    ),
-  )
-
-  // Create arc edge at bottom
-  const centerRotated = rotatePoint(
-    centerX,
-    centerY,
-    centerX0,
-    centerY0,
-    rotation,
-  )
-  const bottomCenter = repo.add(
-    new CartesianPoint("", centerRotated.x, centerRotated.y, zMin),
-  )
-  const bottomPlacement = repo.add(
-    new Axis2Placement3D(
-      "",
-      bottomCenter,
-      repo.add(new Direction("", 0, 0, -1)),
-      xDir,
-    ),
-  )
-  const bottomCircle = repo.add(new Circle("", bottomPlacement, radius))
-  const bottomArc = repo.add(
-    new EdgeCurve("", bottomStartVertex, bottomEndVertex, bottomCircle, false),
-  )
-
-  // Create arc edge at top
-  const topCenter = repo.add(
-    new CartesianPoint("", centerRotated.x, centerRotated.y, zMax),
-  )
-  const topPlacement = repo.add(new Axis2Placement3D("", topCenter, zDir, xDir))
-  const topCircle = repo.add(new Circle("", topPlacement, radius))
-  const topArc = repo.add(new EdgeCurve("", topEnd, topStart, topCircle, false))
-
-  // Create vertical edges
-  const v1 = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, zMin)),
-    ),
-  )
-  const v2 = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", bottomStart.x, bottomStart.y, zMax)),
-    ),
-  )
-  const v3 = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, zMin)),
-    ),
-  )
-  const v4 = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", bottomEnd.x, bottomEnd.y, zMax)),
-    ),
-  )
-
-  // Create vertical line edges
-  const dir1 = repo.add(new Direction("", 0, 0, 1))
-  const height = zMax - zMin
-  const vec1 = repo.add(new Vector("", dir1, height))
-  const line1 = repo.add(new Line("", v1.resolve(repo).pnt, vec1))
-  const edge1 = repo.add(new EdgeCurve("", v1, v2, line1, true))
-
-  const dir2 = repo.add(new Direction("", 0, 0, 1))
-  const vec2 = repo.add(new Vector("", dir2, height))
-  const line2 = repo.add(new Line("", v3.resolve(repo).pnt, vec2))
-  const edge2 = repo.add(new EdgeCurve("", v3, v4, line2, true))
-
-  // Create edge loop
-  const loop = repo.add(
-    new EdgeLoop("", [
-      repo.add(new OrientedEdge("", bottomArc, true)),
-      repo.add(new OrientedEdge("", edge2, true)),
-      repo.add(new OrientedEdge("", topArc, false)),
-      repo.add(new OrientedEdge("", edge1, false)),
-    ]),
-  )
-
-  // Create cylindrical surface
-  const cylinderPlacement = repo.add(
-    new Axis2Placement3D("", bottomCenter, zDir, xDir),
-  )
-  const cylinderSurface = repo.add(
-    new CylindricalSurface("", cylinderPlacement, radius),
-  )
-
-  return repo.add(
-    new AdvancedFace(
-      "",
-      [repo.add(new FaceOuterBound("", loop, true))],
-      cylinderSurface,
-      false,
-    ),
-  )
-}
-
-/**
- * Create a planar wall face (straight line extrusion)
- */
-function createPlanarWall(
-  repo: Repository,
-  startX: number,
-  startY: number,
-  endX: number,
-  endY: number,
-  rotation: number,
-  centerX0: number,
-  centerY0: number,
-  zMin: number,
-  zMax: number,
-  zDir: Ref<Direction>,
-): Ref<AdvancedFace> {
-  // Rotate points
-  const start = rotatePoint(startX, startY, centerX0, centerY0, rotation)
-  const end = rotatePoint(endX, endY, centerX0, centerY0, rotation)
-
-  // Create vertices
-  const v1 = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", start.x, start.y, zMin)),
-    ),
-  )
-  const v2 = repo.add(
-    new VertexPoint("", repo.add(new CartesianPoint("", end.x, end.y, zMin))),
-  )
-  const v3 = repo.add(
-    new VertexPoint("", repo.add(new CartesianPoint("", end.x, end.y, zMax))),
-  )
-  const v4 = repo.add(
-    new VertexPoint(
-      "",
-      repo.add(new CartesianPoint("", start.x, start.y, zMax)),
-    ),
-  )
-
-  // Calculate edge direction and normal
-  const dx = end.x - start.x
-  const dy = end.y - start.y
-  const edgeLength = Math.sqrt(dx * dx + dy * dy)
-
-  // Create bottom edge
-  const bottomDir = repo.add(
-    new Direction("", dx / edgeLength, dy / edgeLength, 0),
-  )
-  const bottomVec = repo.add(new Vector("", bottomDir, edgeLength))
-  const bottomLine = repo.add(new Line("", v1.resolve(repo).pnt, bottomVec))
-  const bottomEdge = repo.add(new EdgeCurve("", v1, v2, bottomLine, true))
-
-  // Create top edge
-  const topDir = repo.add(
-    new Direction("", dx / edgeLength, dy / edgeLength, 0),
-  )
-  const topVec = repo.add(new Vector("", topDir, edgeLength))
-  const topLine = repo.add(new Line("", v4.resolve(repo).pnt, topVec))
-  const topEdge = repo.add(new EdgeCurve("", v4, v3, topLine, true))
-
-  // Create vertical edges
-  const vertDir = repo.add(new Direction("", 0, 0, 1))
-  const height = zMax - zMin
-  const vertVec1 = repo.add(new Vector("", vertDir, height))
-  const vertLine1 = repo.add(new Line("", v2.resolve(repo).pnt, vertVec1))
-  const vertEdge1 = repo.add(new EdgeCurve("", v2, v3, vertLine1, true))
-
-  const vertVec2 = repo.add(new Vector("", vertDir, height))
-  const vertLine2 = repo.add(new Line("", v1.resolve(repo).pnt, vertVec2))
-  const vertEdge2 = repo.add(new EdgeCurve("", v1, v4, vertLine2, true))
-
-  // Create edge loop
-  const loop = repo.add(
-    new EdgeLoop("", [
-      repo.add(new OrientedEdge("", bottomEdge, true)),
-      repo.add(new OrientedEdge("", vertEdge1, true)),
-      repo.add(new OrientedEdge("", topEdge, false)),
-      repo.add(new OrientedEdge("", vertEdge2, false)),
-    ]),
-  )
-
-  // Create plane
-  // Normal is perpendicular to edge direction in XY plane
-  const normalDir = repo.add(
-    new Direction("", dy / edgeLength, -dx / edgeLength, 0),
-  )
-  const refDir = repo.add(
-    new Direction("", dx / edgeLength, dy / edgeLength, 0),
-  )
-  const planeOrigin = repo.add(new CartesianPoint("", start.x, start.y, zMin))
-  const placement = repo.add(
-    new Axis2Placement3D("", planeOrigin, normalDir, refDir),
-  )
-  const plane = repo.add(new Plane("", placement))
-
-  return repo.add(
-    new AdvancedFace(
-      "",
-      [repo.add(new FaceOuterBound("", loop, true))],
-      plane,
-      true,
-    ),
-  )
+  return { bottomLoop, topLoop, wallFaces }
 }
