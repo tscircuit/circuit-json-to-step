@@ -23,9 +23,9 @@ test("basics05: new test to cause a diff error", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Count CIRCLE occurrences - should have 12 (3 holes × 4 circles each: 2 for top/bottom faces, 2 for cylindrical surface)
+  // Count CIRCLE occurrences - should have 6 (3 holes × 2 shared top/bottom boundary circles
   const circleCount = (stepText.match(/CIRCLE/g) || []).length
-  expect(circleCount).toBe(12)
+  expect(circleCount).toBe(6)
 
   // Count CYLINDRICAL_SURFACE occurrences - should have 3 (one per hole)
   const cylinderCount = (stepText.match(/CYLINDRICAL_SURFACE/g) || []).length

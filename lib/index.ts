@@ -51,12 +51,17 @@ import {
 } from "./step-style-utils"
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
-import { createPillCylindricalFaces, createPillHoleLoop } from "./pill-geometry"
+import { createPillHoleGeometry } from "./pill-geometry"
 
 type Hole = Extract<
   CircuitJson[number],
   { type: "pcb_hole" | "pcb_plated_hole" }
 >
+type SharedHoleGeometry = {
+  bottomLoop: Ref<EdgeLoop>
+  topLoop: Ref<EdgeLoop>
+  wallFaces: Ref<AdvancedFace>[]
+}
 type RuntimeHole = Hole & {
   x?: number | { value: number }
   y?: number | { value: number }
@@ -345,59 +350,6 @@ export async function circuitJsonToStep(
     ),
   )
 
-  // Create holes in bottom face
-  const bottomHoleLoops: Ref<FaceBound>[] = []
-  for (const hole of holes) {
-    // Check shape (pcb_hole uses hole_shape, pcb_plated_hole uses shape)
-    const holeShape = hole.hole_shape ?? hole.shape
-    if (holeShape === "circle") {
-      const holeX = typeof hole.x === "number" ? hole.x : (hole.x ?? 0)
-      const holeY = typeof hole.y === "number" ? hole.y : (hole.y ?? 0)
-      const radius = (hole.hole_diameter ?? 0) / 2
-
-      const holeCenter = repo.add(
-        new CartesianPoint("", holeX, holeY, -halfBoardThickness),
-      )
-      const holeVertex = repo.add(
-        new VertexPoint(
-          "",
-          repo.add(
-            new CartesianPoint("", holeX + radius, holeY, -halfBoardThickness),
-          ),
-        ),
-      )
-      const holePlacement = repo.add(
-        new Axis2Placement3D(
-          "",
-          holeCenter,
-          repo.add(new Direction("", 0, 0, -1)),
-          xDir,
-        ),
-      )
-      const holeCircle = repo.add(new Circle("", holePlacement, radius))
-      const holeEdge = repo.add(
-        new EdgeCurve("", holeVertex, holeVertex, holeCircle, true),
-      )
-      const holeLoop = repo.add(
-        new EdgeLoop("", [repo.add(new OrientedEdge("", holeEdge, false))]),
-      )
-      bottomHoleLoops.push(repo.add(new FaceBound("", holeLoop, true)))
-    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
-      // Create rotated pill-shaped hole boundary at z=-boardThickness/2
-      const pillLoop = createPillHoleLoop(repo, hole, -halfBoardThickness, xDir)
-      bottomHoleLoops.push(repo.add(new FaceBound("", pillLoop, true)))
-    }
-  }
-
-  const bottomFace = repo.add(
-    new AdvancedFace(
-      "",
-      [repo.add(new FaceOuterBound("", bottomLoop, true)), ...bottomHoleLoops],
-      bottomPlane,
-      true,
-    ),
-  )
-
   // Top face (z=boardThickness/2, normal pointing up)
   const topOrigin = repo.add(new CartesianPoint("", 0, 0, halfBoardThickness))
   const topFrame = repo.add(new Axis2Placement3D("", topOrigin, zDir, xDir))
@@ -409,44 +361,135 @@ export async function circuitJsonToStep(
     ),
   )
 
-  // Create holes in top face
-  const topHoleLoops: Ref<FaceBound>[] = []
+  function getHoleCoordinate(
+    coordinate: number | { value: number } | undefined,
+  ): number {
+    if (typeof coordinate === "number") return coordinate
+    return coordinate?.value ?? 0
+  }
+
+  function createCircularHoleGeometry(hole: RuntimeHole): SharedHoleGeometry {
+    const holeX = getHoleCoordinate(hole.x)
+    const holeY = getHoleCoordinate(hole.y)
+    const radius = (hole.hole_diameter ?? 0) / 2
+
+    const bottomHoleCenter = repo.add(
+      new CartesianPoint("", holeX, holeY, -halfBoardThickness),
+    )
+    const bottomHoleVertex = repo.add(
+      new VertexPoint(
+        "",
+        repo.add(
+          new CartesianPoint("", holeX + radius, holeY, -halfBoardThickness),
+        ),
+      ),
+    )
+    const bottomHolePlacement = repo.add(
+      new Axis2Placement3D(
+        "",
+        bottomHoleCenter,
+        repo.add(new Direction("", 0, 0, -1)),
+        xDir,
+      ),
+    )
+    const bottomHoleCircle = repo.add(
+      new Circle("", bottomHolePlacement, radius),
+    )
+    const bottomHoleEdge = repo.add(
+      new EdgeCurve(
+        "",
+        bottomHoleVertex,
+        bottomHoleVertex,
+        bottomHoleCircle,
+        true,
+      ),
+    )
+
+    const topHoleCenter = repo.add(
+      new CartesianPoint("", holeX, holeY, halfBoardThickness),
+    )
+    const topHoleVertex = repo.add(
+      new VertexPoint(
+        "",
+        repo.add(
+          new CartesianPoint("", holeX + radius, holeY, halfBoardThickness),
+        ),
+      ),
+    )
+    const topHolePlacement = repo.add(
+      new Axis2Placement3D("", topHoleCenter, zDir, xDir),
+    )
+    const topHoleCircle = repo.add(new Circle("", topHolePlacement, radius))
+    const topHoleEdge = repo.add(
+      new EdgeCurve("", topHoleVertex, topHoleVertex, topHoleCircle, true),
+    )
+
+    const bottomLoop = repo.add(
+      new EdgeLoop("", [repo.add(new OrientedEdge("", bottomHoleEdge, false))]),
+    )
+    const topLoop = repo.add(
+      new EdgeLoop("", [repo.add(new OrientedEdge("", topHoleEdge, true))]),
+    )
+    const wallLoop = repo.add(
+      new EdgeLoop("", [
+        repo.add(new OrientedEdge("", bottomHoleEdge, true)),
+        repo.add(new OrientedEdge("", topHoleEdge, false)),
+      ]),
+    )
+    const holeCylinderPlacement = repo.add(
+      new Axis2Placement3D("", bottomHoleCenter, zDir, xDir),
+    )
+    const holeCylinderSurface = repo.add(
+      new CylindricalSurface("", holeCylinderPlacement, radius),
+    )
+    const wallFace = repo.add(
+      new AdvancedFace(
+        "",
+        [repo.add(new FaceOuterBound("", wallLoop, true))],
+        holeCylinderSurface,
+        false,
+      ),
+    )
+
+    return { bottomLoop, topLoop, wallFaces: [wallFace] }
+  }
+
+  const sharedHoleGeometries: SharedHoleGeometry[] = []
   for (const hole of holes) {
-    // Check shape (pcb_hole uses hole_shape, pcb_plated_hole uses shape)
     const holeShape = hole.hole_shape ?? hole.shape
     if (holeShape === "circle") {
-      const holeX = typeof hole.x === "number" ? hole.x : (hole.x ?? 0)
-      const holeY = typeof hole.y === "number" ? hole.y : (hole.y ?? 0)
-      const radius = (hole.hole_diameter ?? 0) / 2
-
-      const holeCenter = repo.add(
-        new CartesianPoint("", holeX, holeY, halfBoardThickness),
-      )
-      const holeVertex = repo.add(
-        new VertexPoint(
-          "",
-          repo.add(
-            new CartesianPoint("", holeX + radius, holeY, halfBoardThickness),
-          ),
+      sharedHoleGeometries.push(createCircularHoleGeometry(hole))
+    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
+      sharedHoleGeometries.push(
+        createPillHoleGeometry(
+          repo,
+          hole,
+          -halfBoardThickness,
+          halfBoardThickness,
+          zDir,
         ),
       )
-      const holePlacement = repo.add(
-        new Axis2Placement3D("", holeCenter, zDir, xDir),
-      )
-      const holeCircle = repo.add(new Circle("", holePlacement, radius))
-      const holeEdge = repo.add(
-        new EdgeCurve("", holeVertex, holeVertex, holeCircle, true),
-      )
-      const holeLoop = repo.add(
-        new EdgeLoop("", [repo.add(new OrientedEdge("", holeEdge, true))]),
-      )
-      topHoleLoops.push(repo.add(new FaceBound("", holeLoop, true)))
-    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
-      // Create rotated pill-shaped hole boundary at z=boardThickness/2
-      const pillLoop = createPillHoleLoop(repo, hole, halfBoardThickness, xDir)
-      topHoleLoops.push(repo.add(new FaceBound("", pillLoop, true)))
     }
   }
+
+  // Create holes in bottom and top faces from the shared boundary loops.
+  const bottomHoleLoops: Ref<FaceBound>[] = []
+  const topHoleLoops: Ref<FaceBound>[] = []
+  for (const holeGeometry of sharedHoleGeometries) {
+    bottomHoleLoops.push(
+      repo.add(new FaceBound("", holeGeometry.bottomLoop, true)),
+    )
+    topHoleLoops.push(repo.add(new FaceBound("", holeGeometry.topLoop, true)))
+  }
+
+  const bottomFace = repo.add(
+    new AdvancedFace(
+      "",
+      [repo.add(new FaceOuterBound("", bottomLoop, true)), ...bottomHoleLoops],
+      bottomPlane,
+      true,
+    ),
+  )
 
   const topFace = repo.add(
     new AdvancedFace(
@@ -456,6 +499,11 @@ export async function circuitJsonToStep(
       true,
     ),
   )
+
+  const holeCylindricalFaces: Ref<AdvancedFace>[] = []
+  for (const holeGeometry of sharedHoleGeometries) {
+    holeCylindricalFaces.push(...holeGeometry.wallFaces)
+  }
 
   // Create side faces (one for each edge of the outline)
   const sideFaces: Ref<AdvancedFace>[] = []
@@ -501,105 +549,6 @@ export async function circuitJsonToStep(
       ),
     )
     sideFaces.push(sideFace)
-  }
-
-  // Create cylindrical faces for holes
-  const holeCylindricalFaces: Ref<AdvancedFace>[] = []
-  for (const hole of holes) {
-    const holeShape = hole.hole_shape ?? hole.shape
-    if (holeShape === "circle") {
-      const holeX = typeof hole.x === "number" ? hole.x : (hole.x ?? 0)
-      const holeY = typeof hole.y === "number" ? hole.y : (hole.y ?? 0)
-      const radius = (hole.hole_diameter ?? 0) / 2
-
-      // Create circular edges at bottom and top
-      const bottomHoleCenter = repo.add(
-        new CartesianPoint("", holeX, holeY, -halfBoardThickness),
-      )
-      const bottomHoleVertex = repo.add(
-        new VertexPoint(
-          "",
-          repo.add(
-            new CartesianPoint("", holeX + radius, holeY, -halfBoardThickness),
-          ),
-        ),
-      )
-      const bottomHolePlacement = repo.add(
-        new Axis2Placement3D(
-          "",
-          bottomHoleCenter,
-          repo.add(new Direction("", 0, 0, -1)),
-          xDir,
-        ),
-      )
-      const bottomHoleCircle = repo.add(
-        new Circle("", bottomHolePlacement, radius),
-      )
-      const bottomHoleEdge = repo.add(
-        new EdgeCurve(
-          "",
-          bottomHoleVertex,
-          bottomHoleVertex,
-          bottomHoleCircle,
-          true,
-        ),
-      )
-
-      const topHoleCenter = repo.add(
-        new CartesianPoint("", holeX, holeY, halfBoardThickness),
-      )
-      const topHoleVertex = repo.add(
-        new VertexPoint(
-          "",
-          repo.add(
-            new CartesianPoint("", holeX + radius, holeY, halfBoardThickness),
-          ),
-        ),
-      )
-      const topHolePlacement = repo.add(
-        new Axis2Placement3D("", topHoleCenter, zDir, xDir),
-      )
-      const topHoleCircle = repo.add(new Circle("", topHolePlacement, radius))
-      const topHoleEdge = repo.add(
-        new EdgeCurve("", topHoleVertex, topHoleVertex, topHoleCircle, true),
-      )
-
-      // Create edge loop for cylindrical surface
-      const holeCylinderLoop = repo.add(
-        new EdgeLoop("", [
-          repo.add(new OrientedEdge("", bottomHoleEdge, true)),
-          repo.add(new OrientedEdge("", topHoleEdge, false)),
-        ]),
-      )
-
-      // Create cylindrical surface for the hole (axis along Z)
-      const holeCylinderPlacement = repo.add(
-        new Axis2Placement3D("", bottomHoleCenter, zDir, xDir),
-      )
-      const holeCylinderSurface = repo.add(
-        new CylindricalSurface("", holeCylinderPlacement, radius),
-      )
-      const holeCylinderFace = repo.add(
-        new AdvancedFace(
-          "",
-          [repo.add(new FaceOuterBound("", holeCylinderLoop, true))],
-          holeCylinderSurface,
-          false,
-        ),
-      )
-      holeCylindricalFaces.push(holeCylinderFace)
-    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
-      // Create cylindrical and planar faces for pill hole walls
-      const pillFaces = createPillCylindricalFaces(
-        repo,
-        hole,
-        -halfBoardThickness,
-        halfBoardThickness,
-        xDir,
-        zDir,
-      )
-      holeCylindricalFaces.push(...pillFaces)
-    }
   }
 
   // Collect all faces
