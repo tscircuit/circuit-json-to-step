@@ -104,6 +104,93 @@ export async function generateComponentMeshes(
     for (const box of scene3d.boxes as SceneBox[]) {
       solids.push(createSceneBoxSolid(repo, box))
     }
+
+    // Helper to generate a fallback box
+    const createFallbackBox = (
+      element: any,
+      height: number,
+      zOffset: number,
+    ) => {
+      if (
+        typeof element.center?.x !== "number" ||
+        typeof element.center?.y !== "number" ||
+        typeof element.width !== "number" ||
+        typeof element.height !== "number"
+      ) {
+        // For smtpad it's x,y instead of center.x, center.y
+        if (
+          typeof element.x === "number" &&
+          typeof element.y === "number" &&
+          typeof element.width === "number" &&
+          typeof element.height === "number"
+        ) {
+          return {
+            center: {
+              x: element.x,
+              y: element.y,
+              z: element.layer === "bottom" ? -zOffset : zOffset,
+            },
+            size: { x: element.width, y: element.height, z: height },
+            rotation: { x: 0, y: 0, z: element.rotation || 0 },
+            label:
+              element.pcb_component_id ||
+              element.pcb_smtpad_id ||
+              element.pcb_silkscreen_rect_id ||
+              "fallback",
+          }
+        }
+        return null
+      }
+
+      return {
+        center: {
+          x: element.center.x,
+          y: element.center.y,
+          z: element.layer === "bottom" ? -zOffset : zOffset,
+        },
+        size: { x: element.width, y: element.height, z: height },
+        rotation: { x: 0, y: 0, z: element.rotation || 0 },
+        label:
+          element.pcb_component_id ||
+          element.pcb_smtpad_id ||
+          element.pcb_silkscreen_rect_id ||
+          "fallback",
+      }
+    }
+
+    // Provide fallbacks for components/rectangles if the mesh generation didn't provide enough boxes
+    // For pcb_component: height 1mm, zOffset on top of board
+    for (const element of filteredCircuitJson) {
+      let fallbackBox = null
+      if (element.type === "pcb_component") {
+        fallbackBox = createFallbackBox(element, 1.0, boardThickness / 2 + 0.5)
+      } else if (element.type === "pcb_smtpad" && element.shape === "rect") {
+        fallbackBox = createFallbackBox(
+          element,
+          0.05,
+          boardThickness / 2 + 0.025,
+        )
+      } else if (element.type === "pcb_silkscreen_rect") {
+        fallbackBox = createFallbackBox(
+          element,
+          0.05,
+          boardThickness / 2 + 0.025,
+        )
+      }
+
+      if (fallbackBox) {
+        // Only add if there isn't already a box near this center
+        const hasExistingBox = (scene3d.boxes as SceneBox[]).some((b) => {
+          const dx = b.center.x - fallbackBox!.center.x
+          const dy = b.center.y - fallbackBox!.center.y
+          return Math.sqrt(dx * dx + dy * dy) < 0.1
+        })
+
+        if (!hasExistingBox) {
+          solids.push(createSceneBoxSolid(repo, fallbackBox))
+        }
+      }
+    }
   } catch (error) {
     console.warn("Failed to generate component mesh:", error)
   }

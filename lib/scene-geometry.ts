@@ -1,4 +1,4 @@
-import type { Entity, Ref, StyledItem, ManifoldSolidBrep } from "stepts"
+import type { Entity, ManifoldSolidBrep, Ref, StyledItem } from "stepts"
 
 export type Point3 = { x: number; y: number; z: number }
 

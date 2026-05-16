@@ -4,30 +4,30 @@ import {
   CartesianPoint,
   Direction,
   Entity,
+  eid,
   ManifoldSolidBrep,
-  Ref,
-  Repository,
-  Unknown,
   parseRepository,
+  Ref,
+  type Repository,
   stepStr,
+  Unknown,
 } from "stepts"
-import { eid } from "stepts"
 import { EXCLUDED_ENTITY_TYPES } from "./step-model-merger/excluded-entity-types"
-import {
-  asVector3,
-  toRadians,
-  transformDirection,
-  transformPoint,
-  rotateVector,
-} from "./step-model-merger/vector-utils"
 import { readStepFile } from "./step-model-merger/read-step-file"
 import type {
   CadComponent,
-  PcbComponent,
   MergeStepModelOptions,
   MergeStepModelResult,
   MergeTransform,
+  PcbComponent,
 } from "./step-model-merger/types"
+import {
+  asVector3,
+  rotateVector,
+  toRadians,
+  transformDirection,
+  transformPoint,
+} from "./step-model-merger/vector-utils"
 
 export type {
   MergeStepModelOptions,
