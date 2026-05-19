@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
-    "circuit-json-to-gltf": "^0.0.100",
+    "circuit-json-to-gltf": "^0.0.101",
     "circuit-to-svg": "^0.0.345",
     "schematic-symbols": "^0.0.202",
     "stepts": "^0.0.4"
