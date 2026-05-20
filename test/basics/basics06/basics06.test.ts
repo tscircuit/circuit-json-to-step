@@ -1,10 +1,8 @@
-import { test, expect } from "bun:test"
+import { expect, test } from "bun:test"
 
 import { circuitJsonToStep } from "../../../lib/index"
-
-import { importStepWithOcct } from "../../utils/occt/importer"
-
 import { loadStepFilesFromCircuitJson } from "../../utils/load-step-files"
+import { importStepWithOcct } from "../../utils/occt/importer"
 
 import circuitJson from "./basics06.json"
 

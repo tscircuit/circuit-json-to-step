@@ -1,12 +1,12 @@
 import { expect } from "bun:test"
 import {
   createSceneFromGLTF,
-  renderSceneFromGLTF,
-  pureImageFactory,
   encodePNGToBuffer,
+  pureImageFactory,
+  renderSceneFromGLTF,
 } from "poppygl"
-import { importStepWithOcct } from "../utils/occt/importer"
 import type { OcctMesh } from "../utils/occt/importer"
+import { importStepWithOcct } from "../utils/occt/importer"
 
 // Ensure PNG matcher is loaded so we can reuse it
 import "./png-matcher"

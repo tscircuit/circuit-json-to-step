@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test"
+import { expect, test } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics02.json"

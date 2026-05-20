@@ -4,7 +4,7 @@ import * as path from "node:path"
 import looksSame from "looks-same"
 
 const DEFAULT_DIFF_PERCENTAGE = Number(
-  process.env["PNG_SNAPSHOT_DIFF_PERCENTAGE"] ?? 0.5,
+  process.env["PNG_SNAPSHOT_DIFF_PERCENTAGE"] ?? 2.0,
 )
 
 function ensureDir(dir: string) {

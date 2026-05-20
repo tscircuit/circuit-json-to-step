@@ -5,9 +5,9 @@ import type {
   SceneBox,
   TriangleColor,
 } from "./scene-geometry"
-import { createStyleCache, createStyledItem } from "./step-style-utils"
 import { rotatePoint3 } from "./scene-geometry"
 import { createFaceFromVertices, createVertex } from "./step-brep-utils"
+import { createStyleCache, createStyledItem } from "./step-style-utils"
 
 export function createSceneBoxSolid(
   repo: Repository,

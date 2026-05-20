@@ -1,11 +1,11 @@
-import { test, expect } from "bun:test"
-import { fileURLToPath } from "node:url"
+import { expect, test } from "bun:test"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { ManifoldSolidBrep, parseRepository } from "stepts"
 import { circuitJsonToStep } from "../../../lib/index"
-import { importStepWithOcct } from "../../utils/occt/importer"
-import type { OcctMesh } from "../../utils/occt/importer"
 import { loadStepFilesFromCircuitJson } from "../../utils/load-step-files"
-import { parseRepository, ManifoldSolidBrep } from "stepts"
+import type { OcctMesh } from "../../utils/occt/importer"
+import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./kicad-step.json"
 
 type CadComponentJson = {
