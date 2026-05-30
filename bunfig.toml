@@ -1,5 +1,0 @@
-[test]
-preload = ["./test/fixtures/step-snapshot.ts"]
-
-[install.lockfile]
-save = false
