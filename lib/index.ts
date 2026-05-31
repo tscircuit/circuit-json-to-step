@@ -592,13 +592,15 @@ export async function circuitJsonToStep(
   if (options.includeComponents) {
     // Build set of pcb_component_ids covered by cad_components with model_step_url
     const pcbComponentIdsWithStepUrl = new Set<string>()
-    for (const item of circuitJson) {
-      if (
-        item.type === "cad_component" &&
-        item.model_step_url &&
-        item.pcb_component_id
-      ) {
-        pcbComponentIdsWithStepUrl.add(item.pcb_component_id)
+    if (options.includeExternalMeshes) {
+      for (const item of circuitJson) {
+        if (
+          item.type === "cad_component" &&
+          item.model_step_url &&
+          item.pcb_component_id
+        ) {
+          pcbComponentIdsWithStepUrl.add(item.pcb_component_id)
+        }
       }
     }
 
