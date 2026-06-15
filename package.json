@@ -22,7 +22,7 @@
     "circuit-json": "^0.0.425",
     "looks-same": "^10.0.1",
     "occt-import-js": "^0.0.23",
-    "poppygl": "^0.0.17",
+    "poppygl": "^0.0.24",
     "tsup": "^8.5.0"
   },
   "peerDependencies": {
