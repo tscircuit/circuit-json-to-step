@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { renderGLTFToPNGBufferFromGLBBuffer } from "poppygl"
+import { renderGLTFToPNGFromGLB } from "poppygl"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./repro02.json"
@@ -37,7 +37,7 @@ test("repro02: convert circuit json with rotated pill holes to STEP", async () =
         fov: scene3d.camera.fov ?? 60,
       }
     : undefined
-  const gltfPng = await renderGLTFToPNGBufferFromGLBBuffer(
+  const gltfPng = await renderGLTFToPNGFromGLB(
     glb as ArrayBuffer,
     cameraOptions,
   )
