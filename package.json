@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
+    "circuit-to-svg": "^0.0.356",
     "@resvg/resvg-js": "^2.6.2",
     "@resvg/resvg-wasm": "^2.6.2",
     "@tscircuit/circuit-json-util": "^0.0.75",
@@ -27,12 +28,12 @@
   },
   "peerDependencies": {
     "@tscircuit/circuit-json-util": "*",
-    "typescript": "^5"
+    "typescript": "^5",
+    "circuit-to-svg": "*"
   },
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
     "circuit-json-to-gltf": "^0.0.102",
-    "circuit-to-svg": "^0.0.354",
     "schematic-symbols": "^0.0.202",
     "stepts": "^0.0.4"
   }
