@@ -572,7 +572,10 @@ export async function circuitJsonToStep(
   let handledComponentIds = new Set<string>()
   let handledPcbComponentIds = new Set<string>()
 
-  if (options.includeComponents && options.includeExternalMeshes) {
+  const shouldUseExternalStepModels =
+    options.includeComponents && options.includeExternalMeshes
+
+  if (shouldUseExternalStepModels) {
     const mergeResult = await mergeExternalStepModels({
       repo,
       circuitJson,
@@ -590,15 +593,18 @@ export async function circuitJsonToStep(
   // Generate component mesh fallback if requested
   // Only call mesh generation if there are components that need it
   if (options.includeComponents) {
-    // Build set of pcb_component_ids covered by cad_components with model_step_url
+    // Build set of pcb_component_ids covered by cad_components with model_step_url.
+    // STEP-backed components are only covered when external mesh merging is enabled.
     const pcbComponentIdsWithStepUrl = new Set<string>()
-    for (const item of circuitJson) {
-      if (
-        item.type === "cad_component" &&
-        item.model_step_url &&
-        item.pcb_component_id
-      ) {
-        pcbComponentIdsWithStepUrl.add(item.pcb_component_id)
+    if (options.includeExternalMeshes) {
+      for (const item of circuitJson) {
+        if (
+          item.type === "cad_component" &&
+          item.model_step_url &&
+          item.pcb_component_id
+        ) {
+          pcbComponentIdsWithStepUrl.add(item.pcb_component_id)
+        }
       }
     }
 
@@ -621,8 +627,9 @@ export async function circuitJsonToStep(
         ) {
           return false
         }
-        // Needs mesh if no model_step_url
-        return !item.model_step_url
+        // Needs fallback mesh when it has no external STEP model, or when
+        // external mesh merging is disabled and the STEP URL is intentionally ignored.
+        return !item.model_step_url || !options.includeExternalMeshes
       }
       if (item.type === "pcb_component") {
         // Skip if already handled
