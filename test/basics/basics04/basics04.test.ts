@@ -22,9 +22,11 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Verify we have multiple solids (board + components)
+  // Verify we have one solid per disconnected body: board + R1 + C1.
+  // A board-only export would still contain one MANIFOLD_SOLID_BREP, so keep
+  // this exact count to guard against component boxes disappearing again.
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
-  expect(solidCount).toBeGreaterThanOrEqual(1)
+  expect(solidCount).toBe(3)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics04.step"
