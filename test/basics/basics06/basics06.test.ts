@@ -45,11 +45,12 @@ test("basics06: skip mesh generation when all components have model_step_url", a
 
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Should have multiple solids: board + 2 external STEP components
+  // Should have exactly the board plus the two unique external STEP models.
+  // A weaker >= check would miss regressions that drop or duplicate model solids.
 
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
 
-  expect(solidCount).toBeGreaterThanOrEqual(3)
+  expect(solidCount).toBe(3)
 
   // Write STEP file to debug-output
 
