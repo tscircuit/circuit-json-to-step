@@ -18,6 +18,8 @@ test("basics01: convert circuit json with circular holes to STEP", async () => {
   // Verify product structure
   expect(stepText).toContain("TestPCB")
   expect(stepText).toContain("MANIFOLD_SOLID_BREP")
+  const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
+  expect(solidCount).toBe(1)
 
   // Verify holes are created (should have CIRCLE and CYLINDRICAL_SURFACE entities)
   expect(stepText).toContain("CIRCLE")
@@ -37,6 +39,7 @@ test("basics01: convert circuit json with circular holes to STEP", async () => {
 
   console.log("✓ STEP file generated successfully")
   console.log(`  - Circles created: ${circleCount}`)
+  console.log(`  - Solids created: ${solidCount}`)
   console.log(`  - STEP text length: ${stepText.length} bytes`)
   console.log(`  - Output: ${outputPath}`)
 

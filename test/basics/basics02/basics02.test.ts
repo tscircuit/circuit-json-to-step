@@ -15,12 +15,15 @@ test("basics02: convert pcb_board with outline only to STEP", async () => {
   // Verify product structure
   expect(stepText).toContain("TestPCB_Outline")
   expect(stepText).toContain("MANIFOLD_SOLID_BREP")
+  const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
+  expect(solidCount).toBe(1)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics02.step"
   await Bun.write(outputPath, stepText)
 
   console.log("✓ STEP file generated successfully")
+  console.log(`  - Solids created: ${solidCount}`)
   console.log(`  - STEP text length: ${stepText.length} bytes`)
   console.log(`  - Output: ${outputPath}`)
 
