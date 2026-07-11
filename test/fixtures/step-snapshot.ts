@@ -2,8 +2,8 @@ import { expect } from "bun:test"
 import {
   createSceneFromGLTF,
   renderSceneFromGLTF,
-  pureImageFactory,
-  encodePNGToBuffer,
+  createUint8Bitmap,
+  encodePNG,
 } from "poppygl"
 import { importStepWithOcct } from "../utils/occt/importer"
 import type { OcctMesh } from "../utils/occt/importer"
@@ -270,11 +270,10 @@ async function renderStepToPNG(
       height,
       ambient,
     },
-    pureImageFactory,
+    createUint8Bitmap,
   )
 
-  const png = await encodePNGToBuffer(bitmap)
-  return png
+  return encodePNG(bitmap)
 }
 
 /**
