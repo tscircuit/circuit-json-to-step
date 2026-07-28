@@ -88,6 +88,7 @@ export async function generateComponentMeshes(
             model_stl_url: undefined,
             model_glb_url: undefined,
             model_gltf_url: undefined,
+            show_as_bounding_box: true,
           }
         }
 
