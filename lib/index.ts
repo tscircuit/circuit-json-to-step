@@ -423,6 +423,9 @@ export async function circuitJsonToStep(
     const topHoleEdge = repo.add(
       new EdgeCurve("", topHoleVertex, topHoleVertex, topHoleCircle, true),
     )
+    // A cylindrical face's boundary wire needs seam edges to connect the
+    // bottom and top circular edges. Reuse one seam edge in both directions.
+    const wallSeamEdge = createEdge(bottomHoleVertex, topHoleVertex)
 
     const bottomLoop = repo.add(
       new EdgeLoop("", [repo.add(new OrientedEdge("", bottomHoleEdge, false))]),
@@ -433,7 +436,9 @@ export async function circuitJsonToStep(
     const wallLoop = repo.add(
       new EdgeLoop("", [
         repo.add(new OrientedEdge("", bottomHoleEdge, true)),
+        repo.add(new OrientedEdge("", wallSeamEdge, true)),
         repo.add(new OrientedEdge("", topHoleEdge, false)),
+        repo.add(new OrientedEdge("", wallSeamEdge, false)),
       ]),
     )
     const holeCylinderPlacement = repo.add(

@@ -36,9 +36,15 @@ test("repro04: convert a rounded business-card outline with holes to STEP", asyn
   expect(occtResult.success).toBe(true)
   expect(occtResult.meshes.length).toBeGreaterThan(0)
 
-  const bounds = getBounds(
-    occtResult.meshes[0].attributes.position.array as number[],
-  )
+  const positions = occtResult.meshes[0].attributes.position.array as number[]
+  const offPlaneZ: number[] = []
+  for (let index = 2; index < positions.length; index += 3) {
+    const z = positions[index]!
+    if (Math.abs(Math.abs(z) - 0.4) > 1e-6) offPlaneZ.push(z)
+  }
+  expect(offPlaneZ).toEqual([])
+
+  const bounds = getBounds(positions)
   expect(bounds.min[0]).toBeCloseTo(-37.5, 4)
   expect(bounds.max[0]).toBeCloseTo(37.5, 4)
   expect(bounds.min[1]).toBeCloseTo(-27.5, 4)
