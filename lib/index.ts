@@ -357,7 +357,7 @@ export async function circuitJsonToStep(
   const topLoop = repo.add(
     new EdgeLoop(
       "",
-      topEdges.map((edge) => repo.add(new OrientedEdge("", edge, false))),
+      topEdges.map((edge) => repo.add(new OrientedEdge("", edge, true))),
     ),
   )
 

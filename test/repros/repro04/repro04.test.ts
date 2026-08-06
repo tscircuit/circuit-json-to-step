@@ -1,4 +1,5 @@
 import { test, expect } from "bun:test"
+import { parseRepository, type AdvancedFace } from "stepts"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import "../../fixtures/step-snapshot"
@@ -18,6 +19,44 @@ function getBounds(positions: number[]) {
   return { min, max }
 }
 
+function getBoardOuterLoopBreakCounts(stepText: string) {
+  const repo = parseRepository(stepText)
+  const breakCounts: number[] = []
+
+  for (const [, entity] of repo.entries()) {
+    if (entity.type !== "ADVANCED_FACE") continue
+    const face = entity as AdvancedFace
+    if (face.surface.resolve(repo).type !== "PLANE") continue
+
+    const outerBound = face.bounds.find(
+      (bound) => bound.resolve(repo).type === "FACE_OUTER_BOUND",
+    )
+    if (!outerBound) continue
+
+    const loop = outerBound.resolve(repo).bound.resolve(repo)
+    if (loop.edges.length <= 4) continue
+
+    const orientedEdges = loop.edges.map((edge) => edge.resolve(repo))
+    let breaks = 0
+    for (let index = 0; index < orientedEdges.length; index++) {
+      const current = orientedEdges[index]!
+      const next = orientedEdges[(index + 1) % orientedEdges.length]!
+      const currentEdge = current.edge.resolve(repo)
+      const nextEdge = next.edge.resolve(repo)
+      const currentEnd = (
+        current.orientation ? currentEdge.end : currentEdge.start
+      ).resolve(repo)
+      const nextStart = (
+        next.orientation ? nextEdge.start : nextEdge.end
+      ).resolve(repo)
+      if (currentEnd !== nextStart) breaks++
+    }
+    breakCounts.push(breaks)
+  }
+
+  return breakCounts
+}
+
 test("repro04: convert a rounded business-card outline with holes to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
     includeComponents: false,
@@ -31,6 +70,7 @@ test("repro04: convert a rounded business-card outline with holes to STEP", asyn
 
   expect((stepText.match(/CIRCLE/g) || []).length).toBe(10)
   expect((stepText.match(/CYLINDRICAL_SURFACE/g) || []).length).toBe(5)
+  expect(getBoardOuterLoopBreakCounts(stepText)).toEqual([0, 0])
 
   const occtResult = await importStepWithOcct(stepText)
   expect(occtResult.success).toBe(true)
