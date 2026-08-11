@@ -52,6 +52,10 @@ import {
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
+import {
+  createPolygonHoleGeometry,
+  getCutoutPolygonPoints,
+} from "./cutout-geometry"
 
 type Hole = Extract<
   CircuitJson[number],
@@ -106,6 +110,7 @@ export async function circuitJsonToStep(
     (item): item is RuntimeHole =>
       item.type === "pcb_hole" || item.type === "pcb_plated_hole",
   )
+  const cutouts = circuitJson.filter((item) => item.type === "pcb_cutout")
 
   // Get dimensions from pcb_board or options
   const boardWidth = options.boardWidth ?? pcbBoard?.width
@@ -472,6 +477,31 @@ export async function circuitJsonToStep(
           -halfBoardThickness,
           halfBoardThickness,
           zDir,
+        ),
+      )
+    }
+  }
+
+  // pcb_cutouts remove board material just like holes do
+  for (const cutout of cutouts) {
+    if (cutout.shape === "circle") {
+      sharedHoleGeometries.push(
+        createCircularHoleGeometry({
+          x: cutout.center.x,
+          y: cutout.center.y,
+          hole_diameter: cutout.radius * 2,
+        } as RuntimeHole),
+      )
+      continue
+    }
+    const points = getCutoutPolygonPoints(cutout)
+    if (points) {
+      sharedHoleGeometries.push(
+        createPolygonHoleGeometry(
+          repo,
+          points,
+          -halfBoardThickness,
+          halfBoardThickness,
         ),
       )
     }

@@ -27,7 +27,7 @@ export function createVertex(
   )
 }
 
-function createEdge(
+export function createEdge(
   repo: Repository,
   vStart: Ref<VertexPoint>,
   vEnd: Ref<VertexPoint>,
