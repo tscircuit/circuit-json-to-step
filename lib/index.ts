@@ -53,8 +53,8 @@ import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
 import {
-  createPolygonHoleGeometry,
-  getCutoutPolygonPoints,
+  createHoleGeometryFromSegments,
+  getCutoutBoundarySegments,
 } from "./cutout-geometry"
 
 type Hole = Extract<
@@ -494,12 +494,12 @@ export async function circuitJsonToStep(
       )
       continue
     }
-    const points = getCutoutPolygonPoints(cutout)
-    if (points) {
+    const segments = getCutoutBoundarySegments(cutout)
+    if (segments?.length) {
       sharedHoleGeometries.push(
-        createPolygonHoleGeometry(
+        createHoleGeometryFromSegments(
           repo,
-          points,
+          segments,
           -halfBoardThickness,
           halfBoardThickness,
         ),
