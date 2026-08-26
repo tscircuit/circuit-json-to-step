@@ -1,0 +1,46 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_1",
+    "width": 40,
+    "height": 30,
+    "thickness": 1.6,
+    "center": { "x": 0, "y": 0 }
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "pcb_cutout_1",
+    "shape": "rect",
+    "center": { "x": -11, "y": 4 },
+    "width": 14,
+    "height": 3,
+    "rotation": 30,
+    "corner_radius": 1.5
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "pcb_cutout_2",
+    "shape": "rect",
+    "center": { "x": 11, "y": -4 },
+    "width": 10,
+    "height": 8,
+    "corner_radius": 2
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "pcb_cutout_3",
+    "shape": "rect",
+    "center": { "x": -11, "y": -8 },
+    "width": 6,
+    "height": 6,
+    "corner_radius": 10
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "pcb_cutout_4",
+    "shape": "rect",
+    "center": { "x": 0, "y": 12 },
+    "width": 8,
+    "height": 0
+  }
+]
