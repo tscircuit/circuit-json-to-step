@@ -24,9 +24,11 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Verify we have multiple solids (board + components)
+  // Verify each component gets its own solid (1 board + 4 component boxes = 5).
+  // Issue #6: merging all boxes into a single ClosedShell creates invalid
+  // STEP topology that viewers silently discard.
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
-  expect(solidCount).toBeGreaterThanOrEqual(1)
+  expect(solidCount).toBe(5)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/repro01.step"
