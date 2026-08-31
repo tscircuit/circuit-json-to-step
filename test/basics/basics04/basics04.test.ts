@@ -22,9 +22,13 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Verify we have multiple solids (board + components)
+  // Verify we have multiple solids (board + components).
+  // basics04 has exactly 2 source_components (R1 + C1) plus the board, so the
+  // STEP must emit exactly 3 MANIFOLD_SOLID_BREP entities. A loose `>= 1`
+  // assertion would silently mask a regression that drops component fallback
+  // boxes — which is the original issue #6 failure mode.
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
-  expect(solidCount).toBeGreaterThanOrEqual(1)
+  expect(solidCount).toBe(3)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics04.step"

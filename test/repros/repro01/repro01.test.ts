@@ -24,9 +24,12 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Verify we have multiple solids (board + components)
+  // repro01 has 4 source_components plus the board (= 5 solids expected).
+  // The loose `>= 1` assertion this replaces would have passed even if every
+  // component fallback box silently disappeared — which is issue #6's
+  // original failure. Asserting exact count makes the regression observable.
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
-  expect(solidCount).toBeGreaterThanOrEqual(1)
+  expect(solidCount).toBe(5)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/repro01.step"
