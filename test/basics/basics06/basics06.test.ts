@@ -87,3 +87,22 @@ test("basics06: skip mesh generation when all components have model_step_url", a
 
   await expect(stepText).toMatchStepSnapshot(import.meta.path, "basics06")
 }, 30000)
+
+test("basics06: falls back to component boxes when external meshes are disabled", async () => {
+  const stepText = await circuitJsonToStep(circuitJson as any, {
+    includeComponents: true,
+    includeExternalMeshes: false,
+    productName: "TestPCB_FallbackBoxes",
+  })
+
+  expect(stepText).toContain("TestPCB_FallbackBoxes")
+  expect(stepText).toContain("MANIFOLD_SOLID_BREP")
+  expect(stepText.match(/MAPPED_ITEM/g) ?? []).toHaveLength(0)
+
+  const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
+  expect(solidCount).toBeGreaterThanOrEqual(3)
+
+  const occtResult = await importStepWithOcct(stepText)
+  expect(occtResult.success).toBe(true)
+  expect(occtResult.meshes.length).toBeGreaterThanOrEqual(3)
+}, 30000)
