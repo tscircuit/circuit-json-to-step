@@ -55,11 +55,20 @@ test("repro02: convert circuit json with rotated pill holes to STEP", async () =
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
+  // Guard against #6 regression: complex rotated-pill hole cutting must
+  // produce exactly one board solid. This fixture has source_components
+  // (MP1-4, Xpattern1-4) but no pcb_component entries, so no component
+  // fallback boxes should be generated. A regression that fragments the
+  // board geometry or adds spurious component boxes would change this count.
+  const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
+  expect(solidCount).toBe(1)
+
   // Write STEP file to debug-output
   const outputPath = "debug-output/repro02.step"
   await Bun.write(outputPath, stepText)
 
   console.log("✓ STEP file generated successfully")
+  console.log(`  - Solids created: ${solidCount}`)
   console.log(`  - STEP text length: ${stepText.length} bytes`)
   console.log(`  - Output: ${outputPath}`)
 
