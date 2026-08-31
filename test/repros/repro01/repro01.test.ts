@@ -24,9 +24,11 @@ test("basics04: convert circuit json with components to STEP", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Verify we have multiple solids (board + components)
+  // Verify the repro keeps all fallback component rectangles as separate solids.
+  // The issue originally allowed missing component boxes to go unnoticed because
+  // a board-only STEP export still has one MANIFOLD_SOLID_BREP.
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
-  expect(solidCount).toBeGreaterThanOrEqual(1)
+  expect(solidCount).toBe(5)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/repro01.step"
