@@ -25,6 +25,7 @@ const EXPECTED_UNIQUE_STEP_MODEL_COUNT = new Set(
     .filter((item) => item.type === "cad_component" && item.model_step_url)
     .map((item) => item.model_step_url),
 ).size
+const EXPECTED_SOLID_COUNT = 1 + EXPECTED_UNIQUE_STEP_MODEL_COUNT
 
 const fixturesDir = fileURLToPath(
   new URL("../../fixtures/kicad-models/", import.meta.url),
@@ -109,7 +110,9 @@ test("kicad-step: merges KiCad STEP models referenced via model_step_url", async
 
   expect(stepText).toContain("KiCadStepMerge")
   const solidCount = (stepText.match(/MANIFOLD_SOLID_BREP/g) || []).length
-  expect(solidCount).toBeGreaterThanOrEqual(3)
+  // The STEP merge should define one board solid and one reusable solid per
+  // unique external model. Component instances are MAPPED_ITEM references.
+  expect(solidCount).toBe(EXPECTED_SOLID_COUNT)
 
   const repository = parseRepository(stepText)
   const solids = Array.from(repository.entries())
@@ -123,9 +126,7 @@ test("kicad-step: merges KiCad STEP models referenced via model_step_url", async
   )
   expect(boardSolids.length).toBe(1)
   const uniqueComponentSolids = solids.length - boardSolids.length
-  expect(uniqueComponentSolids).toBeGreaterThanOrEqual(
-    EXPECTED_UNIQUE_STEP_MODEL_COUNT,
-  )
+  expect(uniqueComponentSolids).toBe(EXPECTED_UNIQUE_STEP_MODEL_COUNT)
   expect(stepText.match(/MAPPED_ITEM/g) ?? []).toHaveLength(
     EXPECTED_COMPONENT_CENTERS.length,
   )
