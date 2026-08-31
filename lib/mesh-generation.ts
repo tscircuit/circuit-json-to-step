@@ -43,6 +43,7 @@ export async function generateComponentMeshes(
   } = options
 
   const solids: GeneratedSceneSolid[] = []
+  let fallbackCircuitJson = circuitJson
 
   try {
     const filteredCircuitJson = circuitJson
@@ -93,6 +94,7 @@ export async function generateComponentMeshes(
 
         return element
       })
+    fallbackCircuitJson = filteredCircuitJson as CircuitJson
 
     const { convertCircuitJsonTo3D } = await getCircuitJsonToGltfModule()
 
@@ -101,12 +103,83 @@ export async function generateComponentMeshes(
       renderBoardTextures: false,
     })
 
-    for (const box of scene3d.boxes as SceneBox[]) {
+    const boxes = scene3d.boxes?.length
+      ? (scene3d.boxes as SceneBox[])
+      : createFallbackComponentBoxes(filteredCircuitJson, boardThickness)
+
+    for (const box of boxes) {
       solids.push(createSceneBoxSolid(repo, box))
     }
   } catch (error) {
     console.warn("Failed to generate component mesh:", error)
+    for (const box of createFallbackComponentBoxes(
+      fallbackCircuitJson,
+      boardThickness,
+    )) {
+      solids.push(createSceneBoxSolid(repo, box))
+    }
   }
 
   return solids
+}
+
+export function createFallbackComponentBoxes(
+  circuitJson: CircuitJson,
+  boardThickness: number,
+): SceneBox[] {
+  const sourceNames = new Map<string, string>()
+  for (const element of circuitJson as any[]) {
+    if (
+      element.type === "source_component" &&
+      element.source_component_id &&
+      element.name
+    ) {
+      sourceNames.set(element.source_component_id, element.name)
+    }
+  }
+
+  const componentThickness = 0.6
+
+  return (circuitJson as any[])
+    .filter((element) => element.type === "pcb_component")
+    .map((component): SceneBox | null => {
+      const center = component.center
+      const centerX = Number(center?.x)
+      const centerY = Number(center?.y)
+      const width = Number(component.width)
+      const height = Number(component.height)
+      if (
+        !Number.isFinite(centerX) ||
+        !Number.isFinite(centerY) ||
+        !Number.isFinite(width) ||
+        !Number.isFinite(height)
+      ) {
+        return null
+      }
+
+      const layer = component.layer === "bottom" ? "bottom" : "top"
+      const verticalSign = layer === "bottom" ? -1 : 1
+      const rotationDegrees = Number(component.rotation ?? 0)
+
+      return {
+        center: {
+          x: centerX,
+          y: verticalSign * (boardThickness / 2 + componentThickness / 2),
+          z: centerY,
+        },
+        size: {
+          x: width,
+          y: componentThickness,
+          z: height,
+        },
+        rotation: Number.isFinite(rotationDegrees)
+          ? { x: 0, y: (-rotationDegrees * Math.PI) / 180, z: 0 }
+          : undefined,
+        label:
+          sourceNames.get(component.source_component_id) ??
+          component.pcb_component_id ??
+          "Component",
+      }
+    })
+    .filter((box): box is SceneBox => box !== null)
 }
