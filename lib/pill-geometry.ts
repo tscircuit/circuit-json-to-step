@@ -55,7 +55,8 @@ export function getPillGeometry(hole: any): PillGeometry {
   const centerY = typeof hole.y === "number" ? hole.y : (hole.y as any).value
   const width = hole.hole_width
   const height = hole.hole_height
-  const ccwRotation = hole.ccw_rotation ?? 0
+  const ccwRotation =
+    hole.hole_ccw_rotation ?? hole.rect_ccw_rotation ?? hole.ccw_rotation ?? 0
   const rotation = (ccwRotation * Math.PI) / 180
   const isHorizontal = width >= height
   const radius = Math.min(width, height) / 2
