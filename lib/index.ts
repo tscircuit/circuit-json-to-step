@@ -68,6 +68,46 @@ type RuntimeHole = Hole & {
   hole_shape?: string
   shape?: string
   hole_diameter?: number
+  hole_width?: number
+  hole_height?: number
+  hole_offset_x?: number
+  hole_offset_y?: number
+  ccw_rotation?: number
+  hole_ccw_rotation?: number
+  rect_ccw_rotation?: number
+}
+
+const PILL_DRILL_SHAPES = new Set([
+  "pill",
+  "rotated_pill",
+  "oval",
+  "pill_hole_with_rect_pad",
+  "rotated_pill_hole_with_rect_pad",
+])
+
+const CIRCULAR_DRILL_SHAPES = new Set(["circle", "circular_hole_with_rect_pad"])
+
+function getDrillKind(hole: RuntimeHole): "pill" | "circle" | null {
+  if (hole.hole_shape && PILL_DRILL_SHAPES.has(hole.hole_shape)) return "pill"
+  if (hole.hole_shape && CIRCULAR_DRILL_SHAPES.has(hole.hole_shape)) {
+    return "circle"
+  }
+  if (hole.shape && PILL_DRILL_SHAPES.has(hole.shape)) return "pill"
+  if (
+    hole.shape &&
+    (CIRCULAR_DRILL_SHAPES.has(hole.shape) ||
+      hole.shape === "hole_with_polygon_pad")
+  ) {
+    return "circle"
+  }
+  if (
+    typeof hole.hole_width === "number" &&
+    typeof hole.hole_height === "number"
+  ) {
+    return "pill"
+  }
+  if (typeof hole.hole_diameter === "number") return "circle"
+  return null
 }
 
 export interface CircuitJsonToStepOptions {
@@ -368,6 +408,18 @@ export async function circuitJsonToStep(
     return coordinate?.value ?? 0
   }
 
+  function withDrillCenter(hole: RuntimeHole): RuntimeHole {
+    const offsetX =
+      typeof hole.hole_offset_x === "number" ? hole.hole_offset_x : 0
+    const offsetY =
+      typeof hole.hole_offset_y === "number" ? hole.hole_offset_y : 0
+    return {
+      ...hole,
+      x: getHoleCoordinate(hole.x) + offsetX,
+      y: getHoleCoordinate(hole.y) + offsetY,
+    }
+  }
+
   function createCircularHoleGeometry(hole: RuntimeHole): SharedHoleGeometry {
     const holeX = getHoleCoordinate(hole.x)
     const holeY = getHoleCoordinate(hole.y)
@@ -461,14 +513,17 @@ export async function circuitJsonToStep(
 
   const sharedHoleGeometries: SharedHoleGeometry[] = []
   for (const hole of holes) {
-    const holeShape = hole.hole_shape ?? hole.shape
-    if (holeShape === "circle") {
-      sharedHoleGeometries.push(createCircularHoleGeometry(hole))
-    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
+    const drillKind = getDrillKind(hole)
+    const centeredHole = withDrillCenter(hole)
+    if (drillKind === "circle") {
+      if (!centeredHole.hole_diameter) continue
+      sharedHoleGeometries.push(createCircularHoleGeometry(centeredHole))
+    } else if (drillKind === "pill") {
+      if (!centeredHole.hole_width || !centeredHole.hole_height) continue
       sharedHoleGeometries.push(
         createPillHoleGeometry(
           repo,
-          hole,
+          centeredHole,
           -halfBoardThickness,
           halfBoardThickness,
           zDir,
