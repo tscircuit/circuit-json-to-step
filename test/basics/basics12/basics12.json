@@ -1,0 +1,21 @@
+[
+  {
+    "type": "source_component",
+    "source_component_id": "imported",
+    "ftype": "printedpart",
+    "name": "IMPORTED"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_imported",
+    "source_component_id": "imported",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "model_glb_url": "https://example.com/part.glb",
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  }
+]

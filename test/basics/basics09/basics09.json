@@ -1,0 +1,46 @@
+[
+  {
+    "type": "source_component",
+    "source_component_id": "a",
+    "ftype": "printedpart",
+    "name": "FIRST"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_a",
+    "source_component_id": "a",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "model_jscad": {
+      "type": "cuboid",
+      "size": [4, 6, 2]
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "b",
+    "ftype": "printedpart",
+    "name": "SECOND"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_b",
+    "source_component_id": "b",
+    "position": {
+      "x": 4,
+      "y": 0,
+      "z": 0
+    },
+    "model_jscad": {
+      "type": "cuboid",
+      "size": [4, 6, 2]
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  }
+]
