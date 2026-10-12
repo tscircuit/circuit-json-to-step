@@ -11,8 +11,18 @@ test("basics14: separate printed-part files preserve geometry and safe filenames
   expect(typeof (await circuitJsonToStep(pcbOnly as CircuitJson))).toBe(
     "string",
   )
-  const files = await circuitJsonToStep(circuitJson as CircuitJson)
-  if (typeof files === "string") throw new Error("Expected separate part files")
+  expect(typeof (await circuitJsonToStep(circuitJson as CircuitJson))).toBe(
+    "string",
+  )
+  expect(
+    typeof (await circuitJsonToStep(transformed as CircuitJson, {
+      boardWidth: 20,
+      boardHeight: 10,
+    })),
+  ).toBe("string")
+  const files = await circuitJsonToStep(circuitJson as CircuitJson, {
+    exportMode: "assembly",
+  })
   expect(Object.keys(files)).toEqual(["CASE_BASE.step", "SWITCH_PLATE.step"])
   for (const [fileName, step] of Object.entries(files)) {
     const name = fileName.replace(/\.step$/, "")
@@ -55,9 +65,7 @@ test("basics14: separate printed-part files preserve geometry and safe filenames
     const model = input.find((item) => item.type === "cad_component")!
     if (model.type !== "cad_component") throw new Error("Missing CAD fixture")
     input.push({ ...model, cad_component_id: "second_model" })
-    const files = await circuitJsonToStep(input)
-    if (typeof files === "string")
-      throw new Error("Expected separate part files")
+    const files = await circuitJsonToStep(input, { exportMode: "assembly" })
     expect(Object.keys(files)).toEqual(["Case_base.step", "Case_base-2.step"])
     expect(
       (await importStepWithOcct(files["Case_base.step"])).meshes,
@@ -68,8 +76,8 @@ test("basics14: separate printed-part files preserve geometry and safe filenames
     await expect(
       circuitJsonToStep([], { exportMode: "assembly" }),
     ).rejects.toThrow("No assembly.printedpart")
-    await expect(circuitJsonToStep(missing as CircuitJson)).rejects.toThrow(
-      "needs JSCAD geometry",
-    )
+    await expect(
+      circuitJsonToStep(missing as CircuitJson, { exportMode: "assembly" }),
+    ).rejects.toThrow("needs JSCAD geometry")
   }
 }, 30_000)

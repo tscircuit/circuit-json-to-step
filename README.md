@@ -47,19 +47,15 @@ await Bun.write("output.step", stepText)
 
 ### Printed parts
 
-`circuitJsonToStep` exports one STEP file per `assembly.printedpart` by default.
-It returns a filename-to-STEP-content map when printed parts are present, including
-assemblies that also contain a PCB. A touching case base and switch plate produce
-two independently printable files.
+With `exportMode: "assembly"`, `circuitJsonToStep` exports one STEP file per
+`assembly.printedpart` and returns a filename-to-STEP-content map. A touching case
+base and switch plate produce two independently printable files, including when
+the circuit also contains a PCB.
 
 ```typescript
-const output = await circuitJsonToStep(circuitJson)
-if (typeof output === "string") {
-  await Bun.write("pcb.step", output)
-} else {
-  for (const [fileName, stepText] of Object.entries(output)) {
-    await Bun.write(fileName, stepText)
-  }
+const files = await circuitJsonToStep(circuitJson, { exportMode: "assembly" })
+for (const [fileName, stepText] of Object.entries(files)) {
+  await Bun.write(fileName, stepText)
 }
 ```
 
@@ -73,9 +69,10 @@ PCBs and ordinary `assembly.part` elements are excluded from printed-part files.
 Missing or unsupported printed-part geometry produces an error rather than
 silently omitting a part. Printed parts currently require JSCAD geometry.
 
-PCB-only input retains the single STEP string result. Set `exportMode: "pcb"`
-to export only a PCB from a mixed assembly. `exportMode: "assembly"` explicitly
-requests separate printed-part files and reports an error when none are present.
+PCB mode retains the single STEP string result. When `exportMode` is omitted,
+the existing selection is unchanged: inputs containing a PCB or board dimensions
+select PCB mode; printed-only inputs select assembly mode. Assembly mode reports
+an error when no printed parts are present.
 
 ## Related Projects
 

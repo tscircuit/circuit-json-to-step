@@ -72,7 +72,7 @@ type RuntimeHole = Hole & {
 }
 
 export interface CircuitJsonToStepOptions {
-  /** Defaults to separate printed-part files when printed parts are present, otherwise a PCB. */
+  /** Export a PCB or separate printed-part files. Defaults to PCB when dimensions are available, otherwise a printed-part assembly. */
   exportMode?: "pcb" | "assembly"
   /** Board width in mm (optional if pcb_board is present) */
   boardWidth?: number
@@ -113,12 +113,17 @@ export async function circuitJsonToStep(
   circuitJson: CircuitJson,
   options: CircuitJsonToStepOptions = {},
 ): Promise<string | Record<string, string>> {
+  const hasBoard = circuitJson.some((item) => item.type === "pcb_board")
   const printedParts = circuitJson.filter(
     (item) => item.type === "source_component" && item.ftype === "printedpart",
   )
   if (
     options.exportMode === "assembly" ||
-    (options.exportMode === undefined && printedParts.length > 0)
+    (options.exportMode === undefined &&
+      !hasBoard &&
+      !options.boardWidth &&
+      !options.boardHeight &&
+      printedParts.length > 0)
   ) {
     if (printedParts.length === 0) {
       throw new Error("No assembly.printedpart elements found to export")
