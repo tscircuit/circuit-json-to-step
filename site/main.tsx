@@ -285,13 +285,18 @@ convertBtn.addEventListener("click", async () => {
     // Restore console.warn
     console.warn = originalWarn
 
-    // Download the STEP file
-    downloadFile(`${baseName}.step`, stepContent)
+    if (typeof stepContent === "string") {
+      downloadFile(`${baseName}.step`, stepContent)
+    } else {
+      for (const [fileName, content] of Object.entries(stepContent)) {
+        downloadFile(fileName, content)
+      }
+    }
 
     if (warnings.length > 0) {
       showStatusWithWarnings(warnings)
     } else {
-      showStatus("Conversion complete! File downloaded.", "success")
+      showStatus("Conversion complete! STEP files downloaded.", "success")
     }
     convertBtn.disabled = false
   } catch (error) {

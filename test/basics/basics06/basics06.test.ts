@@ -18,6 +18,7 @@ test("basics06: skip mesh generation when all components have model_step_url", a
   // because all cad_components have model_step_url and mesh generation should be skipped
 
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     includeComponents: true,
 
     includeExternalMeshes: true,

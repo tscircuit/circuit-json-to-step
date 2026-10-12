@@ -1,13 +1,18 @@
 import { expect, test } from "bun:test"
 import type { CircuitJson } from "circuit-json"
-import { circuitJsonToPrintedPartStepFiles } from "../../../lib/index"
+import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import transformed from "../basics08/basics08.json"
+import pcbOnly from "../basics01/basics01.json"
 import missing from "../basics11/basics11.json"
 import circuitJson from "./basics14.json"
 
 test("basics14: separate printed-part files preserve geometry and safe filenames", async () => {
-  const files = circuitJsonToPrintedPartStepFiles(circuitJson as CircuitJson)
+  expect(typeof (await circuitJsonToStep(pcbOnly as CircuitJson))).toBe(
+    "string",
+  )
+  const files = await circuitJsonToStep(circuitJson as CircuitJson)
+  if (typeof files === "string") throw new Error("Expected separate part files")
   expect(Object.keys(files)).toEqual(["CASE_BASE.step", "SWITCH_PLATE.step"])
   for (const [fileName, step] of Object.entries(files)) {
     const name = fileName.replace(/\.step$/, "")
@@ -24,7 +29,9 @@ test("basics14: separate printed-part files preserve geometry and safe filenames
   }
 
   {
-    const files = circuitJsonToPrintedPartStepFiles(transformed as CircuitJson)
+    const files = await circuitJsonToStep(transformed as CircuitJson, {
+      exportMode: "assembly",
+    })
     const imported = await importStepWithOcct(files["ROTATED.step"])
     const positions = imported.meshes[0].attributes.position.array
     for (const [axis, min, max] of [
@@ -48,7 +55,9 @@ test("basics14: separate printed-part files preserve geometry and safe filenames
     const model = input.find((item) => item.type === "cad_component")!
     if (model.type !== "cad_component") throw new Error("Missing CAD fixture")
     input.push({ ...model, cad_component_id: "second_model" })
-    const files = circuitJsonToPrintedPartStepFiles(input)
+    const files = await circuitJsonToStep(input)
+    if (typeof files === "string")
+      throw new Error("Expected separate part files")
     expect(Object.keys(files)).toEqual(["Case_base.step", "Case_base-2.step"])
     expect(
       (await importStepWithOcct(files["Case_base.step"])).meshes,
@@ -56,11 +65,11 @@ test("basics14: separate printed-part files preserve geometry and safe filenames
     expect(
       (await importStepWithOcct(files["Case_base-2.step"])).meshes,
     ).toHaveLength(1)
-    expect(() => circuitJsonToPrintedPartStepFiles([])).toThrow(
-      "No assembly.printedpart",
+    await expect(
+      circuitJsonToStep([], { exportMode: "assembly" }),
+    ).rejects.toThrow("No assembly.printedpart")
+    await expect(circuitJsonToStep(missing as CircuitJson)).rejects.toThrow(
+      "needs JSCAD geometry",
     )
-    expect(() =>
-      circuitJsonToPrintedPartStepFiles(missing as CircuitJson),
-    ).toThrow("needs JSCAD geometry")
   }
 }, 30_000)

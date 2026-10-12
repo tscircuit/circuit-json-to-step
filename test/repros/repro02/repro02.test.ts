@@ -6,6 +6,7 @@ import circuitJson from "./repro02.json"
 
 test("repro02: convert circuit json with rotated pill holes to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     includeComponents: true,
     productName: "Repro02",
   })

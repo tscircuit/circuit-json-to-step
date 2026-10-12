@@ -59,6 +59,7 @@ function getBoardOuterLoopBreakCounts(stepText: string) {
 
 test("repro04: convert a rounded business-card outline with holes to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     includeComponents: false,
     productName: "Repro04_BusinessViaCard",
   })

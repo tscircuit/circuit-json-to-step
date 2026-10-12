@@ -5,6 +5,7 @@ import circuitJson from "./repro03.json"
 
 test("repro03: reproduces fallback boxes for hole wrapper components", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     includeComponents: true,
     productName: "Repro03",
   })
