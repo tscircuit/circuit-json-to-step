@@ -5,6 +5,7 @@ import circuitJson from "./basics01.json"
 
 test("basics01: convert circuit json with circular holes to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     boardWidth: 20,
     boardHeight: 15,
     boardThickness: 1.6,

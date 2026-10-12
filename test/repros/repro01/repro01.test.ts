@@ -8,6 +8,7 @@ test("basics04: convert circuit json with components to STEP", async () => {
   // the test stays local and deterministic. Core should not emit
   // show_as_bounding_box together with a real model URL.
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     includeComponents: true,
     productName: "TestPCB_with_components",
   })

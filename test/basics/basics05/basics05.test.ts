@@ -5,6 +5,7 @@ import circuitJson from "./basics05.json"
 
 test("basics05: new test to cause a diff error", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     boardWidth: 20,
     boardHeight: 15,
     boardThickness: 1.6,

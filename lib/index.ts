@@ -72,7 +72,7 @@ type RuntimeHole = Hole & {
 }
 
 export interface CircuitJsonToStepOptions {
-  /** Export a PCB or a named JSCAD printed-part assembly. Defaults to PCB when dimensions are available, otherwise a printed-part assembly. */
+  /** Export a PCB or separate printed-part files. Defaults to PCB when dimensions are available, otherwise a printed-part assembly. */
   exportMode?: "pcb" | "assembly"
   /** Board width in mm (optional if pcb_board is present) */
   boardWidth?: number
@@ -80,7 +80,7 @@ export interface CircuitJsonToStepOptions {
   boardHeight?: number
   /** Board thickness in mm (default: 1.6mm or from pcb_board) */
   boardThickness?: number
-  /** Root product name (default: "PCB" for PCBs, "Combined Assembly" for printed parts). */
+  /** Root product name (default: "PCB" for PCBs, or the printed part's name). */
   productName?: string
   /** Include component meshes (default: false) */
   includeComponents?: boolean
@@ -95,14 +95,26 @@ export interface CircuitJsonToStepOptions {
 }
 
 /**
- * Converts a PCB or JSCAD printed-part assembly from Circuit JSON to STEP.
+ * Converts Circuit JSON to a PCB STEP string or separate named printed-part STEP files.
  */
+export function circuitJsonToStep(
+  circuitJson: CircuitJson,
+  options: CircuitJsonToStepOptions & { exportMode: "pcb" },
+): Promise<string>
+export function circuitJsonToStep(
+  circuitJson: CircuitJson,
+  options: CircuitJsonToStepOptions & { exportMode: "assembly" },
+): Promise<Record<string, string>>
+export function circuitJsonToStep(
+  circuitJson: CircuitJson,
+  options?: CircuitJsonToStepOptions,
+): Promise<string | Record<string, string>>
 export async function circuitJsonToStep(
   circuitJson: CircuitJson,
   options: CircuitJsonToStepOptions = {},
-): Promise<string> {
+): Promise<string | Record<string, string>> {
   const hasBoard = circuitJson.some((item) => item.type === "pcb_board")
-  const hasPrintedParts = circuitJson.some(
+  const printedParts = circuitJson.filter(
     (item) => item.type === "source_component" && item.ftype === "printedpart",
   )
   if (
@@ -111,9 +123,29 @@ export async function circuitJsonToStep(
       !hasBoard &&
       !options.boardWidth &&
       !options.boardHeight &&
-      hasPrintedParts)
+      printedParts.length > 0)
   ) {
-    return circuitJsonToAssemblyStep(circuitJson, options)
+    if (printedParts.length === 0) {
+      throw new Error("No assembly.printedpart elements found to export")
+    }
+    const files: Record<string, string> = {}
+    const usedNames = new Set<string>()
+    for (const part of printedParts) {
+      const baseName =
+        part.name.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") ||
+        "printed-part"
+      let fileName = `${baseName}.step`
+      let suffix = 2
+      while (usedNames.has(fileName.toLowerCase())) {
+        fileName = `${baseName}-${suffix++}.step`
+      }
+      usedNames.add(fileName.toLowerCase())
+      files[fileName] = circuitJsonToAssemblyStep(circuitJson, {
+        productName: options.productName ?? part.name,
+        sourceComponentId: part.source_component_id,
+      })
+    }
+    return files
   }
   const repo = new Repository()
 
