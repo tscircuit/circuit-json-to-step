@@ -32,7 +32,7 @@ import { VERSION } from "./version"
 /** Export JSCAD printed parts as distinct named children of a STEP assembly. */
 export function circuitJsonToAssemblyStep(
   circuitJson: CircuitJson,
-  { productName = "Assembly" }: { productName?: string } = {},
+  { productName = "Combined Assembly" }: { productName?: string } = {},
 ): string {
   const parts = circuitJson
     .filter((item) => item.type === "source_component")

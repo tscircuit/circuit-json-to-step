@@ -80,7 +80,7 @@ export interface CircuitJsonToStepOptions {
   boardHeight?: number
   /** Board thickness in mm (default: 1.6mm or from pcb_board) */
   boardThickness?: number
-  /** Root product name (default: "PCB" for PCBs, "Assembly" for printed parts). */
+  /** Root product name (default: "PCB" for PCBs, "Combined Assembly" for printed parts). */
   productName?: string
   /** Include component meshes (default: false) */
   includeComponents?: boolean

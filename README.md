@@ -48,7 +48,10 @@ await Bun.write("output.step", stepText)
 ### Printed-part assemblies
 
 Export JSCAD-backed `assembly.printedpart` elements as separate named parts in a
-STEP assembly:
+STEP assembly.
+
+The parent assembly is named `Combined Assembly` by default. Set `productName` to
+provide a custom name.
 
 ```typescript
 const stepText = await circuitJsonToStep(circuitJson, {
