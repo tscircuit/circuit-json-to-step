@@ -40,7 +40,7 @@
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
     "circuit-json-to-gltf": "^0.0.106",
-    "jscad-to-step": "0.0.7",
+    "jscad-to-step": "0.0.8",
     "stepts": "^0.0.4"
   }
 }
