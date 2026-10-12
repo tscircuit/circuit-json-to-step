@@ -37,6 +37,7 @@ const circuitJson = [
 ]
 
 const stepText = await circuitJsonToStep(circuitJson, {
+  exportMode: "pcb",
   boardWidth: 20,
   boardHeight: 15,
   boardThickness: 1.6,
