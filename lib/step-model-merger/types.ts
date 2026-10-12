@@ -43,4 +43,6 @@ export interface MergeStepModelOptions {
    * Useful for browser environments where fs is not available.
    */
   fsMap?: Record<string, string>
+  /** Allow fetching STEP files absent from fsMap (default: true). */
+  allowExternalModelFetch?: boolean
 }

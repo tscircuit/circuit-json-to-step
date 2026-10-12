@@ -86,6 +86,8 @@ export interface CircuitJsonToStepOptions {
   includeComponents?: boolean
   /** Include external model meshes from model_*_url fields (default: false). Only applicable when includeComponents is true. */
   includeExternalMeshes?: boolean
+  /** Allow network requests for external component models (default: true). Set false to use only cached STEP models and generated meshes. */
+  allowExternalModelFetch?: boolean
   /**
    * Pre-loaded STEP file contents, keyed by URL/path.
    * If a URL is found here, the content is used directly instead of fetching.
@@ -632,6 +634,7 @@ export async function circuitJsonToStep(
       circuitJson,
       boardThickness,
       fsMap: options.fsMap,
+      allowExternalModelFetch: options.allowExternalModelFetch,
     })
     handledComponentIds = mergeResult.handledComponentIds
     handledPcbComponentIds = mergeResult.handledPcbComponentIds
@@ -703,7 +706,9 @@ export async function circuitJsonToStep(
         repo,
         circuitJson,
         boardThickness,
-        includeExternalMeshes: options.includeExternalMeshes,
+        includeExternalMeshes:
+          options.includeExternalMeshes &&
+          options.allowExternalModelFetch !== false,
         excludeCadComponentIds: handledComponentIds,
         excludePcbComponentIds: handledPcbComponentIds,
         pcbComponentIdsWithStepUrl,
