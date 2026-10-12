@@ -30,4 +30,5 @@ test("basics07: export named printed parts as an assembly without a PCB", async 
     ],
   })
   await Bun.write("debug-output/basics07.step", step)
+  await expect(step).toMatchStepSnapshot(import.meta.path, "basics07")
 }, 30_000)

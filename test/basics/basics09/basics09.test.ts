@@ -14,4 +14,5 @@ test("basics09: touching printed parts remain separate named solids", async () =
   ])
   expect(step.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g)).toHaveLength(2)
   await Bun.write("debug-output/basics09.step", step)
+  await expect(step).toMatchStepSnapshot(import.meta.path, "basics09")
 }, 30_000)

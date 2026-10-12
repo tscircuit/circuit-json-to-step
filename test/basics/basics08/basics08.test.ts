@@ -21,4 +21,5 @@ test("basics08: assembly placement preserves origin, scale, and Euler rotation",
     expect(Math.max(...coordinates)).toBeCloseTo(max)
   }
   await Bun.write("debug-output/basics08.step", step)
+  await expect(step).toMatchStepSnapshot(import.meta.path, "basics08")
 }, 30_000)

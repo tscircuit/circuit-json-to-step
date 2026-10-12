@@ -17,4 +17,5 @@ test("basics10: explicit assembly mode exports printed parts from a mixed device
   const pcb = await circuitJsonToStep(circuitJson as CircuitJson)
   expect(pcb).not.toContain("NEXT_ASSEMBLY_USAGE_OCCURRENCE")
   expect(pcb.match(/= PRODUCT\(/g)).toHaveLength(1)
+  await expect(step).toMatchStepSnapshot(import.meta.path, "basics10")
 }, 30_000)
