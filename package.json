@@ -40,8 +40,7 @@
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
     "circuit-json-to-gltf": "^0.0.106",
-    "jscad-to-step": "github:tscircuit/jscad-to-step#e47220e6b7a98746b2135f9be62f5687644e58fc",
+    "jscad-to-step": "^0.0.11",
     "stepts": "^0.0.4"
-  },
-  "trustedDependencies": ["jscad-to-step"]
+  }
 }
