@@ -54,6 +54,8 @@ import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 
+export { circuitJsonToPrintedPartStepFiles } from "./printed-part-step-files"
+
 type Hole = Extract<
   CircuitJson[number],
   { type: "pcb_hole" | "pcb_plated_hole" }

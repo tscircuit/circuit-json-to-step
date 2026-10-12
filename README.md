@@ -77,6 +77,26 @@ assemblies. Printed parts without JSCAD geometry, including imported STL/GLB
 models, produce an error instead of being omitted. The output has one root
 assembly with named children; nested Circuit JSON groups are not reconstructed.
 
+### Separate STEP files for printing
+
+Use `circuitJsonToPrintedPartStepFiles` to export each `assembly.printedpart` in
+its own STEP file. A case base and switch plate therefore produce two files, even
+when they touch in the assembled preview. All CAD models belonging to one printed
+part stay in that part's file. Geometry, units, and placement are preserved.
+
+```typescript
+import { circuitJsonToPrintedPartStepFiles } from "circuit-json-to-step"
+
+const files = circuitJsonToPrintedPartStepFiles(circuitJson)
+for (const [fileName, stepText] of Object.entries(files)) {
+  await Bun.write(fileName, stepText)
+}
+```
+
+File names come from the part names, with unsafe characters replaced and numeric
+suffixes added for collisions. PCBs and ordinary `assembly.part` elements are
+excluded. Missing printed-part geometry produces an error, as in assembly export.
+
 ## Related Projects
 
 - [circuit-json](https://github.com/tscircuit/circuit-json) - Circuit JSON specification
