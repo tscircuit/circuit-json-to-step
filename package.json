@@ -24,7 +24,7 @@
     "@resvg/resvg-wasm": "^2.6.2",
     "@tscircuit/circuit-json-util": "^0.0.75",
     "@types/bun": "latest",
-    "circuit-json": "^0.0.425",
+    "circuit-json": "^0.0.525",
     "looks-same": "^10.0.1",
     "occt-import-js": "^0.0.23",
     "schematic-symbols": "^0.0.221",
@@ -39,6 +39,7 @@
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
     "circuit-json-to-gltf": "^0.0.106",
+    "jscad-to-step": "0.0.7",
     "stepts": "^0.0.4"
   }
 }

@@ -153,6 +153,23 @@ function importStepModelOnce(
   stepText: string,
   modelName: string,
 ): ImportedStepModel {
+  const { entries, origin, representation } = importStepModelGeometry(
+    targetRepo,
+    stepText,
+    modelName,
+  )
+  const representationMap = targetRepo.add(
+    new RepresentationMap(origin, representation),
+  )
+  return { entries, representationMap }
+}
+
+/** Import geometry without retaining the source file's product structure. */
+export function importStepModelGeometry(
+  targetRepo: Repository,
+  stepText: string,
+  modelName: string,
+) {
   const sourceRepo = parseRepository(stepText)
   let entries: RepositoryEntry[] = sourceRepo
     .entries()
@@ -193,11 +210,7 @@ function importStepModelOnce(
       getGeomContext(targetRepo),
     ),
   )
-  const representationMap = targetRepo.add(
-    new RepresentationMap(mappingOrigin, representation),
-  )
-
-  return { entries, representationMap }
+  return { entries, origin: mappingOrigin, representation, solids }
 }
 
 function createMappedStepModelInstance({

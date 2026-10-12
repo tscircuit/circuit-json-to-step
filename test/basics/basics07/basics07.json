@@ -1,0 +1,56 @@
+[
+  {
+    "type": "source_component",
+    "source_component_id": "left",
+    "ftype": "printedpart",
+    "name": "LEFT's bracket"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_left",
+    "source_component_id": "left",
+    "position": {
+      "x": -10,
+      "y": 0,
+      "z": 0
+    },
+    "model_jscad": {
+      "type": "cuboid",
+      "size": [4, 6, 2]
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "right",
+    "ftype": "printedpart",
+    "name": "RIGHT"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_right",
+    "source_component_id": "right",
+    "position": {
+      "x": 10,
+      "y": 0,
+      "z": 0
+    },
+    "model_jscad": {
+      "type": "subtract",
+      "shapes": [
+        {
+          "type": "cuboid",
+          "size": [4, 6, 2]
+        },
+        {
+          "type": "cylinder",
+          "radius": 1,
+          "height": 4
+        }
+      ]
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  }
+]

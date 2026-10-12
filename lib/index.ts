@@ -52,6 +52,7 @@ import {
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
+import { circuitJsonToAssemblyStep } from "./assembly"
 
 type Hole = Extract<
   CircuitJson[number],
@@ -71,13 +72,15 @@ type RuntimeHole = Hole & {
 }
 
 export interface CircuitJsonToStepOptions {
+  /** Export a PCB or a named JSCAD printed-part assembly. Defaults to PCB when dimensions are available, otherwise a printed-part assembly. */
+  exportMode?: "pcb" | "assembly"
   /** Board width in mm (optional if pcb_board is present) */
   boardWidth?: number
   /** Board height in mm (optional if pcb_board is present) */
   boardHeight?: number
   /** Board thickness in mm (default: 1.6mm or from pcb_board) */
   boardThickness?: number
-  /** Product name (default: "PCB") */
+  /** Root product name (default: "PCB" for PCBs, "Combined Assembly" for printed parts). */
   productName?: string
   /** Include component meshes (default: false) */
   includeComponents?: boolean
@@ -92,12 +95,26 @@ export interface CircuitJsonToStepOptions {
 }
 
 /**
- * Converts circuit JSON to STEP format, creating holes in a PCB board
+ * Converts a PCB or JSCAD printed-part assembly from Circuit JSON to STEP.
  */
 export async function circuitJsonToStep(
   circuitJson: CircuitJson,
   options: CircuitJsonToStepOptions = {},
 ): Promise<string> {
+  const hasBoard = circuitJson.some((item) => item.type === "pcb_board")
+  const hasPrintedParts = circuitJson.some(
+    (item) => item.type === "source_component" && item.ftype === "printedpart",
+  )
+  if (
+    options.exportMode === "assembly" ||
+    (options.exportMode === undefined &&
+      !hasBoard &&
+      !options.boardWidth &&
+      !options.boardHeight &&
+      hasPrintedParts)
+  ) {
+    return circuitJsonToAssemblyStep(circuitJson, options)
+  }
   const repo = new Repository()
 
   // Extract pcb_board and holes from circuit JSON
