@@ -5,10 +5,9 @@ import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics08.json"
 
 test("basics08: assembly placement preserves origin, scale, and Euler rotation", async () => {
-  const files = await circuitJsonToStep(circuitJson as CircuitJson, {
+  const step = await circuitJsonToStep(circuitJson as CircuitJson, {
     exportMode: "assembly",
   })
-  const step = files["ROTATED.step"]
   const imported = await importStepWithOcct(step)
   expect(imported.meshes).toHaveLength(1)
   const positions = imported.meshes[0].attributes.position.array

@@ -1,0 +1,15 @@
+[
+  {
+    "type": "source_component",
+    "source_component_id": "nested",
+    "ftype": "part",
+    "name": "IMPORTED_ASSEMBLY"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "nested_model",
+    "source_component_id": "nested",
+    "model_step_url": "https://models.example/nested.step",
+    "position": { "x": 0, "y": 0, "z": 0 }
+  }
+]

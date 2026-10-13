@@ -46,34 +46,55 @@ const stepText = await circuitJsonToStep(circuitJson, {
 await Bun.write("output.step", stepText)
 ```
 
-### Printed parts
+### Assemblies
 
-With `exportMode: "assembly"`, `circuitJsonToStep` exports one STEP file per
-`assembly.printedpart` and returns a filename-to-STEP-content map. A touching case
-base and switch plate produce two independently printable files, including when
-the circuit also contains a PCB.
+`circuitJsonToStep` always returns one STEP string. With `exportMode: "assembly"`,
+the file contains one named parent assembly with separate named children for the
+PCB, printed parts, ordinary assembly parts, and PCB component models. Touching
+parts remain separate bodies. The converter does not create ZIP archives or
+filename-to-content maps.
 
 ```typescript
-const files = await circuitJsonToStep(circuitJson, { exportMode: "assembly" })
-for (const [fileName, stepText] of Object.entries(files)) {
-  await Bun.write(fileName, stepText)
-}
+const stepText = await circuitJsonToStep(circuitJson, {
+  exportMode: "assembly",
+  productName: "My device",
+  fsMap: { "./models/bracket.step": preloadedStepText },
+})
+await Bun.write("my-device.step", stepText)
 ```
 
-Printed-part files retain their model geometry, units, origins, rotations, and
-placements. All CAD models belonging to one printed part stay in that part's
-file. File names come from part names, with unsafe characters replaced and
-numeric suffixes added for collisions. `productName` sets the root product name
-in each file; it defaults to that printed part's name.
+JSCAD and imported STEP parts retain their geometry, colors, model origins,
+uniform unit scales, rotations, and placements. Each CAD model becomes a named
+child; multiple models can share the same part name. PCB components and imported
+STL, OBJ, GLB, and GLTF printed parts use the existing scene geometry converter.
+Mesh bodies share their vertices and edges. Failed external meshes, unsupported
+or missing geometry produce an error instead of a partial assembly. Relative
+STEP paths must be provided as plain STEP text in `fsMap`, keyed
+by the exact `model_step_url`; uncached STEP files require an HTTP(S) URL.
+Imported STEP files that contain their own assembly occurrences are rejected
+with the offending part name; nested imported assembly hierarchies are not yet
+supported.
 
-PCBs and ordinary `assembly.part` elements are excluded from printed-part files.
-Missing or unsupported printed-part geometry produces an error rather than
-silently omitting a part. Printed parts currently require JSCAD geometry.
+Multi-board assemblies include every board, named by its `pcb_board_id`; a single
+board retains the name "PCB". Holes use explicit board/subcircuit ownership when
+available, or their location when exactly one board contains them. Ambiguous hole
+ownership is an error. PCB components infer board thickness from a unique
+subcircuit match; ambiguous ownership with different board thicknesses is an
+error.
 
-PCB mode retains the single STEP string result. When `exportMode` is omitted,
-the existing selection is unchanged: inputs containing a PCB or board dimensions
-select PCB mode; printed-only inputs select assembly mode. Assembly mode reports
-an error when no printed parts are present.
+When `exportMode` is omitted, inputs containing `assembly.printedpart` or ordinary
+`assembly.part` source components select assembly mode, including mixed PCB
+and assembly designs. Other inputs retain PCB mode. `exportMode: "assembly"`
+also supports PCB-only inputs and CAD models without source components.
+
+`exportMode: "pcb"` retains the existing PCB behavior. `includeComponents` and
+`includeExternalMeshes` default to false in PCB mode. Assembly mode includes all
+CAD parts and PCB components; `includeExternalMeshes` defaults to true for its
+non-STEP mesh fallback. `productName` defaults to "PCB" in PCB mode and "Combined
+Assembly" in assembly mode. Empty assemblies produce an error.
+
+This changes the assembly-mode return type from `Record<string, string>` to
+`string`. Consumers should download that string as a single `.step` file.
 
 ## Related Projects
 

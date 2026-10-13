@@ -53,6 +53,7 @@ import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
+import { selectBoardGeometry } from "./select-board-geometry"
 
 type Hole = Extract<
   CircuitJson[number],
@@ -72,7 +73,7 @@ type RuntimeHole = Hole & {
 }
 
 export interface CircuitJsonToStepOptions {
-  /** Export a PCB or separate printed-part files. Defaults to PCB when dimensions are available, otherwise a printed-part assembly. */
+  /** Export one STEP file. Defaults to assembly when printed parts or ordinary assembly parts are present, otherwise PCB. */
   exportMode?: "pcb" | "assembly"
   /** Board width in mm (optional if pcb_board is present) */
   boardWidth?: number
@@ -80,11 +81,11 @@ export interface CircuitJsonToStepOptions {
   boardHeight?: number
   /** Board thickness in mm (default: 1.6mm or from pcb_board) */
   boardThickness?: number
-  /** Root product name (default: "PCB" for PCBs, or the printed part's name). */
+  /** Root product name (default: "PCB" or "Combined Assembly"). */
   productName?: string
-  /** Include component meshes (default: false) */
+  /** Include component meshes in PCB mode (default: false). Assembly mode includes all parts. */
   includeComponents?: boolean
-  /** Include external model meshes from model_*_url fields (default: false). Only applicable when includeComponents is true. */
+  /** Include external model meshes from model_*_url fields (default: false in PCB mode, true in assembly mode). */
   includeExternalMeshes?: boolean
   /**
    * Pre-loaded STEP file contents, keyed by URL/path.
@@ -95,57 +96,60 @@ export interface CircuitJsonToStepOptions {
 }
 
 /**
- * Converts Circuit JSON to a PCB STEP string or separate named printed-part STEP files.
+ * Converts Circuit JSON to one STEP file containing a PCB or a named assembly.
  */
-export function circuitJsonToStep(
-  circuitJson: CircuitJson,
-  options: CircuitJsonToStepOptions & { exportMode: "pcb" },
-): Promise<string>
-export function circuitJsonToStep(
-  circuitJson: CircuitJson,
-  options: CircuitJsonToStepOptions & { exportMode: "assembly" },
-): Promise<Record<string, string>>
-export function circuitJsonToStep(
-  circuitJson: CircuitJson,
-  options?: CircuitJsonToStepOptions,
-): Promise<string | Record<string, string>>
 export async function circuitJsonToStep(
   circuitJson: CircuitJson,
   options: CircuitJsonToStepOptions = {},
-): Promise<string | Record<string, string>> {
-  const hasBoard = circuitJson.some((item) => item.type === "pcb_board")
-  const printedParts = circuitJson.filter(
-    (item) => item.type === "source_component" && item.ftype === "printedpart",
+): Promise<string> {
+  const boards = circuitJson.filter((item) => item.type === "pcb_board")
+  const hasAssemblyParts = circuitJson.some(
+    (item) =>
+      item.type === "source_component" &&
+      ["printedpart", "part"].includes(item.ftype),
   )
   if (
     options.exportMode === "assembly" ||
-    (options.exportMode === undefined &&
-      !hasBoard &&
-      !options.boardWidth &&
-      !options.boardHeight &&
-      printedParts.length > 0)
+    (options.exportMode === undefined && hasAssemblyParts)
   ) {
-    if (printedParts.length === 0) {
-      throw new Error("No assembly.printedpart elements found to export")
-    }
-    const files: Record<string, string> = {}
-    const usedNames = new Set<string>()
-    for (const part of printedParts) {
-      const baseName =
-        part.name.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") ||
-        "printed-part"
-      let fileName = `${baseName}.step`
-      let suffix = 2
-      while (usedNames.has(fileName.toLowerCase())) {
-        fileName = `${baseName}-${suffix++}.step`
-      }
-      usedNames.add(fileName.toLowerCase())
-      files[fileName] = circuitJsonToAssemblyStep(circuitJson, {
-        productName: options.productName ?? part.name,
-        sourceComponentId: part.source_component_id,
+    const pcbSteps: { id: string; name: string; stepText: string }[] = []
+    for (const board of boards) {
+      const name = boards.length === 1 ? "PCB" : board.pcb_board_id
+      pcbSteps.push({
+        id: board.pcb_board_id,
+        name,
+        stepText: await circuitJsonToStep(
+          boards.length === 1
+            ? circuitJson
+            : selectBoardGeometry(circuitJson, board),
+          {
+            ...options,
+            exportMode: "pcb",
+            productName: name,
+            includeComponents: false,
+          },
+        ),
       })
     }
-    return files
+    if (boards.length === 0 && options.boardWidth && options.boardHeight) {
+      pcbSteps.push({
+        id: "pcb",
+        name: "PCB",
+        stepText: await circuitJsonToStep(circuitJson, {
+          ...options,
+          exportMode: "pcb",
+          productName: "PCB",
+          includeComponents: false,
+        }),
+      })
+    }
+    return circuitJsonToAssemblyStep(circuitJson, {
+      productName: options.productName,
+      pcbSteps,
+      fsMap: options.fsMap,
+      boardThickness: options.boardThickness ?? boards[0]?.thickness ?? 1.6,
+      includeExternalMeshes: options.includeExternalMeshes ?? true,
+    })
   }
   const repo = new Repository()
 
@@ -243,7 +247,7 @@ export async function circuitJsonToStep(
   let topVertices: Ref<VertexPoint>[]
 
   if (outline && Array.isArray(outline) && outline.length >= 3) {
-    // Use custom outline (points are already relative to board center)
+    // Circuit JSON outline points are already in world coordinates.
     // Filter out duplicate consecutive vertices (including first/last wrap-around)
     const cleanedOutline: { x: number; y: number }[] = []
     for (let i = 0; i < outline.length; i++) {

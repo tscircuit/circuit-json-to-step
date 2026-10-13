@@ -1,0 +1,17 @@
+[
+  {
+    "type": "source_component",
+    "source_component_id": "mesh_part",
+    "ftype": "printedpart",
+    "name": "IMPORTED_MESH"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "mesh_model",
+    "source_component_id": "mesh_part",
+    "position": { "x": 4, "y": 5, "z": 6 },
+    "model_obj_url": "https://models.example/cube.obj",
+    "model_unit_to_mm_scale_factor": 2,
+    "model_origin_alignment": "center"
+  }
+]

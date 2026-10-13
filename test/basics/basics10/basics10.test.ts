@@ -4,21 +4,26 @@ import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics10.json"
 
-test("basics10: explicit assembly mode exports printed parts from a mixed device", async () => {
-  const files = await circuitJsonToStep(circuitJson as CircuitJson, {
+test("basics10: mixed designs default to a complete assembly and retain explicit PCB mode", async () => {
+  const options = { productName: "Device" }
+  const step = await circuitJsonToStep(circuitJson as CircuitJson, {
+    ...options,
     exportMode: "assembly",
-    productName: "Device",
   })
-  const step = files["BRACKET.step"]
+  expect(
+    await circuitJsonToStep(circuitJson as CircuitJson, options),
+  ).toContain("NEXT_ASSEMBLY_USAGE_OCCURRENCE")
   const imported = await importStepWithOcct(step)
-  expect(imported.meshes).toHaveLength(1)
-  expect(imported.meshes[0].name).toBe("BRACKET")
-  expect(step).not.toContain("MOTOR")
-  expect(step.match(/= PRODUCT\(/g)).toHaveLength(2)
+  expect(imported.meshes.map((mesh) => mesh.name)).toEqual([
+    "PCB",
+    "BRACKET",
+    "MOTOR",
+  ])
+  expect(imported.root.children[0].name).toBe("Device")
+  expect(imported.root.children[0].children).toHaveLength(3)
   const pcb = await circuitJsonToStep(circuitJson as CircuitJson, {
     exportMode: "pcb",
   })
   expect(pcb).not.toContain("NEXT_ASSEMBLY_USAGE_OCCURRENCE")
-  expect(pcb.match(/= PRODUCT\(/g)).toHaveLength(1)
-  await expect(step).toMatchStepSnapshot(import.meta.path, "basics10")
+  expect((await importStepWithOcct(pcb)).meshes).toHaveLength(1)
 }, 30_000)

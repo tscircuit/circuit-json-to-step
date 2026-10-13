@@ -55,17 +55,21 @@ function createEdge(
 export function createFaceFromVertices(
   repo: Repository,
   vertices: Ref<VertexPoint>[],
+  sharedEdges?: Map<string, Ref<EdgeCurve>>,
 ): Ref<AdvancedFace> {
-  const edges = vertices.map((vertex, index) =>
-    createEdge(repo, vertex, vertices[(index + 1) % vertices.length]!),
-  )
+  const edges = vertices.map((vertex, index) => {
+    const next = vertices[(index + 1) % vertices.length]!
+    const key = [Number(vertex.id), Number(next.id)]
+      .sort((a, b) => a - b)
+      .join(":")
+    const edge = sharedEdges?.get(key) ?? createEdge(repo, vertex, next)
+    sharedEdges?.set(key, edge)
+    return repo.add(
+      new OrientedEdge("", edge, edge.resolve(repo).start.id === vertex.id),
+    )
+  })
 
-  const edgeLoop = repo.add(
-    new EdgeLoop(
-      "",
-      edges.map((edge) => repo.add(new OrientedEdge("", edge, true))),
-    ),
-  )
+  const edgeLoop = repo.add(new EdgeLoop("", edges))
 
   const p1 = vertices[0]!.resolve(repo).pnt.resolve(repo)
   const p2 = vertices[1]!.resolve(repo).pnt.resolve(repo)

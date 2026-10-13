@@ -209,8 +209,8 @@ async function handleFile(file: File) {
 
     // Update STEP models section visibility
     if (
-      includeExternalMeshesCheckbox.checked &&
-      requiredStepModels.length > 0
+      requiredStepModels.length > 0 &&
+      (includeExternalMeshesCheckbox.checked || hasAssemblyParts(circuitJson))
     ) {
       stepModelsSection.style.display = "block"
       updateStepModelsList()
@@ -278,25 +278,22 @@ convertBtn.addEventListener("click", async () => {
     // Convert to STEP
     const stepContent = await circuitJsonToStep(circuitJson, {
       includeComponents,
-      includeExternalMeshes: includeComponents && includeExternalMeshes,
+      includeExternalMeshes:
+        hasAssemblyParts(circuitJson) ||
+        (includeComponents && includeExternalMeshes),
       fsMap: Object.keys(stepFilesMap).length > 0 ? stepFilesMap : undefined,
+      productName: baseName,
     })
 
     // Restore console.warn
     console.warn = originalWarn
 
-    if (typeof stepContent === "string") {
-      downloadFile(`${baseName}.step`, stepContent)
-    } else {
-      for (const [fileName, content] of Object.entries(stepContent)) {
-        downloadFile(fileName, content)
-      }
-    }
+    downloadFile(`${baseName}.step`, stepContent)
 
     if (warnings.length > 0) {
       showStatusWithWarnings(warnings)
     } else {
-      showStatus("Conversion complete! STEP files downloaded.", "success")
+      showStatus("Conversion complete! STEP file downloaded.", "success")
     }
     convertBtn.disabled = false
   } catch (error) {
@@ -336,6 +333,14 @@ function downloadFile(filename: string, content: string) {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+function hasAssemblyParts(json: any[]) {
+  return json.some(
+    (item) =>
+      item?.type === "source_component" &&
+      ["printedpart", "part"].includes(item.ftype),
+  )
 }
 
 // Helper function to show status
