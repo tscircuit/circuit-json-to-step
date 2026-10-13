@@ -40,6 +40,7 @@
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
     "circuit-json-to-gltf": "^0.0.106",
+    "color": "^5.0.3",
     "jscad-to-step": "^0.0.11",
     "stepts": "^0.0.4"
   }

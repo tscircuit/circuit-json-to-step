@@ -1,4 +1,5 @@
 import type { CircuitJson } from "circuit-json"
+import Color from "color"
 import { jscadToStep } from "jscad-to-step"
 import {
   ApplicationContext,
@@ -144,6 +145,14 @@ export function circuitJsonToAssemblyStep(
     for (const model of models) {
       const modelOrigin = asVector3(model.model_origin_position)
       const scale = model.model_unit_to_mm_scale_factor ?? 1
+      // Apply the same CAD color override as the assembly viewer.
+      const shape = model.color
+        ? {
+            type: "colorize",
+            color: Color(model.color).rgb().unitArray().slice(0, 3),
+            shape: model.model_jscad!,
+          }
+        : model.model_jscad!
       // Keep geometry local; rigid placement belongs to the assembly occurrence.
       const geometry = jscadToStep({
         type: "scale",
@@ -151,7 +160,7 @@ export function circuitJsonToAssemblyStep(
         shape: {
           type: "translate",
           vector: [-modelOrigin.x, -modelOrigin.y, -modelOrigin.z],
-          shape: model.model_jscad!,
+          shape,
         },
       })
       const imported = importStepModelGeometry(repo, geometry, part.name)
