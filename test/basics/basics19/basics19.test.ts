@@ -5,9 +5,7 @@ import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics19.json"
 
 test("basics19: multi-board assemblies include every board and reject ambiguous hole ownership", async () => {
-  const step = await circuitJsonToStep(circuitJson as CircuitJson, {
-    exportMode: "assembly",
-  })
+  const step = await circuitJsonToStep(circuitJson as CircuitJson)
   const imported = await importStepWithOcct(step)
   expect(imported.root.children[0].children.map((child) => child.name)).toEqual(
     ["LEFT_PCB", "RIGHT_PCB"],

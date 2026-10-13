@@ -37,7 +37,6 @@ const circuitJson = [
 ]
 
 const stepText = await circuitJsonToStep(circuitJson, {
-  exportMode: "pcb",
   boardWidth: 20,
   boardHeight: 15,
   boardThickness: 1.6,
@@ -48,15 +47,14 @@ await Bun.write("output.step", stepText)
 
 ### Assemblies
 
-`circuitJsonToStep` always returns one STEP string. With `exportMode: "assembly"`,
-the file contains one named parent assembly with separate named children for the
-PCB, printed parts, ordinary assembly parts, and PCB component models. Touching
-parts remain separate bodies. The converter does not create ZIP archives or
-filename-to-content maps.
+`circuitJsonToStep(circuitJson)` exports the complete design by default and always
+returns one STEP string. The file contains one named parent assembly with
+separate named children for the PCB, printed parts, ordinary assembly parts, and
+PCB component models. Touching parts remain separate bodies. The converter does
+not create ZIP archives or filename-to-content maps.
 
 ```typescript
 const stepText = await circuitJsonToStep(circuitJson, {
-  exportMode: "assembly",
   productName: "My device",
   fsMap: { "./models/bracket.step": preloadedStepText },
 })
@@ -82,10 +80,11 @@ ownership is an error. PCB components infer board thickness from a unique
 subcircuit match; ambiguous ownership with different board thicknesses is an
 error.
 
-When `exportMode` is omitted, inputs containing `assembly.printedpart` or ordinary
-`assembly.part` source components select assembly mode, including mixed PCB
-and assembly designs. Other inputs retain PCB mode. `exportMode: "assembly"`
-also supports PCB-only inputs and CAD models without source components.
+Omitting `exportMode` always selects the complete assembly, including PCB-only
+designs with component models, mixed PCB and assembly designs, printed-only
+designs, multiple boards, and CAD models without source components. No special
+part tags or component-inclusion flags are required for the default export.
+Passing `exportMode: "assembly"` is equivalent to omitting it.
 
 `exportMode: "pcb"` retains the existing PCB behavior. `includeComponents` and
 `includeExternalMeshes` default to false in PCB mode. Assembly mode includes all

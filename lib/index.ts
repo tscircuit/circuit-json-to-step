@@ -73,7 +73,7 @@ type RuntimeHole = Hole & {
 }
 
 export interface CircuitJsonToStepOptions {
-  /** Export one STEP file. Defaults to assembly when printed parts or ordinary assembly parts are present, otherwise PCB. */
+  /** Export one STEP file. Defaults to the complete assembly, including all PCBs and parts. Explicit "pcb" retains PCB-only behavior. */
   exportMode?: "pcb" | "assembly"
   /** Board width in mm (optional if pcb_board is present) */
   boardWidth?: number
@@ -81,7 +81,7 @@ export interface CircuitJsonToStepOptions {
   boardHeight?: number
   /** Board thickness in mm (default: 1.6mm or from pcb_board) */
   boardThickness?: number
-  /** Root product name (default: "PCB" or "Combined Assembly"). */
+  /** Root product name (default: "Combined Assembly", or "PCB" in explicit PCB mode). */
   productName?: string
   /** Include component meshes in PCB mode (default: false). Assembly mode includes all parts. */
   includeComponents?: boolean
@@ -103,15 +103,7 @@ export async function circuitJsonToStep(
   options: CircuitJsonToStepOptions = {},
 ): Promise<string> {
   const boards = circuitJson.filter((item) => item.type === "pcb_board")
-  const hasAssemblyParts = circuitJson.some(
-    (item) =>
-      item.type === "source_component" &&
-      ["printedpart", "part"].includes(item.ftype),
-  )
-  if (
-    options.exportMode === "assembly" ||
-    (options.exportMode === undefined && hasAssemblyParts)
-  ) {
+  if (options.exportMode !== "pcb") {
     const pcbSteps: { id: string; name: string; stepText: string }[] = []
     for (const board of boards) {
       const name = boards.length === 1 ? "PCB" : board.pcb_board_id

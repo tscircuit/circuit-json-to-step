@@ -55,7 +55,6 @@ test("basics17: full STEP assembly retains cached instances, CAD transforms, and
   const realStepFiles = await loadStepFilesFromCircuitJson(pcbFixture)
   const pcbAssembly = await importStepWithOcct(
     await circuitJsonToStep(pcbFixture as CircuitJson, {
-      exportMode: "assembly",
       fsMap: realStepFiles,
     }),
   )
