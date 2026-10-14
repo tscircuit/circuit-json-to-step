@@ -12,6 +12,7 @@ import {
   stepStr,
 } from "stepts"
 import { eid } from "stepts"
+import type { CadComponent, PcbComponent } from "circuit-json"
 import { EXCLUDED_ENTITY_TYPES } from "./step-model-merger/excluded-entity-types"
 import {
   asVector3,
@@ -22,8 +23,6 @@ import {
 } from "./step-model-merger/vector-utils"
 import { readStepFile } from "./step-model-merger/read-step-file"
 import type {
-  CadComponent,
-  PcbComponent,
   MergeStepModelOptions,
   MergeStepModelResult,
   MergeTransform,
@@ -38,14 +37,17 @@ export async function mergeExternalStepModels(
   options: MergeStepModelOptions,
 ): Promise<MergeStepModelResult> {
   const { repo, circuitJson, boardThickness, fsMap } = options
-  const cadComponents = (circuitJson as CadComponent[]).filter(
-    (item) =>
-      item?.type === "cad_component" && typeof item.model_step_url === "string",
+  const cadComponents = circuitJson.filter(
+    (item): item is CadComponent =>
+      item.type === "cad_component" && typeof item.model_step_url === "string",
   )
 
-  const pcbComponentMap = new Map<string, PcbComponent>()
-  for (const item of circuitJson as (CadComponent | PcbComponent)[]) {
-    if (item?.type === "pcb_component" && item.pcb_component_id) {
+  const pcbComponentMap = new Map<
+    PcbComponent["pcb_component_id"],
+    PcbComponent
+  >()
+  for (const item of circuitJson) {
+    if (item.type === "pcb_component") {
       pcbComponentMap.set(item.pcb_component_id, item)
     }
   }
@@ -56,7 +58,6 @@ export async function mergeExternalStepModels(
   const importedModels = new Map<string, ImportedStepModel>()
 
   for (const component of cadComponents) {
-    const componentId = component.cad_component_id ?? ""
     const stepUrl = component.model_step_url!
 
     try {
@@ -89,18 +90,33 @@ export async function mergeExternalStepModels(
           boardThickness,
         },
       })
-      if (componentSolids.length > 0) {
-        if (componentId) {
-          handledComponentIds.add(componentId)
-        }
-        const pcbComponentId = component.pcb_component_id
-        if (pcbComponentId) {
-          handledPcbComponentIds.add(pcbComponentId)
-        }
+      if (componentSolids.length === 0) {
+        throw new Error("STEP model contains no solid geometry")
+      }
+      handledComponentIds.add(component.cad_component_id)
+      if (component.pcb_component_id) {
+        handledPcbComponentIds.add(component.pcb_component_id)
       }
       solids.push(...componentSolids)
     } catch (error) {
-      console.warn(`Failed to merge STEP model from ${stepUrl}:`, error)
+      const sourceComponent = circuitJson.find(
+        (item) =>
+          item.type === "source_component" &&
+          item.source_component_id === component.source_component_id,
+      )
+      let componentName = "unnamed component"
+      if (
+        sourceComponent?.type === "source_component" &&
+        sourceComponent.name
+      ) {
+        componentName = sourceComponent.name
+      }
+      throw new Error(
+        `Failed to import STEP model for component "${componentName}".`,
+        {
+          cause: error,
+        },
+      )
     }
   }
 

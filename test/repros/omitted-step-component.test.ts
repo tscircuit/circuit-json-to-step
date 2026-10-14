@@ -3,11 +3,10 @@ import type { CircuitJson } from "circuit-json"
 import { parseRepository } from "stepts"
 import { circuitJsonToStep } from "../../lib/index"
 import { importStepWithOcct } from "../utils/occt/importer"
-import { renderStepToPNG } from "../fixtures/step-snapshot"
 import { Resvg } from "@resvg/resvg-js"
 import { fileURLToPath } from "node:url"
 
-test("STEP export succeeds after discarding a valid component model", async () => {
+test("STEP export rejects a component model that cannot be imported", async () => {
   const componentStep = await circuitJsonToStep([], {
     exportMode: "pcb",
     boardWidth: 4,
@@ -74,30 +73,20 @@ test("STEP export succeeds after discarding a valid component model", async () =
     warningCount = warning.mock.calls.length
     warning.mockRestore()
   }
-  expect(exportError).toBeUndefined()
-  expect(warningCount).toBe(1)
-  if (!incompleteStep) throw new Error("Expected a successful STEP export")
-  const assembly = await importStepWithOcct(incompleteStep)
-  expect(assembly.success).toBe(true)
-  expect(assembly.meshes).toHaveLength(1)
-  let preview = ""
-  let status = "Export rejected; no incomplete STEP file returned"
-  if (incompleteStep) {
-    const png = await renderStepToPNG(incompleteStep, {
-      width: 800,
-      height: 450,
-    })
-    preview = `<image x="0" y="130" width="800" height="450" href="data:image/png;base64,${Buffer.from(png).toString("base64")}"/>`
-    status = `Export succeeded: ${assembly.meshes.length} mesh instead of 2 (U1 missing)`
-  }
+  expect(exportError).toMatchObject({
+    message: 'Failed to import STEP model for component "U1".',
+    cause: expect.any(Error),
+  })
+  expect(warningCount).toBe(0)
+  expect(incompleteStep).toBeUndefined()
   const snapshot = new Resvg(
     `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
     <rect width="800" height="600" fill="#101820"/>
     <g font-family="KenPixel" fill="white" text-anchor="middle">
       <text x="400" y="35" font-size="23">One board + one valid U1 STEP model</text>
       <text x="400" y="70" font-size="16">OpenCascade accepts the model; stepts rejects legal whitespace.</text>
-      <text x="400" y="108" font-size="18" fill="#ffba70">${status}</text>
-    </g>${preview}
+      <text x="400" y="108" font-size="18" fill="#ffba70">Export rejected; no incomplete STEP file returned</text>
+    </g>
   </svg>`,
     {
       font: {
