@@ -3,18 +3,24 @@ import {
   AdvancedFace,
   Axis2Placement3D,
   CartesianPoint,
-  Circle,
   CylindricalSurface,
   Direction,
   EdgeCurve,
   EdgeLoop,
   FaceOuterBound,
-  Line,
   OrientedEdge,
   Plane,
-  Vector,
   VertexPoint,
 } from "stepts"
+import {
+  createArcSegment,
+  createLineEdge,
+  createLineSegment,
+  createLoopFromSegments,
+  createVertexCache,
+  rotatePoint,
+  type BoundarySegment,
+} from "./segment-geometry"
 
 export interface CutoutGeometry {
   bottomLoop: Ref<EdgeLoop>
@@ -34,25 +40,6 @@ export type RuntimeCutout = {
   points?: { x?: number | string; y?: number | string }[]
 }
 
-type BoundarySegment =
-  | {
-      kind: "arc"
-      edge: Ref<EdgeCurve>
-      start: Ref<VertexPoint>
-      end: Ref<VertexPoint>
-      centerX: number
-      centerY: number
-      refX: number
-      refY: number
-      radius: number
-    }
-  | {
-      kind: "line"
-      edge: Ref<EdgeCurve>
-      start: Ref<VertexPoint>
-      end: Ref<VertexPoint>
-    }
-
 const CIRCLE_CUTOUT_SEGMENTS = 24
 
 function isFiniteNumber(value: unknown): value is number {
@@ -61,152 +48,6 @@ function isFiniteNumber(value: unknown): value is number {
 
 function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180
-}
-
-function rotatePoint(
-  x: number,
-  y: number,
-  centerX: number,
-  centerY: number,
-  angle: number,
-): { x: number; y: number } {
-  const cos = Math.cos(angle)
-  const sin = Math.sin(angle)
-  const dx = x - centerX
-  const dy = y - centerY
-  return {
-    x: centerX + dx * cos - dy * sin,
-    y: centerY + dx * sin + dy * cos,
-  }
-}
-
-function createVertexCache(repo: Repository, z: number) {
-  const vertices = new Map<string, Ref<VertexPoint>>()
-  const normalize = (value: number) => {
-    const rounded = Number(value.toFixed(9))
-    return Object.is(rounded, -0) ? 0 : rounded
-  }
-
-  return (x: number, y: number) => {
-    const key = `${normalize(x)},${normalize(y)},${normalize(z)}`
-    const existing = vertices.get(key)
-    if (existing) return existing
-
-    const vertex = repo.add(
-      new VertexPoint("", repo.add(new CartesianPoint("", x, y, z))),
-    )
-    vertices.set(key, vertex)
-    return vertex
-  }
-}
-
-function createLineEdge(
-  repo: Repository,
-  v1: Ref<VertexPoint>,
-  v2: Ref<VertexPoint>,
-): Ref<EdgeCurve> {
-  const p1 = v1.resolve(repo).pnt.resolve(repo)
-  const p2 = v2.resolve(repo).pnt.resolve(repo)
-  const dx = p2.x - p1.x
-  const dy = p2.y - p1.y
-  const dz = p2.z - p1.z
-  const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
-
-  if (length < 1e-10) {
-    const dir = repo.add(new Direction("", 1, 0, 0))
-    const vec = repo.add(new Vector("", dir, 1e-10))
-    const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
-    return repo.add(new EdgeCurve("", v1, v2, line, true))
-  }
-
-  const dir = repo.add(new Direction("", dx / length, dy / length, dz / length))
-  const vec = repo.add(new Vector("", dir, length))
-  const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
-  return repo.add(new EdgeCurve("", v1, v2, line, true))
-}
-
-function createLineSegment(
-  repo: Repository,
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-  getVertex: (x: number, y: number) => Ref<VertexPoint>,
-): BoundarySegment {
-  const startVertex = getVertex(start.x, start.y)
-  const endVertex = getVertex(end.x, end.y)
-  return {
-    kind: "line",
-    edge: createLineEdge(repo, startVertex, endVertex),
-    start: startVertex,
-    end: endVertex,
-  }
-}
-
-function createArcSegment(
-  repo: Repository,
-  centerX: number,
-  centerY: number,
-  radius: number,
-  startAngle: number,
-  endAngle: number,
-  rotation: number,
-  originX: number,
-  originY: number,
-  z: number,
-  getVertex: (x: number, y: number) => Ref<VertexPoint>,
-): BoundarySegment {
-  const start = rotatePoint(
-    centerX + radius * Math.cos(startAngle),
-    centerY + radius * Math.sin(startAngle),
-    originX,
-    originY,
-    rotation,
-  )
-  const end = rotatePoint(
-    centerX + radius * Math.cos(endAngle),
-    centerY + radius * Math.sin(endAngle),
-    originX,
-    originY,
-    rotation,
-  )
-  const center = rotatePoint(centerX, centerY, originX, originY, rotation)
-  const startVertex = getVertex(start.x, start.y)
-  const endVertex = getVertex(end.x, end.y)
-  const centerPoint = repo.add(new CartesianPoint("", center.x, center.y, z))
-  const normalDir = repo.add(new Direction("", 0, 0, -1))
-  const refDir = repo.add(
-    new Direction("", Math.cos(rotation), Math.sin(rotation), 0),
-  )
-  const placement = repo.add(
-    new Axis2Placement3D("", centerPoint, normalDir, refDir),
-  )
-  const circle = repo.add(new Circle("", placement, radius))
-
-  return {
-    kind: "arc",
-    edge: repo.add(new EdgeCurve("", startVertex, endVertex, circle, false)),
-    start: startVertex,
-    end: endVertex,
-    centerX: center.x,
-    centerY: center.y,
-    refX: Math.cos(rotation),
-    refY: Math.sin(rotation),
-    radius,
-  }
-}
-
-function createLoopFromSegments(
-  repo: Repository,
-  segments: BoundarySegment[],
-  orientation: boolean,
-): Ref<EdgeLoop> {
-  return repo.add(
-    new EdgeLoop(
-      "",
-      segments.map((segment) =>
-        repo.add(new OrientedEdge("", segment.edge, orientation)),
-      ),
-    ),
-  )
 }
 
 function createWallFaces(
@@ -648,16 +489,19 @@ function createPolygonCutoutGeometry(
 export function createCutoutGeometry({
   repo,
   cutout,
-  zMin,
-  zMax,
+  boardThickness,
   zDir,
 }: {
   repo: Repository
   cutout: RuntimeCutout
-  zMin: number
-  zMax: number
+  /** The cutout spans the full board thickness, so the caller supplies the
+   * thickness and the geometry derives its own z extents. */
+  boardThickness: number
   zDir: Ref<Direction>
 }): CutoutGeometry | null {
+  const zMin = -boardThickness / 2
+  const zMax = boardThickness / 2
+
   const centerX = cutout.center?.x
   const centerY = cutout.center?.y
 

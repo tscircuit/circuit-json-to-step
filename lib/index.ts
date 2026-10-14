@@ -528,8 +528,7 @@ export async function circuitJsonToStep(
     const cutoutGeometry = createCutoutGeometry({
       repo,
       cutout: element as unknown as RuntimeCutout,
-      zMin: -halfBoardThickness,
-      zMax: halfBoardThickness,
+      boardThickness,
       zDir,
     })
     if (cutoutGeometry) {
