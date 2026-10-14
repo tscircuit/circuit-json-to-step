@@ -4,6 +4,7 @@ import type {
   StyledItem,
   EdgeCurve,
   VertexPoint,
+  AdvancedFace,
 } from "stepts"
 import { ClosedShell, ManifoldSolidBrep } from "stepts"
 import type {
@@ -101,36 +102,47 @@ function createSceneMeshSolid(
   const polygons = weldMeshTopology
     ? splitMeshTJunctions(box.mesh!.triangles!)
     : box.mesh!.triangles!
-  const faces = polygons.map((triangle) => {
-    const vertices = triangle.vertices.map((vertex) => {
-      const rotated = rotatePoint3(vertex, box.rotation)
-      const translated = {
-        x: rotated.x + box.center.x,
-        y: rotated.z + box.center.z,
-        z: rotated.y + box.center.y,
-      }
-      if (!weldMeshTopology) return createVertex(repo, translated)
-      const key = [translated.x, translated.y, translated.z]
-        .map((value) => value.toFixed(9))
-        .join(":")
-      const stepVertex = vertexCache.get(key) ?? createVertex(repo, translated)
-      vertexCache.set(key, stepVertex)
-      return stepVertex
-    })
+  const faces = polygons
+    .map((triangle) => {
+      const vertices = triangle.vertices.map((vertex) => {
+        const rotated = rotatePoint3(vertex, box.rotation)
+        const translated = {
+          x: rotated.x + box.center.x,
+          y: rotated.z + box.center.z,
+          z: rotated.y + box.center.y,
+        }
+        if (!weldMeshTopology) return createVertex(repo, translated)
+        const key = [translated.x, translated.y, translated.z]
+          .map((value) => value.toFixed(9))
+          .join(":")
+        const stepVertex =
+          vertexCache.get(key) ?? createVertex(repo, translated)
+        vertexCache.set(key, stepVertex)
+        return stepVertex
+      })
 
-    const face = createFaceFromVertices(repo, vertices, edgeCache)
-    const faceColor = normalizeTriangleColor(triangle.color)
-    if (faceColor) {
-      styledItems.push(
-        createStyledItem(repo, {
-          itemRef: face,
-          rgb: faceColor,
-          styleCache,
-        }),
+      const distinct = vertices.filter(
+        (vertex, i) =>
+          vertex.id !==
+          vertices[(i + vertices.length - 1) % vertices.length].id,
       )
-    }
-    return face
-  })
+      // Boolean tessellation can contain triangles that collapse when welded.
+      // They must not create self-edges or zero-area faces in the STEP shell.
+      if (distinct.length < 3) return null
+      const face = createFaceFromVertices(repo, distinct, edgeCache)
+      const faceColor = normalizeTriangleColor(triangle.color)
+      if (faceColor) {
+        styledItems.push(
+          createStyledItem(repo, {
+            itemRef: face,
+            rgb: faceColor,
+            styleCache,
+          }),
+        )
+      }
+      return face
+    })
+    .filter((face): face is Ref<AdvancedFace> => face !== null)
 
   const shell = repo.add(new ClosedShell("", faces))
   return {

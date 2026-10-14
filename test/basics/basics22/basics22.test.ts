@@ -2,7 +2,10 @@ import { expect, test } from "bun:test"
 import type { CircuitJson } from "circuit-json"
 import { tokenizeSTEP } from "stepts"
 import { circuitJsonToStep } from "../../../lib/index"
-import { normalizeStepEntityTerminators } from "../../../lib/step-text-utils"
+import {
+  normalizeStepEntityTerminators,
+  normalizeStepNumericExponents,
+} from "../../../lib/step-text-utils"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics22.json"
 
@@ -26,6 +29,9 @@ test("basics22: imported SolidWorks STEP accepts whitespace before semicolons", 
   )
   expect(spline?.args[6]).toBe("(2,2)")
   expect(spline?.args[5]).toBe(".U.")
+  expect(normalizeStepNumericExponents("VECTOR('',#1,1e-10);")).toBe(
+    "VECTOR('',#1,1.E-10);",
+  )
   expect(imported.root.children[0].children.map((child) => child.name)).toEqual(
     ["PCB", "CONNECTOR"],
   )
