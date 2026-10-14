@@ -20,6 +20,8 @@ export interface MeshGenerationOptions {
   excludePcbComponentIds?: Set<string>
   /** PCB component ids covered by cad_components with model_step_url */
   pcbComponentIdsWithStepUrl?: Set<string>
+  /** Reject absent model meshes instead of substituting bounding boxes. */
+  requireMeshGeometry?: boolean
 }
 
 /**
@@ -40,6 +42,7 @@ export async function generateComponentMeshes(
     excludeCadComponentIds,
     excludePcbComponentIds,
     pcbComponentIdsWithStepUrl,
+    requireMeshGeometry = false,
   } = options
 
   const solids: GeneratedSceneSolid[] = []
@@ -102,9 +105,17 @@ export async function generateComponentMeshes(
     })
 
     for (const box of scene3d.boxes as SceneBox[]) {
-      solids.push(createSceneBoxSolid(repo, box))
+      if (requireMeshGeometry && !box.mesh?.triangles?.length) {
+        throw new Error("External model mesh could not be loaded")
+      }
+      solids.push(
+        createSceneBoxSolid(repo, box, {
+          weldMeshTopology: requireMeshGeometry,
+        }),
+      )
     }
   } catch (error) {
+    if (requireMeshGeometry) throw error
     console.warn("Failed to generate component mesh:", error)
   }
 

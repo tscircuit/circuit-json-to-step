@@ -4,6 +4,7 @@ import { jscadToStep } from "jscad-to-step"
 import {
   ApplicationContext,
   ApplicationProtocolDefinition,
+  AdvancedBrepShapeRepresentation,
   Axis2Placement3D,
   CartesianPoint,
   ContextDependentShapeRepresentation,
@@ -17,11 +18,22 @@ import {
   ProductDefinitionFormation,
   ProductDefinitionShape,
   Repository,
+  MechanicalDesignGeometricPresentationRepresentation,
   ShapeDefinitionRepresentation,
   ShapeRepresentation,
   Unknown,
+  parseRepository,
+  type Entity,
+  type Ref,
 } from "stepts"
-import { importStepModelGeometry } from "./step-model-merger"
+import {
+  importStepModelGeometry,
+  mergeExternalStepModels,
+} from "./step-model-merger"
+import { generateComponentMeshes } from "./mesh-generation"
+import { readStepFile } from "./step-model-merger/read-step-file"
+import { transformStepGeometry } from "./transform-step-geometry"
+import { createStyleCache, createStyledItems } from "./step-style-utils"
 import {
   asVector3,
   toRadians,
@@ -30,24 +42,45 @@ import {
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 
-/** Export JSCAD printed parts as distinct named children of a STEP assembly. */
-export function circuitJsonToAssemblyStep(
+/** Export all CAD parts and the PCB as distinct named children of one STEP assembly. */
+export async function circuitJsonToAssemblyStep(
   circuitJson: CircuitJson,
   {
     productName = "Combined Assembly",
-    sourceComponentId,
-  }: { productName?: string; sourceComponentId?: string } = {},
-): string {
-  const parts = circuitJson
-    .filter((item) => item.type === "source_component")
-    .filter((item) => item.ftype === "printedpart")
-    .filter(
-      (item) =>
-        sourceComponentId === undefined ||
-        item.source_component_id === sourceComponentId,
-    )
-  if (parts.length === 0) {
-    throw new Error("No assembly.printedpart elements found to export")
+    pcbSteps = [],
+    fsMap,
+    boardThickness = 1.6,
+    includeExternalMeshes = true,
+  }: {
+    productName?: string
+    pcbSteps?: { id: string; name: string; stepText: string }[]
+    fsMap?: Record<string, string>
+    boardThickness?: number
+    includeExternalMeshes?: boolean
+  } = {},
+): Promise<string> {
+  const parts = circuitJson.filter((item) => item.type === "source_component")
+  const models = circuitJson.filter((item) => item.type === "cad_component")
+  const pcbComponents = circuitJson.filter(
+    (item) => item.type === "pcb_component",
+  )
+  if (
+    pcbSteps.length === 0 &&
+    models.length === 0 &&
+    pcbComponents.length === 0 &&
+    parts.length === 0
+  ) {
+    throw new Error("No assembly geometry found to export")
+  }
+  for (const part of parts) {
+    if (
+      ["printedpart", "part"].includes(part.ftype) &&
+      !models.some(
+        (model) => model.source_component_id === part.source_component_id,
+      )
+    ) {
+      throw new Error(`Part "${part.name}" needs CAD geometry for STEP export`)
+    }
   }
 
   const repo = new Repository()
@@ -132,17 +165,97 @@ export function circuitJsonToAssemblyStep(
   )
   repo.add(new ShapeDefinitionRepresentation(assembly.shape, representation))
 
-  for (const part of parts) {
-    const models = circuitJson
-      .filter((item) => item.type === "cad_component")
-      .filter((item) => item.source_component_id === part.source_component_id)
-    if (models.length === 0 || models.some((model) => !model.model_jscad)) {
-      throw new Error(
-        `Printed part "${part.name}" needs JSCAD geometry for STEP export`,
-      )
+  const addChild = (
+    id: string,
+    name: string,
+    childRepresentation: Ref<Entity>,
+    childOrigin: Ref<Axis2Placement3D>,
+    position = { x: 0, y: 0, z: 0 },
+    rotation = { x: 0, y: 0, z: 0 },
+  ) => {
+    const child = createProduct(id, name)
+    repo.add(
+      new ShapeDefinitionRepresentation(child.shape, childRepresentation),
+    )
+    const placement = createPlacement(position, rotation)
+    representation.resolve(repo).items.push(placement)
+    const usage = repo.add(
+      new NextAssemblyUsageOccurrence(
+        id,
+        name,
+        "",
+        assembly.definition,
+        child.definition,
+        name,
+      ),
+    )
+    const transformation = repo.add(
+      new ItemDefinedTransformation("", "", childOrigin, placement),
+    )
+    const relationship = repo.add(
+      new Unknown("", [
+        `( REPRESENTATION_RELATIONSHIP('','',${childRepresentation},${representation}) REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(${transformation}) SHAPE_REPRESENTATION_RELATIONSHIP() )`,
+      ]),
+    )
+    const usageShape = repo.add(
+      new Unknown("PRODUCT_DEFINITION_SHAPE", ["''", "''", `${usage}`]),
+    )
+    repo.add(new ContextDependentShapeRepresentation(relationship, usageShape))
+  }
+  const addStepChild = (
+    id: string,
+    name: string,
+    geometry: string,
+    position?: { x: number; y: number; z: number },
+    rotation?: { x: number; y: number; z: number },
+    color?: [number, number, number],
+  ) => {
+    const imported = importStepModelGeometry(repo, geometry, name)
+    if (imported.solids.length === 0) {
+      throw new Error(`Part "${name}" has no solid geometry to export`)
     }
+    imported.representation.resolve(repo).items.unshift(imported.origin)
+    if (color)
+      repo.add(
+        new MechanicalDesignGeometricPresentationRepresentation(
+          "",
+          createStyledItems(repo, {
+            itemRefs: imported.solids,
+            rgb: color,
+            styleCache: createStyleCache(),
+          }),
+          context,
+        ),
+      )
+    addChild(
+      id,
+      name,
+      imported.representation,
+      imported.origin,
+      position,
+      rotation,
+    )
+  }
+  for (const pcb of pcbSteps)
+    addStepChild(
+      pcb.id,
+      pcb.name,
+      pcb.stepText,
+      undefined,
+      undefined,
+      [0.2, 0.6, 0.2],
+    )
 
-    for (const model of models) {
+  const coveredPcbIds = new Set<string>()
+  const stepContents = new Map(Object.entries(fsMap ?? {}))
+  const validatedStepModels = new Set<string>()
+  for (const model of models) {
+    const part = parts.find(
+      (item) => item.source_component_id === model.source_component_id,
+    )
+    const name = part?.name ?? model.cad_component_id
+    if (model.pcb_component_id) coveredPcbIds.add(model.pcb_component_id)
+    if (model.model_jscad) {
       const modelOrigin = asVector3(model.model_origin_position)
       const scale = model.model_unit_to_mm_scale_factor ?? 1
       // Apply the same CAD color override as the assembly viewer.
@@ -163,50 +276,184 @@ export function circuitJsonToAssemblyStep(
           shape,
         },
       })
-      const imported = importStepModelGeometry(repo, geometry, part.name)
-      if (imported.solids.length === 0) {
-        throw new Error(
-          `Printed part "${part.name}" has no solid geometry to export`,
-        )
-      }
-      imported.representation.resolve(repo).items.unshift(imported.origin)
-      const child = createProduct(model.cad_component_id, part.name)
-      repo.add(
-        new ShapeDefinitionRepresentation(child.shape, imported.representation),
-      )
-
-      const placement = createPlacement(
+      addStepChild(
+        model.cad_component_id,
+        name,
+        geometry,
         asVector3(model.position),
         asVector3(model.rotation),
       )
-      representation.resolve(repo).items.push(placement)
-      const usage = repo.add(
-        new NextAssemblyUsageOccurrence(
-          model.cad_component_id,
-          part.name,
-          "",
-          assembly.definition,
-          child.definition,
-          part.name,
-        ),
-      )
-      const transformation = repo.add(
-        new ItemDefinedTransformation("", "", imported.origin, placement),
-      )
-      const relationship = repo.add(
-        new Unknown("", [
-          `( REPRESENTATION_RELATIONSHIP('','',${imported.representation},${representation}) REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(${transformation}) SHAPE_REPRESENTATION_RELATIONSHIP() )`,
-        ]),
-      )
-      // stepts' ProductDefinitionShape type currently excludes product relationships.
-      const usageShape = repo.add(
-        new Unknown("PRODUCT_DEFINITION_SHAPE", ["''", "''", `${usage}`]),
-      )
-      repo.add(
-        new ContextDependentShapeRepresentation(relationship, usageShape),
-      )
+      continue
     }
+    const componentJson = circuitJson.filter((item) =>
+      item.type === "cad_component"
+        ? item.cad_component_id === model.cad_component_id
+        : item.type === "pcb_component"
+          ? item.pcb_component_id === model.pcb_component_id
+          : true,
+    )
+    if (model.model_step_url) {
+      let geometry = stepContents.get(model.model_step_url)
+      if (geometry === undefined) {
+        geometry = await readStepFile(model.model_step_url)
+        stepContents.set(model.model_step_url, geometry)
+      }
+      if (!validatedStepModels.has(model.model_step_url)) {
+        if (
+          parseRepository(geometry)
+            .entries()
+            .some(
+              ([, entity]) => entity.type === "NEXT_ASSEMBLY_USAGE_OCCURRENCE",
+            )
+        ) {
+          throw new Error(
+            `Part "${name}" uses a nested STEP assembly, which is not supported for assembly export`,
+          )
+        }
+        validatedStepModels.add(model.model_step_url)
+      }
+      if (
+        !model.pcb_component_id ||
+        model.model_origin_position ||
+        model.model_unit_to_mm_scale_factor !== undefined
+      ) {
+        const imported = importStepModelGeometry(repo, geometry, name)
+        if (imported.solids.length === 0)
+          throw new Error(`Part "${name}" has no solid geometry to export`)
+        imported.representation.resolve(repo).items.unshift(imported.origin)
+        transformStepGeometry(
+          imported.entries,
+          asVector3(model.model_origin_position),
+          model.model_unit_to_mm_scale_factor ?? 1,
+        )
+        addChild(
+          model.cad_component_id,
+          name,
+          imported.representation,
+          imported.origin,
+          asVector3(model.position),
+          asVector3(model.rotation),
+        )
+        continue
+      }
+      const result = await mergeExternalStepModels({
+        repo,
+        circuitJson: componentJson,
+        boardThickness: thicknessForComponents(componentJson),
+        fsMap: { [model.model_step_url]: geometry },
+      })
+      if (result.solids.length === 0) {
+        throw new Error(`Part "${name}" could not load its STEP geometry`)
+      }
+      // Keep mapped instances in the representation; extracting only BREPs would lose their placements.
+      const childRepresentation = repo.add(
+        new ShapeRepresentation(name, [origin, ...result.solids], context),
+      )
+      addChild(model.cad_component_id, name, childRepresentation, origin)
+      continue
+    }
+    const hasExternalMesh = Boolean(
+      model.model_glb_url ||
+        model.model_gltf_url ||
+        model.model_stl_url ||
+        model.model_obj_url ||
+        model.model_3mf_url,
+    )
+    if (hasExternalMesh && !includeExternalMeshes)
+      throw new Error(`External mesh export is disabled for part "${name}"`)
+    await addMeshChildren(
+      componentJson,
+      model.cad_component_id,
+      name,
+      hasExternalMesh || part?.ftype === "printedpart",
+    )
+  }
+  for (const component of pcbComponents) {
+    if (coveredPcbIds.has(component.pcb_component_id)) continue
+    const name =
+      parts.find(
+        (part) => part.source_component_id === component.source_component_id,
+      )?.name ?? component.pcb_component_id
+    const componentJson = circuitJson.filter((item) =>
+      item.type === "cad_component"
+        ? false
+        : item.type === "pcb_component"
+          ? item.pcb_component_id === component.pcb_component_id
+          : true,
+    )
+    await addMeshChildren(componentJson, component.pcb_component_id, name)
+  }
+  if (representation.resolve(repo).items.length === 1) {
+    throw new Error("No assembly geometry found to export")
   }
 
   return normalizeStepNumericExponents(repo.toPartFile({ name: productName }))
+
+  async function addMeshChildren(
+    componentJson: CircuitJson,
+    id: string,
+    name: string,
+    requireMeshGeometry = false,
+  ) {
+    const generated = await generateComponentMeshes({
+      repo,
+      circuitJson: componentJson,
+      boardThickness: thicknessForComponents(componentJson),
+      includeExternalMeshes,
+      requireMeshGeometry,
+    })
+    if (generated.length === 0)
+      throw new Error(`Part "${name}" has no supported geometry to export`)
+    for (const solid of generated) solid.solid.resolve(repo).name = name
+    const styleCache = createStyleCache()
+    const styles = generated.flatMap((solid) => [
+      ...solid.styledItems,
+      ...(!solid.usesIntrinsicFaceStyles
+        ? createStyledItems(repo, {
+            itemRefs: solid.styleTargets,
+            rgb: [0.75, 0.75, 0.75],
+            styleCache,
+          })
+        : []),
+    ])
+    if (styles.length > 0)
+      repo.add(
+        new MechanicalDesignGeometricPresentationRepresentation(
+          "",
+          styles,
+          context,
+        ),
+      )
+    const childRepresentation = repo.add(
+      new AdvancedBrepShapeRepresentation(
+        name,
+        [origin, ...generated.map((solid) => solid.solid)],
+        context,
+      ),
+    )
+    addChild(id, name, childRepresentation, origin)
+  }
+
+  function thicknessForComponents(componentJson: CircuitJson) {
+    const boards = circuitJson.filter((item) => item.type === "pcb_board")
+    if (boards.length <= 1) return boardThickness
+    const component = componentJson.find(
+      (item) => item.type === "pcb_component",
+    )
+    if (!component) return boardThickness
+    const record = component as unknown as Record<string, unknown>
+    const matches = boards.filter((board) => {
+      const boardRecord = board as unknown as Record<string, unknown>
+      return (
+        record.subcircuit_id &&
+        record.subcircuit_id === boardRecord.subcircuit_id
+      )
+    })
+    if (matches.length === 1) return matches[0]!.thickness ?? boardThickness
+    if (new Set(boards.map((board) => board.thickness)).size === 1)
+      return boards[0]!.thickness ?? boardThickness
+    throw new Error(
+      "Cannot determine PCB thickness for a component in a multi-board assembly",
+    )
+  }
 }
