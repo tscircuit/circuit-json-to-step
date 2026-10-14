@@ -1,0 +1,5 @@
+KenPixel Regular, copyright Kenney 2011.
+Source: https://fontstruct.com/fontstructions/show/503556
+Distributed unchanged under Creative Commons Attribution Share Alike 3.0:
+https://creativecommons.org/licenses/by-sa/3.0/
+Used only to render reproducible test annotations; system fonts are disabled.

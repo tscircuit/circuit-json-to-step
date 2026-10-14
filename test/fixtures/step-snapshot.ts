@@ -249,7 +249,7 @@ function gltfFromOcctMeshes(meshes: OcctMesh[]) {
   return { gltf, buffers }
 }
 
-async function renderStepToPNG(
+export async function renderStepToPNG(
   stepInput: string | Uint8Array | ArrayBuffer,
   opts?: { width?: number; height?: number; ambient?: number },
 ): Promise<Uint8Array> {
