@@ -30,7 +30,8 @@ import {
   importStepModelGeometry,
   mergeExternalStepModels,
 } from "./step-model-merger"
-import { generateComponentMeshes } from "./mesh-generation"
+import { generateComponentMeshes, generatePanelMesh } from "./mesh-generation"
+import type { GeneratedSceneSolid } from "./scene-geometry"
 import { readStepFile } from "./step-model-merger/read-step-file"
 import { transformStepGeometry } from "./transform-step-geometry"
 import { createStyleCache, createStyledItems } from "./step-style-utils"
@@ -39,7 +40,10 @@ import {
   toRadians,
   transformDirection,
 } from "./step-model-merger/vector-utils"
-import { normalizeStepNumericExponents } from "./step-text-utils"
+import {
+  normalizeStepNumericExponents,
+  normalizeStepEntityTerminators,
+} from "./step-text-utils"
 import { VERSION } from "./version"
 
 /** Export all CAD parts and the PCB as distinct named children of one STEP assembly. */
@@ -61,11 +65,13 @@ export async function circuitJsonToAssemblyStep(
 ): Promise<string> {
   const parts = circuitJson.filter((item) => item.type === "source_component")
   const models = circuitJson.filter((item) => item.type === "cad_component")
+  const panel = circuitJson.find((item) => item.type === "pcb_panel")
   const pcbComponents = circuitJson.filter(
     (item) => item.type === "pcb_component",
   )
   if (
     pcbSteps.length === 0 &&
+    !panel &&
     models.length === 0 &&
     pcbComponents.length === 0 &&
     parts.length === 0
@@ -246,15 +252,26 @@ export async function circuitJsonToAssemblyStep(
       [0.2, 0.6, 0.2],
     )
 
-  const coveredPcbIds = new Set<string>()
+  if (panel) {
+    addGeneratedChild(
+      await generatePanelMesh({ repo, circuitJson, boardThickness }),
+      panel.pcb_panel_id,
+      "PCB Panel",
+      [0.2, 0.6, 0.2],
+    )
+  }
+
   const stepContents = new Map(Object.entries(fsMap ?? {}))
   const validatedStepModels = new Set<string>()
+  const importedStepModels = new Map<
+    string,
+    ReturnType<typeof importStepModelGeometry>
+  >()
   for (const model of models) {
     const part = parts.find(
       (item) => item.source_component_id === model.source_component_id,
     )
     const name = part?.name ?? model.cad_component_id
-    if (model.pcb_component_id) coveredPcbIds.add(model.pcb_component_id)
     if (model.model_jscad) {
       const modelOrigin = asVector3(model.model_origin_position)
       const scale = model.model_unit_to_mm_scale_factor ?? 1
@@ -299,6 +316,8 @@ export async function circuitJsonToAssemblyStep(
         stepContents.set(model.model_step_url, geometry)
       }
       if (!validatedStepModels.has(model.model_step_url)) {
+        geometry = normalizeStepEntityTerminators(geometry)
+        stepContents.set(model.model_step_url, geometry)
         if (
           parseRepository(geometry)
             .entries()
@@ -317,15 +336,22 @@ export async function circuitJsonToAssemblyStep(
         model.model_origin_position ||
         model.model_unit_to_mm_scale_factor !== undefined
       ) {
-        const imported = importStepModelGeometry(repo, geometry, name)
-        if (imported.solids.length === 0)
-          throw new Error(`Part "${name}" has no solid geometry to export`)
-        imported.representation.resolve(repo).items.unshift(imported.origin)
-        transformStepGeometry(
-          imported.entries,
-          asVector3(model.model_origin_position),
-          model.model_unit_to_mm_scale_factor ?? 1,
-        )
+        const modelOrigin = asVector3(model.model_origin_position)
+        const scale = model.model_unit_to_mm_scale_factor ?? 1
+        const modelKey = JSON.stringify([
+          model.model_step_url,
+          modelOrigin,
+          scale,
+        ])
+        let imported = importedStepModels.get(modelKey)
+        if (!imported) {
+          imported = importStepModelGeometry(repo, geometry, name)
+          if (imported.solids.length === 0)
+            throw new Error(`Part "${name}" has no solid geometry to export`)
+          imported.representation.resolve(repo).items.unshift(imported.origin)
+          transformStepGeometry(imported.entries, modelOrigin, scale)
+          importedStepModels.set(modelKey, imported)
+        }
         addChild(
           model.cad_component_id,
           name,
@@ -368,21 +394,8 @@ export async function circuitJsonToAssemblyStep(
       hasExternalMesh || part?.ftype === "printedpart",
     )
   }
-  for (const component of pcbComponents) {
-    if (coveredPcbIds.has(component.pcb_component_id)) continue
-    const name =
-      parts.find(
-        (part) => part.source_component_id === component.source_component_id,
-      )?.name ?? component.pcb_component_id
-    const componentJson = circuitJson.filter((item) =>
-      item.type === "cad_component"
-        ? false
-        : item.type === "pcb_component"
-          ? item.pcb_component_id === component.pcb_component_id
-          : true,
-    )
-    await addMeshChildren(componentJson, component.pcb_component_id, name)
-  }
+  // Footprints without cad_components (e.g. silkscreen logos and mounting
+  // holes) have no body in the 3D viewer. Their PCB geometry is already above.
   if (representation.resolve(repo).items.length === 1) {
     throw new Error("No assembly geometry found to export")
   }
@@ -402,6 +415,15 @@ export async function circuitJsonToAssemblyStep(
       includeExternalMeshes,
       requireMeshGeometry,
     })
+    addGeneratedChild(generated, id, name)
+  }
+
+  function addGeneratedChild(
+    generated: GeneratedSceneSolid[],
+    id: string,
+    name: string,
+    color: [number, number, number] = [0.75, 0.75, 0.75],
+  ) {
     if (generated.length === 0)
       throw new Error(`Part "${name}" has no supported geometry to export`)
     for (const solid of generated) solid.solid.resolve(repo).name = name
@@ -411,7 +433,7 @@ export async function circuitJsonToAssemblyStep(
       ...(!solid.usesIntrinsicFaceStyles
         ? createStyledItems(repo, {
             itemRefs: solid.styleTargets,
-            rgb: [0.75, 0.75, 0.75],
+            rgb: color,
             styleCache,
           })
         : []),

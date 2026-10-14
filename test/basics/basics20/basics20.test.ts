@@ -38,6 +38,7 @@ test("basics20: nested imported STEP assemblies fail explicitly and repeated mod
       exportMode: "assembly",
     })
     expect(exported.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g)).toHaveLength(2)
+    expect(exported.match(/= MANIFOLD_SOLID_BREP\(/g)).toHaveLength(1)
     expect(requests).toBe(1)
   } finally {
     globalThis.fetch = originalFetch

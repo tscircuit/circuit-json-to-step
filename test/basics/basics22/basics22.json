@@ -1,0 +1,49 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "board",
+    "center": {
+      "x": 0,
+      "y": 0
+    },
+    "width": 20,
+    "height": 10,
+    "thickness": 1.6
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "connector",
+    "ftype": "part",
+    "name": "CONNECTOR"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "connector_model",
+    "source_component_id": "connector",
+    "model_step_url": "./solidworks.step",
+    "model_origin_position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "position": {
+      "x": 5,
+      "y": 2,
+      "z": 3
+    },
+    "pcb_component_id": "connector_pcb"
+  },
+  {
+    "type": "pcb_component",
+    "pcb_component_id": "connector_pcb",
+    "source_component_id": "connector",
+    "center": {
+      "x": 5,
+      "y": 2
+    },
+    "width": 2,
+    "height": 4,
+    "layer": "top",
+    "rotation": 0
+  }
+]

@@ -73,18 +73,24 @@ export function createFaceFromVertices(
 
   const p1 = vertices[0]!.resolve(repo).pnt.resolve(repo)
   const p2 = vertices[1]!.resolve(repo).pnt.resolve(repo)
-  const p3 = vertices[2]!.resolve(repo).pnt.resolve(repo)
 
   const ux = p2.x - p1.x
   const uy = p2.y - p1.y
   const uz = p2.z - p1.z
-  const vx = p3.x - p1.x
-  const vy = p3.y - p1.y
-  const vz = p3.z - p1.z
-
-  const nx = uy * vz - uz * vy
-  const ny = uz * vx - ux * vz
-  const nz = ux * vy - uy * vx
+  let nx = 0,
+    ny = 0,
+    nz = 0
+  // Splitting a T-junction may put several collinear vertices at the start.
+  for (const vertex of vertices.slice(2)) {
+    const point = vertex.resolve(repo).pnt.resolve(repo)
+    const vx = point.x - p1.x,
+      vy = point.y - p1.y,
+      vz = point.z - p1.z
+    nx = uy * vz - uz * vy
+    ny = uz * vx - ux * vz
+    nz = ux * vy - uy * vx
+    if (nx * nx + ny * ny + nz * nz > 1e-20) break
+  }
   const normalLength = Math.sqrt(nx * nx + ny * ny + nz * nz)
   const normal =
     normalLength < 1e-10

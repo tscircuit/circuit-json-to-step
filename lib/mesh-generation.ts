@@ -50,7 +50,8 @@ export async function generateComponentMeshes(
   try {
     const filteredCircuitJson = circuitJson
       .filter((element) => {
-        if (element.type === "pcb_board") return false
+        if (element.type === "pcb_board" || element.type === "pcb_panel")
+          return false
 
         if (
           element.type === "cad_component" &&
@@ -120,4 +121,33 @@ export async function generateComponentMeshes(
   }
 
   return solids
+}
+
+/** Generate the complete panel substrate with rail holes, mousebites and cutouts. */
+export async function generatePanelMesh({
+  repo,
+  circuitJson,
+  boardThickness,
+}: Pick<
+  MeshGenerationOptions,
+  "repo" | "circuitJson" | "boardThickness"
+>): Promise<GeneratedSceneSolid[]> {
+  const { convertCircuitJsonTo3D } = await getCircuitJsonToGltfModule()
+  const panelGeometry = circuitJson.filter(
+    (item) =>
+      item.type === "pcb_panel" ||
+      item.type === "pcb_hole" ||
+      item.type === "pcb_plated_hole" ||
+      item.type === "pcb_cutout",
+  )
+  const scene = await convertCircuitJsonTo3D(panelGeometry, {
+    boardThickness,
+    renderBoardTextures: false,
+  })
+  return (scene.boxes as SceneBox[]).map((box) => {
+    if (!box.mesh?.triangles?.length)
+      throw new Error("PCB panel has no supported geometry to export")
+    const generated = createSceneBoxSolid(repo, box, { weldMeshTopology: true })
+    return { ...generated, styleTargets: [generated.solid] }
+  })
 }

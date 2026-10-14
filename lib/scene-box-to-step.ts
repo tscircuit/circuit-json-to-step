@@ -14,6 +14,7 @@ import type {
 import { createStyleCache, createStyledItem } from "./step-style-utils"
 import { rotatePoint3 } from "./scene-geometry"
 import { createFaceFromVertices, createVertex } from "./step-brep-utils"
+import { splitMeshTJunctions } from "./split-mesh-t-junctions"
 
 export function createSceneBoxSolid(
   repo: Repository,
@@ -97,7 +98,10 @@ function createSceneMeshSolid(
     ? new Map<string, Ref<EdgeCurve>>()
     : undefined
 
-  const faces = box.mesh!.triangles!.map((triangle) => {
+  const polygons = weldMeshTopology
+    ? splitMeshTJunctions(box.mesh!.triangles!)
+    : box.mesh!.triangles!
+  const faces = polygons.map((triangle) => {
     const vertices = triangle.vertices.map((vertex) => {
       const rotated = rotatePoint3(vertex, box.rotation)
       const translated = {
