@@ -52,6 +52,7 @@ import {
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
+import { createCutoutGeometry, type RuntimeCutout } from "./cutout-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
 
@@ -519,6 +520,20 @@ export async function circuitJsonToStep(
           zDir,
         ),
       )
+    }
+  }
+
+  const cutouts = circuitJson.filter((item) => item.type === "pcb_cutout")
+  for (const element of cutouts) {
+    const cutoutGeometry = createCutoutGeometry({
+      repo,
+      cutout: element as unknown as RuntimeCutout,
+      zMin: -halfBoardThickness,
+      zMax: halfBoardThickness,
+      zDir,
+    })
+    if (cutoutGeometry) {
+      sharedHoleGeometries.push(cutoutGeometry)
     }
   }
 
