@@ -30,7 +30,8 @@ import {
   importStepModelGeometry,
   mergeExternalStepModels,
 } from "./step-model-merger"
-import { generateComponentMeshes, generatePanelMesh } from "./mesh-generation"
+import { generateComponentMeshes } from "./mesh-generation"
+import { generatePanelSolids } from "./panel-geometry"
 import type { GeneratedSceneSolid } from "./scene-geometry"
 import { readStepFile } from "./step-model-merger/read-step-file"
 import { transformStepGeometry } from "./transform-step-geometry"
@@ -254,7 +255,7 @@ export async function circuitJsonToAssemblyStep(
 
   if (panel) {
     addGeneratedChild(
-      await generatePanelMesh({ repo, circuitJson, boardThickness }),
+      await generatePanelSolids({ repo, circuitJson, boardThickness }),
       panel.pcb_panel_id,
       "PCB Panel",
       [0.2, 0.6, 0.2],

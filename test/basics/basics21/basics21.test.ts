@@ -1,11 +1,37 @@
 import { expect, test } from "bun:test"
 import type { CircuitJson } from "circuit-json"
+import { ManifoldSolidBrep, parseRepository } from "stepts"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct, type OcctMesh } from "../../utils/occt/importer"
 import circuitJson from "./basics21.json"
 
 test("basics21: panels preserve rails, edge mousebites, cutouts and components", async () => {
   const step = await circuitJsonToStep(circuitJson as CircuitJson)
+  const repo = parseRepository(step)
+  const solid = repo
+    .entries()
+    .map(([, entity]) => entity)
+    .find(
+      (entity): entity is ManifoldSolidBrep =>
+        entity instanceof ManifoldSolidBrep && entity.name === "PCB Panel",
+    )!
+  const edgeUses = new Map<number, boolean[]>()
+  for (const face of solid.outer.resolve(repo).faces) {
+    for (const bound of face.resolve(repo).bounds) {
+      for (const edge of bound.resolve(repo).bound.resolve(repo).edges) {
+        const use = edge.resolve(repo)
+        const uses = edgeUses.get(Number(use.edge.id)) ?? []
+        uses.push(use.orientation)
+        edgeUses.set(Number(use.edge.id), uses)
+      }
+    }
+  }
+  // A closed panel uses every edge twice, in opposite directions.
+  expect(
+    [...edgeUses.values()].every(
+      (uses) => uses.length === 2 && uses[0] !== uses[1],
+    ),
+  ).toBe(true)
   const imported = await importStepWithOcct(step)
   expect(imported.root.children[0].children.map((child) => child.name)).toEqual(
     ["PCB Panel", "R1"],
@@ -47,6 +73,13 @@ test("basics21: panels preserve rails, edge mousebites, cutouts and components",
       )
     ).meshes,
   ).toHaveLength(1)
+  const barePanel = await importStepWithOcct(
+    await circuitJsonToStep(
+      circuitJson.filter((item) => item.type === "pcb_panel") as CircuitJson,
+    ),
+  )
+  expect(barePanel.meshes).toHaveLength(1)
+  expect(hasTopSurface(barePanel.meshes[0], 11, 19)).toBe(true)
 }, 30_000)
 
 function hasTopSurface(mesh: OcctMesh, x: number, y: number) {

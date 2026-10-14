@@ -82,6 +82,8 @@ error.
 
 Designs with a `pcb_panel` export one "PCB Panel" substrate, including its rails,
 tabs, mounting holes, mousebites and panel cutouts, alongside the CAD models.
+Panel holes and rounded slots use 64-segment outlines, clipped in 2D and
+extruded into closed solids with shared boundary edges.
 Footprints without CAD models, such as silkscreen logos, do not create 3D bodies.
 Repeated STEP models share geometry while retaining separate named occurrences
 and placements.
