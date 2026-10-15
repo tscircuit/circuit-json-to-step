@@ -1,13 +1,17 @@
 import type { Ref, Repository } from "stepts"
 import {
+  AdvancedFace,
   Axis2Placement3D,
   CartesianPoint,
   Circle,
+  CylindricalSurface,
   Direction,
   EdgeCurve,
   EdgeLoop,
+  FaceOuterBound,
   Line,
   OrientedEdge,
+  Plane,
   Vector,
   VertexPoint,
 } from "stepts"
@@ -187,4 +191,106 @@ export function createLoopFromSegments(
       ),
     ),
   )
+}
+
+export function createWallFaces(
+  repo: Repository,
+  bottomSegments: BoundarySegment[],
+  topSegments: BoundarySegment[],
+  zMin: number,
+  zDir: Ref<Direction>,
+): Ref<AdvancedFace>[] {
+  const wallFaces: Ref<AdvancedFace>[] = []
+  const verticalEdges = new Map<string, Ref<EdgeCurve>>()
+  const getVerticalEdge = (
+    bottomVertex: Ref<VertexPoint>,
+    topVertex: Ref<VertexPoint>,
+  ) => {
+    const key = `${bottomVertex.id}:${topVertex.id}`
+    const existing = verticalEdges.get(key)
+    if (existing) return existing
+
+    const edge = createLineEdge(repo, bottomVertex, topVertex)
+    verticalEdges.set(key, edge)
+    return edge
+  }
+
+  for (let i = 0; i < bottomSegments.length; i++) {
+    const bottomSegment = bottomSegments[i]!
+    const topSegment = topSegments[i]!
+    const startVertical = getVerticalEdge(bottomSegment.start, topSegment.start)
+    const endVertical = getVerticalEdge(bottomSegment.end, topSegment.end)
+    const loop = repo.add(
+      new EdgeLoop("", [
+        repo.add(new OrientedEdge("", bottomSegment.edge, true)),
+        repo.add(new OrientedEdge("", endVertical, true)),
+        repo.add(new OrientedEdge("", topSegment.edge, false)),
+        repo.add(new OrientedEdge("", startVertical, false)),
+      ]),
+    )
+
+    if (bottomSegment.kind === "arc") {
+      const bottomCenter = repo.add(
+        new CartesianPoint(
+          "",
+          bottomSegment.centerX,
+          bottomSegment.centerY,
+          zMin,
+        ),
+      )
+      const refDir = repo.add(
+        new Direction("", bottomSegment.refX, bottomSegment.refY, 0),
+      )
+      const cylinderPlacement = repo.add(
+        new Axis2Placement3D("", bottomCenter, zDir, refDir),
+      )
+      const cylinderSurface = repo.add(
+        new CylindricalSurface("", cylinderPlacement, bottomSegment.radius),
+      )
+      wallFaces.push(
+        repo.add(
+          new AdvancedFace(
+            "",
+            [repo.add(new FaceOuterBound("", loop, true))],
+            cylinderSurface,
+            false,
+          ),
+        ),
+      )
+      continue
+    }
+
+    const startPoint = bottomSegment.start.resolve(repo).pnt.resolve(repo)
+    const endPoint = bottomSegment.end.resolve(repo).pnt.resolve(repo)
+    const dx = endPoint.x - startPoint.x
+    const dy = endPoint.y - startPoint.y
+    const edgeLength = Math.sqrt(dx * dx + dy * dy)
+    const normalDir = repo.add(
+      new Direction("", dy / edgeLength, -dx / edgeLength, 0),
+    )
+    const refDir = repo.add(
+      new Direction("", dx / edgeLength, dy / edgeLength, 0),
+    )
+    const placement = repo.add(
+      new Axis2Placement3D(
+        "",
+        bottomSegment.start.resolve(repo).pnt,
+        normalDir,
+        refDir,
+      ),
+    )
+    const plane = repo.add(new Plane("", placement))
+    wallFaces.push(
+      repo.add(
+        new AdvancedFace(
+          "",
+          [repo.add(new FaceOuterBound("", loop, true))],
+          plane,
+          true,
+        ),
+      ),
+    )
+  }
+
+  return wallFaces
 }

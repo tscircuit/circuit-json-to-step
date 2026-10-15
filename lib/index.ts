@@ -53,6 +53,7 @@ import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
 import { createCutoutGeometry } from "./cutout-geometry"
+import { createLineEdge } from "./segment-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
 
@@ -321,35 +322,6 @@ export async function circuitJsonToStep(
   }
 
   // Helper to create edge between vertices
-  function createEdge(
-    v1: Ref<VertexPoint>,
-    v2: Ref<VertexPoint>,
-  ): Ref<EdgeCurve> {
-    const p1 = v1.resolve(repo).pnt.resolve(repo)
-    const p2 = v2.resolve(repo).pnt.resolve(repo)
-    const dx = p2.x - p1.x
-    const dy = p2.y - p1.y
-    const dz = p2.z - p1.z
-    const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
-
-    // Handle zero-length edges (duplicate vertices)
-    if (length < 1e-10) {
-      // Use arbitrary direction for degenerate edge
-      const dir = repo.add(new Direction("", 1, 0, 0))
-      const vec = repo.add(new Vector("", dir, 1e-10))
-      const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
-      return repo.add(new EdgeCurve("", v1, v2, line, true))
-    }
-
-    // Direction must be normalized (unit vector)
-    const dir = repo.add(
-      new Direction("", dx / length, dy / length, dz / length),
-    )
-    // Vector magnitude is the actual edge length
-    const vec = repo.add(new Vector("", dir, length))
-    const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
-    return repo.add(new EdgeCurve("", v1, v2, line, true))
-  }
 
   // Create board edges
   const bottomEdges: Ref<EdgeCurve>[] = []
@@ -360,19 +332,21 @@ export async function circuitJsonToStep(
   for (let i = 0; i < bottomVertices.length; i++) {
     const v1 = bottomVertices[i]!
     const v2 = bottomVertices[(i + 1) % bottomVertices.length]!
-    bottomEdges.push(createEdge(v1, v2))
+    bottomEdges.push(createLineEdge(repo, v1, v2))
   }
 
   // Top edges (connect vertices in a loop)
   for (let i = 0; i < topVertices.length; i++) {
     const v1 = topVertices[i]!
     const v2 = topVertices[(i + 1) % topVertices.length]!
-    topEdges.push(createEdge(v1, v2))
+    topEdges.push(createLineEdge(repo, v1, v2))
   }
 
   // Vertical edges (connect bottom to top)
   for (let i = 0; i < bottomVertices.length; i++) {
-    verticalEdges.push(createEdge(bottomVertices[i]!, topVertices[i]!))
+    verticalEdges.push(
+      createLineEdge(repo, bottomVertices[i]!, topVertices[i]!),
+    )
   }
 
   const origin = repo.add(new CartesianPoint("", 0, 0, -halfBoardThickness))
@@ -471,7 +445,7 @@ export async function circuitJsonToStep(
     )
     // A cylindrical face's boundary wire needs seam edges to connect the
     // bottom and top circular edges. Reuse one seam edge in both directions.
-    const wallSeamEdge = createEdge(bottomHoleVertex, topHoleVertex)
+    const wallSeamEdge = createLineEdge(repo, bottomHoleVertex, topHoleVertex)
 
     const bottomLoop = repo.add(
       new EdgeLoop("", [repo.add(new OrientedEdge("", bottomHoleEdge, false))]),
