@@ -107,6 +107,14 @@ test("fixture holds one of each of the six schema variants", () => {
   )
 })
 
+test("snapshot the variant matrix board", async () => {
+  const stepText = await circuitJsonToStep(structuredClone(fixture) as any[])
+  await expect(stepText).toMatchStepSnapshot(
+    import.meta.path,
+    "plated-hole-variants",
+  )
+})
+
 test("every variant emits a hole, including the two that previously emitted nothing", async () => {
   const bareBoard = await circuitJsonToStep(structuredClone([board]) as any[])
 

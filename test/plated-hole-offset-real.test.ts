@@ -123,6 +123,14 @@ test("the real offsets are one axis only, with float noise on the other", async 
   }
 })
 
+test("snapshot the real board with its offset drills", async () => {
+  const stepText = await circuitJsonToStep(structuredClone(circuitJson) as any)
+  await expect(stepText).toMatchStepSnapshot(
+    import.meta.path,
+    "plated-hole-offset-real",
+  )
+})
+
 test("the board outline survives the conversion", async () => {
   const board = circuitJson.find((item) => item.type === "pcb_board")
   const stepText = await circuitJsonToStep(structuredClone(circuitJson) as any)
