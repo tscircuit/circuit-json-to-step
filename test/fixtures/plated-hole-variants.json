@@ -1,0 +1,107 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "board_0",
+    "width": 60,
+    "height": 40,
+    "thickness": 1.6,
+    "center": { "x": 0, "y": 0 },
+    "outline": [
+      { "x": -30, "y": -20 },
+      { "x": 30, "y": -20 },
+      { "x": 30, "y": 20 },
+      { "x": -30, "y": 20 }
+    ]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "plain_circle",
+    "shape": "circle",
+    "x": -20,
+    "y": -12,
+    "outer_diameter": 2.4,
+    "hole_diameter": 1,
+    "layers": ["top", "bottom"]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "plain_oval",
+    "shape": "oval",
+    "x": -8,
+    "y": -12,
+    "outer_width": 2.6,
+    "outer_height": 2,
+    "hole_width": 1.8,
+    "hole_height": 1.2,
+    "ccw_rotation": 0,
+    "layers": ["top", "bottom"]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "circle_with_rect_pad",
+    "shape": "circular_hole_with_rect_pad",
+    "hole_shape": "circle",
+    "pad_shape": "rect",
+    "x": 4,
+    "y": -12,
+    "hole_diameter": 1,
+    "rect_pad_width": 2.4,
+    "rect_pad_height": 2.4,
+    "hole_offset_x": 0.5,
+    "hole_offset_y": 0.3,
+    "layers": ["top", "bottom"]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "pill_with_rect_pad",
+    "shape": "pill_hole_with_rect_pad",
+    "hole_shape": "pill",
+    "pad_shape": "rect",
+    "x": 16,
+    "y": -12,
+    "hole_width": 1.8,
+    "hole_height": 1.2,
+    "rect_pad_width": 2.4,
+    "rect_pad_height": 2.4,
+    "hole_offset_x": 0.5,
+    "hole_offset_y": 0.3,
+    "layers": ["top", "bottom"]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "rotated_pill_with_rect_pad",
+    "shape": "rotated_pill_hole_with_rect_pad",
+    "hole_shape": "rotated_pill",
+    "pad_shape": "rect",
+    "x": -20,
+    "y": 8,
+    "hole_width": 1.8,
+    "hole_height": 1.2,
+    "hole_ccw_rotation": 30,
+    "rect_pad_width": 2.4,
+    "rect_pad_height": 2.4,
+    "rect_ccw_rotation": 0,
+    "hole_offset_x": 0.5,
+    "hole_offset_y": 0.3,
+    "layers": ["top", "bottom"]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "polygon_pad_with_pill_hole",
+    "shape": "hole_with_polygon_pad",
+    "hole_shape": "pill",
+    "x": 4,
+    "y": 8,
+    "hole_width": 1.8,
+    "hole_height": 1.2,
+    "pad_outline": [
+      { "x": -1.2, "y": -1.2 },
+      { "x": 1.2, "y": -1.2 },
+      { "x": 1.2, "y": 1.2 },
+      { "x": -1.2, "y": 1.2 }
+    ],
+    "hole_offset_x": 0.5,
+    "hole_offset_y": 0.3,
+    "layers": ["top", "bottom"]
+  }
+]

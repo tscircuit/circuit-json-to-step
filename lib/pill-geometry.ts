@@ -51,11 +51,17 @@ export interface PillHoleGeometry {
 }
 
 export function getPillGeometry(hole: any): PillGeometry {
-  const centerX = typeof hole.x === "number" ? hole.x : (hole.x as any).value
-  const centerY = typeof hole.y === "number" ? hole.y : (hole.y as any).value
+  const offsetX = hole.hole_offset_x ?? 0
+  const offsetY = hole.hole_offset_y ?? 0
+  const centerX =
+    (typeof hole.x === "number" ? hole.x : (hole.x as any).value) + offsetX
+  const centerY =
+    (typeof hole.y === "number" ? hole.y : (hole.y as any).value) + offsetY
   const width = hole.hole_width
   const height = hole.hole_height
-  const ccwRotation = hole.ccw_rotation ?? 0
+  // rotated_pill_hole_with_rect_pad names this hole_ccw_rotation; the oval and
+  // polygon pad variants name it ccw_rotation.
+  const ccwRotation = hole.hole_ccw_rotation ?? hole.ccw_rotation ?? 0
   const rotation = (ccwRotation * Math.PI) / 180
   const isHorizontal = width >= height
   const radius = Math.min(width, height) / 2
