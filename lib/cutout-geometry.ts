@@ -1,3 +1,4 @@
+import type { CircuitJson } from "circuit-json"
 import type { Ref, Repository } from "stepts"
 import {
   AdvancedFace,
@@ -28,16 +29,18 @@ export interface CutoutGeometry {
   wallFaces: Ref<AdvancedFace>[]
 }
 
-export type RuntimeCutout = {
-  type: string
-  shape?: string
-  center?: { x?: number | string; y?: number | string }
-  radius?: number | string
-  width?: number | string
-  height?: number | string
-  corner_radius?: number | string
-  rotation?: number | string
-  points?: { x?: number | string; y?: number | string }[]
+type PcbCutoutElement = Extract<CircuitJson[number], { type: "pcb_cutout" }>
+
+/**
+ * A pcb_cutout as it reaches the geometry code. Derived from the schema so it
+ * cannot drift from it, with the size fields loosened: circuit json types a
+ * Distance as number | string | { value }, and not every variant carries every
+ * field. Nothing here is trusted at runtime, each value is narrowed with
+ * isFiniteNumber before use.
+ */
+export type RuntimeCutout = PcbCutoutElement & {
+  center?: { x?: unknown; y?: unknown }
+  points?: unknown
 }
 
 const CIRCLE_CUTOUT_SEGMENTS = 24

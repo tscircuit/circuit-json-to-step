@@ -52,7 +52,7 @@ import {
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
-import { createCutoutGeometry, type RuntimeCutout } from "./cutout-geometry"
+import { createCutoutGeometry } from "./cutout-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
 
@@ -527,7 +527,7 @@ export async function circuitJsonToStep(
   for (const element of cutouts) {
     const cutoutGeometry = createCutoutGeometry({
       repo,
-      cutout: element as unknown as RuntimeCutout,
+      cutout: element,
       boardThickness,
       zDir,
     })
