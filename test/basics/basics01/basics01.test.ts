@@ -2,6 +2,7 @@ import { test, expect } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics01.json"
+import { FULL_CIRCLE_SEGMENTS } from "../../../lib/segment-geometry"
 
 test("basics01: convert circuit json with circular holes to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
@@ -24,13 +25,13 @@ test("basics01: convert circuit json with circular holes to STEP", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Count CIRCLE occurrences - should have 6 (3 holes × 2 shared top/bottom boundary circles)
+  // Each circular hole is bounded by FULL_CIRCLE_SEGMENTS arcs on both the top
+  // and bottom plane, and each arc becomes one cylindrical wall.
   const circleCount = (stepText.match(/CIRCLE/g) || []).length
-  expect(circleCount).toBe(6)
+  expect(circleCount).toBe(3 * 2 * FULL_CIRCLE_SEGMENTS)
 
-  // Count CYLINDRICAL_SURFACE occurrences - should have 3 (one per hole)
   const cylinderCount = (stepText.match(/CYLINDRICAL_SURFACE/g) || []).length
-  expect(cylinderCount).toBe(3)
+  expect(cylinderCount).toBe(3 * FULL_CIRCLE_SEGMENTS)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics01.step"

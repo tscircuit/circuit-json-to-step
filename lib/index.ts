@@ -14,7 +14,6 @@ import {
   Direction,
   Axis2Placement3D,
   Plane,
-  CylindricalSurface,
   VertexPoint,
   EdgeCurve,
   Line,
@@ -24,7 +23,6 @@ import {
   FaceOuterBound,
   FaceBound,
   AdvancedFace,
-  Circle,
   ClosedShell,
   ManifoldSolidBrep,
   ColourRgb,
@@ -52,6 +50,14 @@ import {
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
+import {
+  createArcSegment,
+  FULL_CIRCLE_SEGMENTS,
+  createLoopFromSegments,
+  createVertexCache,
+  createWallFaces,
+  type BoundarySegment,
+} from "./segment-geometry"
 import { createCutoutGeometry, type RuntimeCutout } from "./cutout-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
@@ -418,91 +424,43 @@ export async function circuitJsonToStep(
     const holeX = getHoleCoordinate(hole.x)
     const holeY = getHoleCoordinate(hole.y)
     const radius = (hole.hole_diameter ?? 0) / 2
+    const zMin = -halfBoardThickness
+    const zMax = halfBoardThickness
 
-    const bottomHoleCenter = repo.add(
-      new CartesianPoint("", holeX, holeY, -halfBoardThickness),
-    )
-    const bottomHoleVertex = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint("", holeX + radius, holeY, -halfBoardThickness),
-        ),
-      ),
-    )
-    const bottomHolePlacement = repo.add(
-      new Axis2Placement3D(
-        "",
-        bottomHoleCenter,
-        repo.add(new Direction("", 0, 0, -1)),
-        xDir,
-      ),
-    )
-    const bottomHoleCircle = repo.add(
-      new Circle("", bottomHolePlacement, radius),
-    )
-    const bottomHoleEdge = repo.add(
-      new EdgeCurve(
-        "",
-        bottomHoleVertex,
-        bottomHoleVertex,
-        bottomHoleCircle,
-        true,
-      ),
-    )
+    // A single CIRCLE edge bounds the whole cylinder, which leaves the wall face
+    // trimmed by one seam and removes only half the hole. Building the boundary
+    // from arcs gives every wall face a properly bounded outer loop.
+    const createBoundary = (z: number): BoundarySegment[] => {
+      const getVertex = createVertexCache(repo, z)
+      const segments: BoundarySegment[] = []
+      for (let i = 0; i < FULL_CIRCLE_SEGMENTS; i++) {
+        segments.push(
+          createArcSegment(
+            repo,
+            holeX,
+            holeY,
+            radius,
+            (i / FULL_CIRCLE_SEGMENTS) * Math.PI * 2,
+            ((i + 1) / FULL_CIRCLE_SEGMENTS) * Math.PI * 2,
+            0,
+            holeX,
+            holeY,
+            z,
+            getVertex,
+          ),
+        )
+      }
+      return segments
+    }
 
-    const topHoleCenter = repo.add(
-      new CartesianPoint("", holeX, holeY, halfBoardThickness),
-    )
-    const topHoleVertex = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint("", holeX + radius, holeY, halfBoardThickness),
-        ),
-      ),
-    )
-    const topHolePlacement = repo.add(
-      new Axis2Placement3D("", topHoleCenter, zDir, xDir),
-    )
-    const topHoleCircle = repo.add(new Circle("", topHolePlacement, radius))
-    const topHoleEdge = repo.add(
-      new EdgeCurve("", topHoleVertex, topHoleVertex, topHoleCircle, true),
-    )
-    // A cylindrical face's boundary wire needs seam edges to connect the
-    // bottom and top circular edges. Reuse one seam edge in both directions.
-    const wallSeamEdge = createEdge(bottomHoleVertex, topHoleVertex)
+    const bottomSegments = createBoundary(zMin)
+    const topSegments = createBoundary(zMax)
 
-    const bottomLoop = repo.add(
-      new EdgeLoop("", [repo.add(new OrientedEdge("", bottomHoleEdge, false))]),
-    )
-    const topLoop = repo.add(
-      new EdgeLoop("", [repo.add(new OrientedEdge("", topHoleEdge, true))]),
-    )
-    const wallLoop = repo.add(
-      new EdgeLoop("", [
-        repo.add(new OrientedEdge("", bottomHoleEdge, true)),
-        repo.add(new OrientedEdge("", wallSeamEdge, true)),
-        repo.add(new OrientedEdge("", topHoleEdge, false)),
-        repo.add(new OrientedEdge("", wallSeamEdge, false)),
-      ]),
-    )
-    const holeCylinderPlacement = repo.add(
-      new Axis2Placement3D("", bottomHoleCenter, zDir, xDir),
-    )
-    const holeCylinderSurface = repo.add(
-      new CylindricalSurface("", holeCylinderPlacement, radius),
-    )
-    const wallFace = repo.add(
-      new AdvancedFace(
-        "",
-        [repo.add(new FaceOuterBound("", wallLoop, true))],
-        holeCylinderSurface,
-        false,
-      ),
-    )
-
-    return { bottomLoop, topLoop, wallFaces: [wallFace] }
+    return {
+      bottomLoop: createLoopFromSegments(repo, bottomSegments, false),
+      topLoop: createLoopFromSegments(repo, topSegments, true),
+      wallFaces: createWallFaces(repo, bottomSegments, topSegments, zMin, zDir),
+    }
   }
 
   const sharedHoleGeometries: SharedHoleGeometry[] = []
