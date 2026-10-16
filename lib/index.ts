@@ -70,6 +70,13 @@ type RuntimeHole = Hole & {
   hole_shape?: string
   shape?: string
   hole_diameter?: number
+  // Drill offset from the pad centre. Present only on the four pad variants of
+  // pcb_plated_hole; absent on the plain circle and oval variants.
+  hole_offset_x?: number
+  hole_offset_y?: number
+  // Drill rotation. Only rotated_pill_hole_with_rect_pad carries this name; the
+  // oval and polygon pad variants use ccw_rotation instead.
+  hole_ccw_rotation?: number
 }
 
 export interface CircuitJsonToStepOptions {
@@ -414,8 +421,8 @@ export async function circuitJsonToStep(
   }
 
   function createCircularHoleGeometry(hole: RuntimeHole): SharedHoleGeometry {
-    const holeX = getHoleCoordinate(hole.x)
-    const holeY = getHoleCoordinate(hole.y)
+    const holeX = getHoleCoordinate(hole.x) + (hole.hole_offset_x ?? 0)
+    const holeY = getHoleCoordinate(hole.y) + (hole.hole_offset_y ?? 0)
     const radius = (hole.hole_diameter ?? 0) / 2
 
     const bottomHoleCenter = repo.add(
@@ -510,6 +517,19 @@ export async function circuitJsonToStep(
     if (holeShape === "circle") {
       sharedHoleGeometries.push(createCircularHoleGeometry(hole))
     } else if (holeShape === "rotated_pill" || holeShape === "pill") {
+      sharedHoleGeometries.push(
+        createPillHoleGeometry(
+          repo,
+          hole,
+          -halfBoardThickness,
+          halfBoardThickness,
+          zDir,
+        ),
+      )
+    } else if (holeShape === "oval" && hole.type === "pcb_plated_hole") {
+      // pcb_plated_hole with shape "oval" has no hole_shape, so it reaches here
+      // on `shape` alone. Gated to plated holes: the non-plated oval variant
+      // falls through today and routing it would change pcb_hole output.
       sharedHoleGeometries.push(
         createPillHoleGeometry(
           repo,
