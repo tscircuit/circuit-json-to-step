@@ -1,0 +1,71 @@
+[
+  {
+    "type": "pcb_board",
+    "center": {
+      "x": 0,
+      "y": 0
+    },
+    "outline": [
+      {
+        "x": 50,
+        "y": 12.5
+      },
+      {
+        "x": -50,
+        "y": 12.5
+      },
+      {
+        "x": -50,
+        "y": -12.5
+      },
+      {
+        "x": 50,
+        "y": -12.5
+      },
+      {
+        "x": 50,
+        "y": 12.5
+      }
+    ],
+    "width": 100,
+    "height": 25,
+    "num_layers": 4,
+    "pcb_board_id": "pcb_board_0"
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_0",
+    "hole_shape": "circle",
+    "pcb_component_id": "pcb_component_79",
+    "x": -44.7525,
+    "y": -0.036000000000001364,
+    "hole_diameter": 1.5
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_1",
+    "hole_shape": "circle",
+    "pcb_component_id": "pcb_component_79",
+    "x": -24.752499999999998,
+    "y": -0.036000000000001364,
+    "hole_diameter": 1.5
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_2",
+    "hole_shape": "circle",
+    "pcb_component_id": "pcb_component_80",
+    "x": 25.02000000000001,
+    "y": -0.046999999999997044,
+    "hole_diameter": 1.5
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "pcb_hole_3",
+    "hole_shape": "circle",
+    "pcb_component_id": "pcb_component_80",
+    "x": 45.02000000000001,
+    "y": -0.046999999999997044,
+    "hole_diameter": 1.5
+  }
+]
