@@ -87,7 +87,7 @@ test("repro05: circular holes are only half cut in STEP exports", async () => {
   const crossingsAtHoleCentres = holes.map((hole) =>
     countCrossings(board, hole.x, hole.y),
   )
-  expect(crossingsAtHoleCentres).toEqual([1, 2, 2, 2, 2, 2, 2])
+  expect(crossingsAtHoleCentres).toEqual([0, 0, 0, 0, 0, 0, 0])
 
   // Board material away from the holes is solid, entered and exited.
   expect(countCrossings(board, 6.1, 0.4)).toBe(2)
