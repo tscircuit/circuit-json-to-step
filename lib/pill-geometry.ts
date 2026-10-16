@@ -16,6 +16,10 @@ import {
   VertexPoint,
 } from "stepts"
 
+/** Arcs used to approximate a full circle. More arcs means a rounder hole and a
+ * larger STEP file. */
+export const FULL_CIRCLE_SEGMENTS = 24
+
 export interface PillGeometry {
   centerX: number
   centerY: number
@@ -27,7 +31,7 @@ export interface PillGeometry {
   isHorizontal: boolean
 }
 
-type PillBoundarySegment =
+export type PillBoundarySegment =
   | {
       kind: "arc"
       edge: Ref<EdgeCurve>
@@ -35,6 +39,8 @@ type PillBoundarySegment =
       end: Ref<VertexPoint>
       centerX: number
       centerY: number
+      refX: number
+      refY: number
       radius: number
     }
   | {
@@ -107,7 +113,7 @@ function createVertexAt(
   )
 }
 
-function createVertexCache(repo: Repository, z: number) {
+export function createVertexCache(repo: Repository, z: number) {
   const vertices = new Map<string, Ref<VertexPoint>>()
   const normalize = (value: number) => {
     const rounded = Number(value.toFixed(9))
@@ -125,7 +131,7 @@ function createVertexCache(repo: Repository, z: number) {
   }
 }
 
-function createLineEdge(
+export function createLineEdge(
   repo: Repository,
   v1: Ref<VertexPoint>,
   v2: Ref<VertexPoint>,
@@ -137,14 +143,18 @@ function createLineEdge(
   const dz = p2.z - p1.z
   const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
+  // Handle zero-length edges (duplicate vertices)
   if (length < 1e-10) {
+    // Use arbitrary direction for degenerate edge
     const dir = repo.add(new Direction("", 1, 0, 0))
     const vec = repo.add(new Vector("", dir, 1e-10))
     const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
     return repo.add(new EdgeCurve("", v1, v2, line, true))
   }
 
+  // Direction must be normalized (unit vector)
   const dir = repo.add(new Direction("", dx / length, dy / length, dz / length))
+  // Vector magnitude is the actual edge length
   const vec = repo.add(new Vector("", dir, length))
   const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
   return repo.add(new EdgeCurve("", v1, v2, line, true))
@@ -166,7 +176,7 @@ function createLineSegment(
   }
 }
 
-function createArcSegment(
+export function createArcSegment(
   repo: Repository,
   centerX: number,
   centerY: number,
@@ -211,8 +221,10 @@ function createArcSegment(
     edge: repo.add(new EdgeCurve("", startVertex, endVertex, circle, false)),
     start: startVertex,
     end: endVertex,
-    centerX,
-    centerY,
+    centerX: center.x,
+    centerY: center.y,
+    refX: Math.cos(rotation),
+    refY: Math.sin(rotation),
     radius,
   }
 }
@@ -367,7 +379,7 @@ function createPillBoundarySegments(
   ]
 }
 
-function createLoopFromSegments(
+export function createLoopFromSegments(
   repo: Repository,
   segments: PillBoundarySegment[],
   orientation: boolean,
@@ -389,11 +401,28 @@ export function createPillHoleGeometry(
   zMax: number,
   zDir: Ref<Direction>,
 ): PillHoleGeometry {
-  const geom = getPillGeometry(hole)
   const bottomSegments = createPillBoundarySegments(repo, hole, zMin)
   const topSegments = createPillBoundarySegments(repo, hole, zMax)
   const bottomLoop = createLoopFromSegments(repo, bottomSegments, true)
   const topLoop = createLoopFromSegments(repo, topSegments, true)
+  const wallFaces = createWallFaces(
+    repo,
+    bottomSegments,
+    topSegments,
+    zMin,
+    zDir,
+  )
+  return { bottomLoop, topLoop, wallFaces }
+}
+
+/** Sweep a boundary between two z planes; each segment becomes one wall face. */
+export function createWallFaces(
+  repo: Repository,
+  bottomSegments: PillBoundarySegment[],
+  topSegments: PillBoundarySegment[],
+  zMin: number,
+  zDir: Ref<Direction>,
+): Ref<AdvancedFace>[] {
   const wallFaces: Ref<AdvancedFace>[] = []
   const verticalEdges = new Map<string, Ref<EdgeCurve>>()
   const getVerticalEdge = (
@@ -424,18 +453,16 @@ export function createPillHoleGeometry(
     )
 
     if (bottomSegment.kind === "arc") {
-      const center = rotatePoint(
-        bottomSegment.centerX,
-        bottomSegment.centerY,
-        geom.centerX,
-        geom.centerY,
-        geom.rotation,
-      )
       const bottomCenter = repo.add(
-        new CartesianPoint("", center.x, center.y, zMin),
+        new CartesianPoint(
+          "",
+          bottomSegment.centerX,
+          bottomSegment.centerY,
+          zMin,
+        ),
       )
       const refDir = repo.add(
-        new Direction("", Math.cos(geom.rotation), Math.sin(geom.rotation), 0),
+        new Direction("", bottomSegment.refX, bottomSegment.refY, 0),
       )
       const cylinderPlacement = repo.add(
         new Axis2Placement3D("", bottomCenter, zDir, refDir),
@@ -488,5 +515,5 @@ export function createPillHoleGeometry(
     )
   }
 
-  return { bottomLoop, topLoop, wallFaces }
+  return wallFaces
 }
