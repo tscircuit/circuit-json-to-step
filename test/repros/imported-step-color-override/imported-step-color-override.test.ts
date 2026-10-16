@@ -1,7 +1,14 @@
 import { expect, test } from "bun:test"
-import { assembly, RootCircuit } from "@tscircuit/core"
+import type { CircuitJson } from "circuit-json"
 import { jscadToStep } from "jscad-to-step"
-import { circuitJsonToStep } from "../../lib"
+import { circuitJsonToStep } from "../../../lib"
+import { importStepWithOcct } from "../../utils/occt/importer"
+import circuitJson from "./imported-step-color-override.json"
+
+// Fixture generated with @tscircuit/core@0.0.2165 from:
+// <assembly.device>
+//   <assembly.printedpart name="ORANGE_CASE" modelUrl="./blue-case.step" color="#ff6600" />
+// </assembly.device>
 
 test("repro: imported STEP model ignores the orange CAD color override", async () => {
   const blueCase = jscadToStep({
@@ -20,28 +27,12 @@ test("repro: imported STEP model ignores the orange CAD color override", async (
     },
   })
 
-  const circuit = new RootCircuit()
-  circuit.add(
-    <assembly.device>
-      <assembly.printedpart
-        name="ORANGE_CASE"
-        modelUrl="./blue-case.step"
-        color="#ff6600"
-      />
-    </assembly.device>,
-  )
-  circuit.render()
-
-  expect(circuit.db.cad_component.list()).toEqual([
-    expect.objectContaining({
-      model_step_url: "./blue-case.step",
-      color: "#ff6600",
-    }),
-  ])
-
-  const step = await circuitJsonToStep(circuit.getCircuitJson(), {
+  const step = await circuitJsonToStep(circuitJson as CircuitJson, {
     fsMap: { "./blue-case.step": blueCase },
   })
+  const imported = await importStepWithOcct(step)
+  expect(imported.success).toBe(true)
+  expect(imported.meshes.map((mesh) => mesh.name)).toEqual(["ORANGE_CASE"])
 
   // The requested color is orange, but the exported case stays blue.
   // Capture the current bug so a fix can update this same snapshot.
