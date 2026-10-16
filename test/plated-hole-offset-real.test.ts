@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { circuitJsonToStep } from "../lib"
 import fixture from "./fixtures/plated-hole-offset-real.json"
+import { FULL_CIRCLE_SEGMENTS } from "../lib/pill-geometry"
 
 /**
  * The production defect this guards: pcb_plated_hole carries a drill offset
@@ -80,8 +81,9 @@ test("real plated holes emit their drill at the offset position", async () => {
   expect(stepText).toContain("MANIFOLD_SOLID_BREP")
 
   const axes = parseDrillAxes(stepText)
-  // One cylindrical wall per hole.
-  expect(axes).toHaveLength(4)
+  // Each hole is bounded by FULL_CIRCLE_SEGMENTS arcs, so it contributes that
+  // many cylindrical walls.
+  expect(axes).toHaveLength(holes.length * FULL_CIRCLE_SEGMENTS)
 
   for (const hole of holes) {
     // Derived from the record itself, not from a table.

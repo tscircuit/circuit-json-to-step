@@ -3,6 +3,7 @@ import type { CircuitJson } from "circuit-json"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics19.json"
+import { FULL_CIRCLE_SEGMENTS } from "../../../lib/pill-geometry"
 
 test("basics19: multi-board assemblies include every board and reject ambiguous hole ownership", async () => {
   const step = await circuitJsonToStep(circuitJson as CircuitJson)
@@ -44,7 +45,7 @@ test("basics19: multi-board assemblies include every board and reject ambiguous 
     },
   ] as CircuitJson
   const holeStep = await circuitJsonToStep(withHole, { exportMode: "assembly" })
-  expect(holeStep.match(/= CIRCLE\(/g)).toHaveLength(2)
+  expect(holeStep.match(/= CIRCLE\(/g)).toHaveLength(2 * FULL_CIRCLE_SEGMENTS)
   expect((await importStepWithOcct(holeStep)).meshes).toHaveLength(2)
   const outlined = structuredClone(withHole)
   const leftOutline = outlined[0]
@@ -61,7 +62,9 @@ test("basics19: multi-board assemblies include every board and reject ambiguous 
   const outlinedStep = await circuitJsonToStep(outlined, {
     exportMode: "assembly",
   })
-  expect(outlinedStep.match(/= CIRCLE\(/g)).toHaveLength(2)
+  expect(outlinedStep.match(/= CIRCLE\(/g)).toHaveLength(
+    2 * FULL_CIRCLE_SEGMENTS,
+  )
   expect((await importStepWithOcct(outlinedStep)).meshes).toHaveLength(2)
   const ambiguous = structuredClone(withHole)
   const right = ambiguous[1]

@@ -3,8 +3,8 @@ import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct, type OcctMesh } from "../../utils/occt/importer"
 import circuitJson from "./repro05.json"
 
-// Source: sample012-ov9281-dual-camera-board, from the circuit json dataset.
-// 100 x 25 mm board with four 1.5 mm circular holes.
+// Source: sample014-usb-c-power-adapter, from the circuit json dataset.
+// 21.9 x 52.5 mm board with seven circular holes, from 0.65 mm to 2.2 mm.
 
 /**
  * Count triangles a ray straight down through (x, y) passes through. Two means
@@ -70,24 +70,37 @@ test("repro05: circular holes are only half cut in STEP exports", async () => {
   expect(occtResult.meshes).toHaveLength(1)
   const board = occtResult.meshes[0]!
 
+  // Every circular hole in the fixture, plated or not, since the drill is cut
+  // the same way for both.
   const holes = (circuitJson as any[]).filter(
-    (item) => item.type === "pcb_hole",
+    (item) => item.type === "pcb_hole" || item.type === "pcb_plated_hole",
   )
-  expect(holes).toHaveLength(4)
+  expect(holes).toHaveLength(7)
+  expect(holes.filter((hole) => hole.type === "pcb_hole")).toHaveLength(4)
+  expect(holes.filter((hole) => hole.type === "pcb_plated_hole")).toHaveLength(
+    3,
+  )
 
-  // Each circular hole should be open edge to edge, so a ray through its centre
-  // should cross nothing at all. It currently crosses one face, which is
-  // material left standing inside the hole. A fix should take these to 0.
+  // Each circular hole is open edge to edge, so a ray through its centre crosses
+  // no triangles.
   const crossingsAtHoleCentres = holes.map((hole) =>
     countCrossings(board, hole.x, hole.y),
   )
-  expect(crossingsAtHoleCentres).toEqual([1, 1, 1, 1])
+  expect(crossingsAtHoleCentres).toEqual([0, 0, 0, 0, 0, 0, 0])
 
   // Board material away from the holes is solid, entered and exited.
-  expect(countCrossings(board, 0, 0)).toBe(2)
-  expect(countCrossings(board, 10, 3)).toBe(2)
+  expect(countCrossings(board, 6.1, 0.4)).toBe(2)
+  expect(countCrossings(board, 0.2, -8.7)).toBe(2)
 
-  // Capture the current output, in which the holes are not fully open, so a fix
-  // can update this snapshot.
-  await expect(stepText).toMatchStepSnapshot(import.meta.path, "repro05")
-})
+  // Aimed at the 2.2 mm plated hole straight down its axis. The hole reads as
+  // lit green because you are looking at the inside of a blind hole; once it is
+  // cut through, the same view shows background through it. The close-up render
+  // needs more than bun's 5s default.
+  await expect(stepText).toMatchStepSnapshot(import.meta.path, "repro05", {
+    width: 1600,
+    height: 1200,
+    camPos: [1.98, 9.12, 12],
+    lookAt: [1.98, 9.12, 0],
+    fov: 40,
+  })
+}, 30_000)

@@ -249,9 +249,22 @@ function gltfFromOcctMeshes(meshes: OcctMesh[]) {
   return { gltf, buffers }
 }
 
+type RenderOptions = {
+  width?: number
+  height?: number
+  ambient?: number
+  /** Where the camera sits, in model units. Omit for the default fit. */
+  camPos?: readonly [number, number, number]
+  /** What the camera aims at, in model units. Omit for the default fit. */
+  lookAt?: readonly [number, number, number]
+  /** Field of view in degrees. Omit for the renderer's default of 60. */
+  fov?: number
+  lightDir?: readonly [number, number, number]
+}
+
 async function renderStepToPNG(
   stepInput: string | Uint8Array | ArrayBuffer,
-  opts?: { width?: number; height?: number; ambient?: number },
+  opts?: RenderOptions,
 ): Promise<Uint8Array> {
   const { width = 800, height = 600, ambient = 0.2 } = opts ?? {}
 
@@ -263,15 +276,16 @@ async function renderStepToPNG(
   const { gltf, buffers } = gltfFromOcctMeshes(result.meshes)
   const scene = createSceneFromGLTF(gltf, { buffers, images: [] })
 
-  const { bitmap } = renderSceneFromGLTF(
-    scene,
-    {
-      width,
-      height,
-      ambient,
-    },
-    createUint8Bitmap,
-  )
+  // Only forward camera keys that were actually given. The renderer spreads
+  // options over its own defaults, so an explicit `fov: undefined` would
+  // override the default and reach the projection as NaN.
+  const camera: RenderOptions = { width, height, ambient }
+  if (opts?.camPos !== undefined) camera.camPos = opts.camPos
+  if (opts?.lookAt !== undefined) camera.lookAt = opts.lookAt
+  if (opts?.fov !== undefined) camera.fov = opts.fov
+  if (opts?.lightDir !== undefined) camera.lightDir = opts.lightDir
+
+  const { bitmap } = renderSceneFromGLTF(scene, camera, createUint8Bitmap)
 
   return encodePNG(bitmap)
 }
@@ -289,6 +303,7 @@ async function toMatchStepSnapshot(
   received: unknown,
   testPathOriginal: string,
   pngName?: string,
+  opts?: RenderOptions,
 ) {
   if (
     typeof received !== "string" &&
@@ -300,7 +315,7 @@ async function toMatchStepSnapshot(
     )
   }
 
-  const png = await renderStepToPNG(received)
+  const png = await renderStepToPNG(received, opts)
   // Delegate to existing PNG matcher for snapshot compare/update UX
   return await expect(png).toMatchPngSnapshot(testPathOriginal, pngName)
 }
@@ -314,6 +329,7 @@ declare module "bun:test" {
     toMatchStepSnapshot(
       testPath: string,
       pngName?: string,
+      renderOptions?: RenderOptions,
     ): Promise<import("bun:test").MatcherResult>
   }
 }
