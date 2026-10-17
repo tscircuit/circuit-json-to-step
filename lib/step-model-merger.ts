@@ -37,7 +37,13 @@ export type {
 export async function mergeExternalStepModels(
   options: MergeStepModelOptions,
 ): Promise<MergeStepModelResult> {
-  const { repo, circuitJson, boardThickness, fsMap } = options
+  const {
+    repo,
+    circuitJson,
+    boardThickness,
+    fsMap,
+    allowExternalModelFetch = true,
+  } = options
   const cadComponents = (circuitJson as CadComponent[]).filter(
     (item) =>
       item?.type === "cad_component" && typeof item.model_step_url === "string",
@@ -62,7 +68,13 @@ export async function mergeExternalStepModels(
     try {
       let importedModel = importedModels.get(stepUrl)
       if (!importedModel) {
-        const stepText = fsMap?.[stepUrl] ?? (await readStepFile(stepUrl))
+        let stepText = fsMap?.[stepUrl]
+        if (stepText === undefined) {
+          if (!allowExternalModelFetch) {
+            throw new Error(`STEP model missing from fsMap: ${stepUrl}`)
+          }
+          stepText = await readStepFile(stepUrl)
+        }
         if (!stepText.trim()) {
           throw new Error("STEP file is empty")
         }
