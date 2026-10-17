@@ -95,6 +95,13 @@ test("repro05: circular holes are only half cut in STEP exports", async () => {
 
   // Capture the current output, in which the holes are not fully open, so a fix
   // can update this snapshot.
+  // Whole board, so the reader can see this is a PCB and count all seven holes
+  // rather than judging one of them.
+  await expect(stepText).toMatchStepSnapshot(import.meta.path, "repro05-board")
+
+  // The 2.2 mm plated hole, from directly above. The hole reads as lit green
+  // because you are looking at the inside of a blind hole; once it is cut
+  // through, the same view shows background through it.
   await expect(stepText).toMatchStepSnapshot(import.meta.path, "repro05", {
     width: 1600,
     height: 1200,

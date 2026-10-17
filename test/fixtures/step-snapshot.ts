@@ -249,17 +249,38 @@ function gltfFromOcctMeshes(meshes: OcctMesh[]) {
   return { gltf, buffers }
 }
 
+/**
+ * Options for `renderStepToPNG`.
+ *
+ * `width`, `height` and `ambient` only affect the raster size and the fill light.
+ * The rest place the camera. All of them are optional: anything left out keeps
+ * the renderer's own default, which frames the whole model. Omitting a camera
+ * key matters, because the renderer merges these options over its defaults and
+ * an explicit `undefined` would override the default rather than fall back to
+ * it.
+ */
 type RenderOptions = {
+  /** Raster width in pixels. Defaults to 800. */
   width?: number
+  /** Raster height in pixels. Defaults to 600. */
   height?: number
+  /** Fill light level, 0 to 1. Defaults to 0.2. */
   ambient?: number
-  /** Where the camera sits, in model units. Omit for the default fit. */
+  /**
+   * Where the camera sits, in model units, as `[x, y, z]`. Omit to let the
+   * renderer choose a position that fits the whole model.
+   */
   camPos?: readonly [number, number, number]
-  /** What the camera aims at, in model units. Omit for the default fit. */
+  /**
+   * The point the camera aims at, in model units, as `[x, y, z]`. Omit to aim
+   * at the centre of the model.
+   */
   lookAt?: readonly [number, number, number]
-  /** Field of view in degrees. Omit for the renderer's default of 60. */
+  /**
+   * Field of view in degrees: how much of the scene fits across the frame.
+   * Defaults to 60. Smaller values zoom in, larger values pull back.
+   */
   fov?: number
-  lightDir?: readonly [number, number, number]
 }
 
 async function renderStepToPNG(
@@ -283,7 +304,6 @@ async function renderStepToPNG(
   if (opts?.camPos !== undefined) camera.camPos = opts.camPos
   if (opts?.lookAt !== undefined) camera.lookAt = opts.lookAt
   if (opts?.fov !== undefined) camera.fov = opts.fov
-  if (opts?.lightDir !== undefined) camera.lightDir = opts.lightDir
 
   const { bitmap } = renderSceneFromGLTF(scene, camera, createUint8Bitmap)
 
