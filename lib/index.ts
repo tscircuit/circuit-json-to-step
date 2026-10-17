@@ -14,17 +14,13 @@ import {
   Direction,
   Axis2Placement3D,
   Plane,
-  CylindricalSurface,
   VertexPoint,
   EdgeCurve,
-  Line,
-  Vector,
   EdgeLoop,
   OrientedEdge,
   FaceOuterBound,
   FaceBound,
   AdvancedFace,
-  Circle,
   ClosedShell,
   ManifoldSolidBrep,
   ColourRgb,
@@ -51,7 +47,16 @@ import {
 } from "./step-style-utils"
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
-import { createPillHoleGeometry } from "./pill-geometry"
+import {
+  createArcSegment,
+  createLineEdge,
+  createLoopFromSegments,
+  createVertexCache,
+  createWallFaces,
+  FULL_CIRCLE_SEGMENTS,
+  createPillHoleGeometry,
+  type PillBoundarySegment,
+} from "./pill-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
 
@@ -327,35 +332,6 @@ export async function circuitJsonToStep(
   }
 
   // Helper to create edge between vertices
-  function createEdge(
-    v1: Ref<VertexPoint>,
-    v2: Ref<VertexPoint>,
-  ): Ref<EdgeCurve> {
-    const p1 = v1.resolve(repo).pnt.resolve(repo)
-    const p2 = v2.resolve(repo).pnt.resolve(repo)
-    const dx = p2.x - p1.x
-    const dy = p2.y - p1.y
-    const dz = p2.z - p1.z
-    const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
-
-    // Handle zero-length edges (duplicate vertices)
-    if (length < 1e-10) {
-      // Use arbitrary direction for degenerate edge
-      const dir = repo.add(new Direction("", 1, 0, 0))
-      const vec = repo.add(new Vector("", dir, 1e-10))
-      const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
-      return repo.add(new EdgeCurve("", v1, v2, line, true))
-    }
-
-    // Direction must be normalized (unit vector)
-    const dir = repo.add(
-      new Direction("", dx / length, dy / length, dz / length),
-    )
-    // Vector magnitude is the actual edge length
-    const vec = repo.add(new Vector("", dir, length))
-    const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
-    return repo.add(new EdgeCurve("", v1, v2, line, true))
-  }
 
   // Create board edges
   const bottomEdges: Ref<EdgeCurve>[] = []
@@ -366,19 +342,21 @@ export async function circuitJsonToStep(
   for (let i = 0; i < bottomVertices.length; i++) {
     const v1 = bottomVertices[i]!
     const v2 = bottomVertices[(i + 1) % bottomVertices.length]!
-    bottomEdges.push(createEdge(v1, v2))
+    bottomEdges.push(createLineEdge(repo, v1, v2))
   }
 
   // Top edges (connect vertices in a loop)
   for (let i = 0; i < topVertices.length; i++) {
     const v1 = topVertices[i]!
     const v2 = topVertices[(i + 1) % topVertices.length]!
-    topEdges.push(createEdge(v1, v2))
+    topEdges.push(createLineEdge(repo, v1, v2))
   }
 
   // Vertical edges (connect bottom to top)
   for (let i = 0; i < bottomVertices.length; i++) {
-    verticalEdges.push(createEdge(bottomVertices[i]!, topVertices[i]!))
+    verticalEdges.push(
+      createLineEdge(repo, bottomVertices[i]!, topVertices[i]!),
+    )
   }
 
   const origin = repo.add(new CartesianPoint("", 0, 0, -halfBoardThickness))
@@ -424,91 +402,42 @@ export async function circuitJsonToStep(
     const holeX = getHoleCoordinate(hole.x) + (hole.hole_offset_x ?? 0)
     const holeY = getHoleCoordinate(hole.y) + (hole.hole_offset_y ?? 0)
     const radius = (hole.hole_diameter ?? 0) / 2
+    const zMin = -halfBoardThickness
+    const zMax = halfBoardThickness
 
-    const bottomHoleCenter = repo.add(
-      new CartesianPoint("", holeX, holeY, -halfBoardThickness),
-    )
-    const bottomHoleVertex = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint("", holeX + radius, holeY, -halfBoardThickness),
-        ),
-      ),
-    )
-    const bottomHolePlacement = repo.add(
-      new Axis2Placement3D(
-        "",
-        bottomHoleCenter,
-        repo.add(new Direction("", 0, 0, -1)),
-        xDir,
-      ),
-    )
-    const bottomHoleCircle = repo.add(
-      new Circle("", bottomHolePlacement, radius),
-    )
-    const bottomHoleEdge = repo.add(
-      new EdgeCurve(
-        "",
-        bottomHoleVertex,
-        bottomHoleVertex,
-        bottomHoleCircle,
-        true,
-      ),
-    )
+    // A single CIRCLE edge cannot bound a full hole, so only part of it was
+    // being removed.
+    const createBoundary = (z: number): PillBoundarySegment[] => {
+      const getVertex = createVertexCache(repo, z)
+      const segments: PillBoundarySegment[] = []
+      for (let i = 0; i < FULL_CIRCLE_SEGMENTS; i++) {
+        segments.push(
+          createArcSegment(
+            repo,
+            holeX,
+            holeY,
+            z,
+            radius,
+            (i / FULL_CIRCLE_SEGMENTS) * Math.PI * 2,
+            ((i + 1) / FULL_CIRCLE_SEGMENTS) * Math.PI * 2,
+            0,
+            holeX,
+            holeY,
+            getVertex,
+          ),
+        )
+      }
+      return segments
+    }
 
-    const topHoleCenter = repo.add(
-      new CartesianPoint("", holeX, holeY, halfBoardThickness),
-    )
-    const topHoleVertex = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint("", holeX + radius, holeY, halfBoardThickness),
-        ),
-      ),
-    )
-    const topHolePlacement = repo.add(
-      new Axis2Placement3D("", topHoleCenter, zDir, xDir),
-    )
-    const topHoleCircle = repo.add(new Circle("", topHolePlacement, radius))
-    const topHoleEdge = repo.add(
-      new EdgeCurve("", topHoleVertex, topHoleVertex, topHoleCircle, true),
-    )
-    // A cylindrical face's boundary wire needs seam edges to connect the
-    // bottom and top circular edges. Reuse one seam edge in both directions.
-    const wallSeamEdge = createEdge(bottomHoleVertex, topHoleVertex)
+    const bottomSegments = createBoundary(zMin)
+    const topSegments = createBoundary(zMax)
 
-    const bottomLoop = repo.add(
-      new EdgeLoop("", [repo.add(new OrientedEdge("", bottomHoleEdge, false))]),
-    )
-    const topLoop = repo.add(
-      new EdgeLoop("", [repo.add(new OrientedEdge("", topHoleEdge, true))]),
-    )
-    const wallLoop = repo.add(
-      new EdgeLoop("", [
-        repo.add(new OrientedEdge("", bottomHoleEdge, true)),
-        repo.add(new OrientedEdge("", wallSeamEdge, true)),
-        repo.add(new OrientedEdge("", topHoleEdge, false)),
-        repo.add(new OrientedEdge("", wallSeamEdge, false)),
-      ]),
-    )
-    const holeCylinderPlacement = repo.add(
-      new Axis2Placement3D("", bottomHoleCenter, zDir, xDir),
-    )
-    const holeCylinderSurface = repo.add(
-      new CylindricalSurface("", holeCylinderPlacement, radius),
-    )
-    const wallFace = repo.add(
-      new AdvancedFace(
-        "",
-        [repo.add(new FaceOuterBound("", wallLoop, true))],
-        holeCylinderSurface,
-        false,
-      ),
-    )
-
-    return { bottomLoop, topLoop, wallFaces: [wallFace] }
+    return {
+      bottomLoop: createLoopFromSegments(repo, bottomSegments, false),
+      topLoop: createLoopFromSegments(repo, topSegments, true),
+      wallFaces: createWallFaces(repo, bottomSegments, topSegments, zMin, zDir),
+    }
   }
 
   const sharedHoleGeometries: SharedHoleGeometry[] = []
