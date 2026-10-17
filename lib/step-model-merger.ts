@@ -9,9 +9,11 @@ import {
   Repository,
   Unknown,
   parseRepository,
+  tokenizeSTEP,
   stepStr,
 } from "stepts"
 import { eid } from "stepts"
+import { normalizeStepEntityTerminators } from "./step-text-utils"
 import { EXCLUDED_ENTITY_TYPES } from "./step-model-merger/excluded-entity-types"
 import {
   asVector3,
@@ -170,7 +172,21 @@ export function importStepModelGeometry(
   stepText: string,
   modelName: string,
 ) {
-  const sourceRepo = parseRepository(stepText)
+  const normalizedStep = normalizeStepEntityTerminators(stepText)
+  const sourceRepo = parseRepository(normalizedStep)
+  // stepts promotes 2D points/directions to 3D. UV trimming curves must retain
+  // their dimensionality and must not receive the model's spatial transform.
+  // Preserve spline arguments too: knot multiplicities are STEP integers,
+  // while stepts reserializes them as real numbers and changes .U. to .F.
+  for (const row of tokenizeSTEP(normalizedStep)) {
+    if (
+      row.type === "B_SPLINE_CURVE_WITH_KNOTS" ||
+      ((row.type === "CARTESIAN_POINT" || row.type === "DIRECTION") &&
+        row.args[1]?.replace(/^\(|\)$/g, "").split(",").length === 2)
+    ) {
+      sourceRepo.set(row.id, new Unknown(row.type, row.args))
+    }
+  }
   let entries: RepositoryEntry[] = sourceRepo
     .entries()
     .map(([id, entity]) => [Number(id), entity] as const)
