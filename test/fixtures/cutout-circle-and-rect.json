@@ -1,0 +1,61 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_0",
+    "width": 32,
+    "height": 18,
+    "thickness": 1.6,
+    "center": {
+      "x": -12,
+      "y": -4
+    },
+    "num_layers": 2,
+    "material": "fr4"
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "pcb_cutout_circle_0",
+    "shape": "circle",
+    "center": {
+      "x": -19,
+      "y": 0
+    },
+    "radius": 2
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "pcb_cutout_circle_1",
+    "shape": "circle",
+    "center": {
+      "x": -9,
+      "y": 0
+    },
+    "radius": 1.5
+  },
+  {
+    "type": "pcb_cutout",
+    "shape": "rect",
+    "center": {
+      "x": -20.311822102945786,
+      "y": -10.060660171779821
+    },
+    "width": 13.618996481227711,
+    "height": 2.121320343559643,
+    "rotation": 0,
+    "corner_radius": 1.0606601717798214,
+    "pcb_cutout_id": "panel_tab_axis_aligned"
+  },
+  {
+    "type": "pcb_cutout",
+    "shape": "rect",
+    "center": {
+      "x": 1.0606601717798214,
+      "y": -6.061822102945786
+    },
+    "width": 10.118996481227711,
+    "height": 2.121320343559643,
+    "rotation": 90,
+    "corner_radius": 1.0606601717798214,
+    "pcb_cutout_id": "panel_tab_rotated_90"
+  }
+]
