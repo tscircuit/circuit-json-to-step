@@ -1,0 +1,36 @@
+[
+  {
+    "type": "source_component",
+    "source_component_id": "source_component_0",
+    "ftype": "printedpart",
+    "name": "ORANGE_CASE",
+    "color": "#ff6600"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_component_0",
+    "model_step_url": "./blue-case.step",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "rotation": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "layer": "top",
+    "source_component_id": "source_component_0",
+    "color": "#ff6600",
+    "model_origin_position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "model_unit_to_mm_scale_factor": 1,
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center",
+    "show_as_translucent_model": false
+  }
+]
