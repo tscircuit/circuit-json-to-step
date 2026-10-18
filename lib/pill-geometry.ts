@@ -83,7 +83,8 @@ export interface PillHole {
   ccw_rotation?: number
 }
 
-function coordinateOf(
+/** Read a circuit json coordinate, which is typed as number or { value }. */
+export function coordinateOf(
   coordinate: number | { value: number } | undefined,
 ): number {
   if (typeof coordinate === "number") return coordinate

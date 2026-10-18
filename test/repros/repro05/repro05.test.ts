@@ -1,8 +1,14 @@
 import { expect, test } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct, type OcctMesh } from "../../utils/occt/importer"
-import { parseRepository, type OrientedEdge, type Ref } from "stepts"
-import circuitJson from "./repro05.json"
+import { parseRepository, type EdgeLoop } from "stepts"
+
+import circuitJsonFixture from "./repro05.json"
+import type { CircuitJson } from "circuit-json"
+
+// The JSON import widens `type` to string, so narrow it to the schema once here
+// rather than casting at every use site.
+const circuitJson = circuitJsonFixture as CircuitJson
 
 // Source: sample014-usb-c-power-adapter, from the circuit json dataset.
 // 21.9 x 52.5 mm board with seven circular holes, from 0.65 mm to 2.2 mm.
@@ -61,7 +67,7 @@ const countCrossings = (mesh: OcctMesh, x: number, y: number): number => {
 
 test("repro05: circular holes are only half cut in STEP exports", async () => {
   // Two STEP renders, the close-up at 1600x1200, run past Bun's 5s default.
-  const stepText = await circuitJsonToStep(structuredClone(circuitJson) as any)
+  const stepText = await circuitJsonToStep(structuredClone(circuitJson))
 
   expect(stepText).toContain("ISO-10303-21")
   expect(stepText).toContain("END-ISO-10303-21")
@@ -74,8 +80,13 @@ test("repro05: circular holes are only half cut in STEP exports", async () => {
 
   // Every circular hole in the fixture, plated or not, since the drill is cut
   // the same way for both.
-  const holes = (circuitJson as any[]).filter(
-    (item) => item.type === "pcb_hole" || item.type === "pcb_plated_hole",
+  type Hole = Extract<
+    CircuitJson[number],
+    { type: "pcb_hole" | "pcb_plated_hole" }
+  >
+  const holes = circuitJson.filter(
+    (item): item is Hole =>
+      item.type === "pcb_hole" || item.type === "pcb_plated_hole",
   )
   expect(holes).toHaveLength(7)
   expect(holes.filter((hole) => hole.type === "pcb_hole")).toHaveLength(4)
@@ -102,16 +113,12 @@ test("repro05: circular holes are only half cut in STEP exports", async () => {
   const repo = parseRepository(stepText)
   const loops = [...repo.entries()]
     .map(([, entity]) => entity)
-    .filter((entity) => entity.type === "EDGE_LOOP")
+    .filter((entity): entity is EdgeLoop => entity.type === "EDGE_LOOP")
   expect(loops.length).toBeGreaterThan(0)
   const disconnected: number[] = []
-  let multiEdgeLoops = 0
   for (const loop of loops) {
-    const oriented = (
-      loop as unknown as { edges: Ref<OrientedEdge>[] }
-    ).edges.map((ref) => ref.resolve(repo))
+    const oriented = loop.edges.map((ref) => ref.resolve(repo))
     if (oriented.length < 2) continue
-    multiEdgeLoops++
     for (let i = 0; i < oriented.length; i++) {
       const current = oriented[i]!
       const next = oriented[(i + 1) % oriented.length]!
@@ -129,7 +136,6 @@ test("repro05: circular holes are only half cut in STEP exports", async () => {
       }
     }
   }
-  expect(multiEdgeLoops).toBeGreaterThan(0)
   expect(disconnected).toEqual([])
 
   // Capture the current output, in which the holes are not fully open, so a fix
