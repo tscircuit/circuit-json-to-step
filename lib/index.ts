@@ -45,6 +45,7 @@ import {
 import { generateComponentMeshes } from "./mesh-generation"
 import { mergeExternalStepModels } from "./step-model-merger"
 import {
+  PCB_SUBSTRATE_COLOR_RGB,
   createStyleCache,
   createStyledItem,
   createStyledItems,
@@ -638,7 +639,7 @@ export async function circuitJsonToStep(
   const styleCache = createStyleCache()
   const boardStyledItems = createStyledItems(repo, {
     itemRefs: allFaces,
-    rgb: [0.2, 0.6, 0.2],
+    rgb: PCB_SUBSTRATE_COLOR_RGB,
     styleCache,
   })
 

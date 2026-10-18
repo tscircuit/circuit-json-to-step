@@ -35,7 +35,11 @@ import { generatePanelSolids } from "./panel-geometry"
 import type { GeneratedSceneSolid } from "./scene-geometry"
 import { readStepFile } from "./step-model-merger/read-step-file"
 import { transformStepGeometry } from "./transform-step-geometry"
-import { createStyleCache, createStyledItems } from "./step-style-utils"
+import {
+  PCB_SUBSTRATE_COLOR_RGB,
+  createStyleCache,
+  createStyledItems,
+} from "./step-style-utils"
 import {
   asVector3,
   toRadians,
@@ -247,7 +251,7 @@ export async function circuitJsonToAssemblyStep(
       pcb.stepText,
       undefined,
       undefined,
-      [0.2, 0.6, 0.2],
+      PCB_SUBSTRATE_COLOR_RGB,
     )
 
   if (panel) {
@@ -255,7 +259,7 @@ export async function circuitJsonToAssemblyStep(
       generatePanelSolids({ repo, circuitJson, boardThickness }),
       panel.pcb_panel_id,
       "PCB Panel",
-      [0.2, 0.6, 0.2],
+      PCB_SUBSTRATE_COLOR_RGB,
     )
   }
 
