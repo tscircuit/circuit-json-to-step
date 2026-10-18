@@ -23,9 +23,15 @@ type CachedVertexKey = string
 /** Cache key pairing the two vertices a vertical wall edge connects. */
 type VerticalEdgeKey = string
 
-/** Arcs used to approximate a full circle. More arcs means a rounder hole and a
- * larger STEP file. */
-export const fullCircleSegments = 24
+/**
+ * Arcs used to approximate a full circle.
+ *
+ * Two semicircles are enough, because a semicircle is exact. The count does not
+ * buy accuracy: occt tessellates each arc at its own fixed deflection, so the
+ * emitted boundary is subdivided the same way whether this is 2 or 24, and the
+ * wall faces and loop edges are what scale with it.
+ */
+export const fullCircleSegments = 2
 
 export interface PillGeometry {
   centerX: number
@@ -157,8 +163,8 @@ function createVertexAt(
 
 export function createVertexCache(repo: Repository, z: number) {
   const vertices = new Map<CachedVertexKey, Ref<VertexPoint>>()
-  const normalize = (value: number) => {
-    const rounded = Number(value.toFixed(9))
+  const normalize = (coordinate: number) => {
+    const rounded = Number(coordinate.toFixed(9))
     return Object.is(rounded, -0) ? 0 : rounded
   }
 

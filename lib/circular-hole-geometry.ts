@@ -67,10 +67,15 @@ function rotatePoint({
   }
 }
 
-/** Arcs used to approximate a full circle. More arcs means a finer
- * tessellation and a larger STEP file; a two-arc circle fans interior
- * triangles across the opening, which is the defect this construction avoids. */
-const fullCircleSegments = 24
+/**
+ * Arcs used to approximate a full circle.
+ *
+ * Two semicircles are enough, because a semicircle is exact. The count does not
+ * buy accuracy: occt tessellates each arc at its own fixed deflection, so the
+ * emitted boundary is subdivided the same way whether this is 2 or 24, and the
+ * wall faces and loop edges are what scale with it.
+ */
+const fullCircleSegments = 2
 
 function createLineEdge(
   repo: Repository,
@@ -336,7 +341,7 @@ function createWallFaces({
 
 /** A circular hole boundary spanning the board: the loops for its two faces and
  * the walls joining them. */
-export interface CircularHoleGeometry {
+interface CircularHoleGeometry {
   bottomLoop: Ref<EdgeLoop>
   topLoop: Ref<EdgeLoop>
   wallFaces: Ref<AdvancedFace>[]
@@ -345,7 +350,7 @@ export interface CircularHoleGeometry {
 /** The circular fields of a pcb_hole or pcb_plated_hole, loosened from the
  * schema because circuit json types a coordinate as number | { value } and the
  * drill offset is only present on the plated pad variants. */
-export interface CircularHole {
+interface CircularHole {
   x?: number | { value: number }
   y?: number | { value: number }
   hole_diameter?: number
