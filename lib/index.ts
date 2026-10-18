@@ -45,6 +45,7 @@ import {
 import { generateComponentMeshes } from "./mesh-generation"
 import { mergeExternalStepModels } from "./step-model-merger"
 import {
+  PCB_SUBSTRATE_COLOR_RGB,
   createStyleCache,
   createStyledItem,
   createStyledItems,
@@ -112,7 +113,10 @@ export async function circuitJsonToStep(
   const boards = circuitJson.filter((item) => item.type === "pcb_board")
   if (options.exportMode !== "pcb") {
     const pcbSteps: { id: string; name: string; stepText: string }[] = []
-    for (const board of boards) {
+    // A panel is one substrate, including the boards, rails and connecting tabs.
+    // Its holes and cutouts cannot be scoped to individual board outlines.
+    const panel = circuitJson.find((item) => item.type === "pcb_panel")
+    for (const board of panel ? [] : boards) {
       const name = boards.length === 1 ? "PCB" : board.pcb_board_id
       pcbSteps.push({
         id: board.pcb_board_id,
@@ -130,7 +134,12 @@ export async function circuitJsonToStep(
         ),
       })
     }
-    if (boards.length === 0 && options.boardWidth && options.boardHeight) {
+    if (
+      !panel &&
+      boards.length === 0 &&
+      options.boardWidth &&
+      options.boardHeight
+    ) {
       pcbSteps.push({
         id: "pcb",
         name: "PCB",
@@ -146,7 +155,11 @@ export async function circuitJsonToStep(
       productName: options.productName,
       pcbSteps,
       fsMap: options.fsMap,
-      boardThickness: options.boardThickness ?? boards[0]?.thickness ?? 1.6,
+      boardThickness:
+        options.boardThickness ??
+        panel?.thickness ??
+        boards[0]?.thickness ??
+        1.6,
       includeExternalMeshes: options.includeExternalMeshes ?? true,
     })
   }
@@ -626,7 +639,7 @@ export async function circuitJsonToStep(
   const styleCache = createStyleCache()
   const boardStyledItems = createStyledItems(repo, {
     itemRefs: allFaces,
-    rgb: [0.2, 0.6, 0.2],
+    rgb: PCB_SUBSTRATE_COLOR_RGB,
     styleCache,
   })
 

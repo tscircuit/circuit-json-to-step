@@ -31,9 +31,15 @@ import {
   mergeExternalStepModels,
 } from "./step-model-merger"
 import { generateComponentMeshes } from "./mesh-generation"
+import { generatePanelSolids } from "./panel-geometry"
+import type { GeneratedSceneSolid } from "./scene-geometry"
 import { readStepFile } from "./step-model-merger/read-step-file"
 import { transformStepGeometry } from "./transform-step-geometry"
-import { createStyleCache, createStyledItems } from "./step-style-utils"
+import {
+  PCB_SUBSTRATE_COLOR_RGB,
+  createStyleCache,
+  createStyledItems,
+} from "./step-style-utils"
 import {
   asVector3,
   toRadians,
@@ -61,11 +67,13 @@ export async function circuitJsonToAssemblyStep(
 ): Promise<string> {
   const parts = circuitJson.filter((item) => item.type === "source_component")
   const models = circuitJson.filter((item) => item.type === "cad_component")
+  const panel = circuitJson.find((item) => item.type === "pcb_panel")
   const pcbComponents = circuitJson.filter(
     (item) => item.type === "pcb_component",
   )
   if (
     pcbSteps.length === 0 &&
+    !panel &&
     models.length === 0 &&
     pcbComponents.length === 0 &&
     parts.length === 0
@@ -243,8 +251,17 @@ export async function circuitJsonToAssemblyStep(
       pcb.stepText,
       undefined,
       undefined,
-      [0.2, 0.6, 0.2],
+      PCB_SUBSTRATE_COLOR_RGB,
     )
+
+  if (panel) {
+    addGeneratedChild(
+      generatePanelSolids({ repo, circuitJson, boardThickness }),
+      panel.pcb_panel_id,
+      "PCB Panel",
+      PCB_SUBSTRATE_COLOR_RGB,
+    )
+  }
 
   const coveredPcbIds = new Set<string>()
   const stepContents = new Map(Object.entries(fsMap ?? {}))
@@ -402,6 +419,15 @@ export async function circuitJsonToAssemblyStep(
       includeExternalMeshes,
       requireMeshGeometry,
     })
+    addGeneratedChild(generated, id, name)
+  }
+
+  function addGeneratedChild(
+    generated: GeneratedSceneSolid[],
+    id: string,
+    name: string,
+    color: [number, number, number] = [0.75, 0.75, 0.75],
+  ) {
     if (generated.length === 0)
       throw new Error(`Part "${name}" has no supported geometry to export`)
     for (const solid of generated) solid.solid.resolve(repo).name = name
@@ -411,7 +437,7 @@ export async function circuitJsonToAssemblyStep(
       ...(!solid.usesIntrinsicFaceStyles
         ? createStyledItems(repo, {
             itemRefs: solid.styleTargets,
-            rgb: [0.75, 0.75, 0.75],
+            rgb: color,
             styleCache,
           })
         : []),

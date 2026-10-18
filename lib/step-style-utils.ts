@@ -10,6 +10,8 @@ import {
   SurfaceStyleUsage,
 } from "stepts"
 
+export const PCB_SUBSTRATE_COLOR_RGB: [number, number, number] = [0.2, 0.6, 0.2]
+
 export type StyleCache = Map<string, Ref<PresentationStyleAssignment>>
 
 type StyledItemOptions = {

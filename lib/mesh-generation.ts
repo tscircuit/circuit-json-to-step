@@ -50,7 +50,8 @@ export async function generateComponentMeshes(
   try {
     const filteredCircuitJson = circuitJson
       .filter((element) => {
-        if (element.type === "pcb_board") return false
+        if (element.type === "pcb_board" || element.type === "pcb_panel")
+          return false
 
         if (
           element.type === "cad_component" &&
