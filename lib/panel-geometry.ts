@@ -9,9 +9,14 @@ import {
 } from "stepts"
 import type { GeneratedSceneSolid } from "./scene-geometry"
 import { createFaceFromVertices, createVertex } from "./step-brep-utils"
+import { getPillGeometry, rotatePoint } from "./pill-geometry"
 
 const SEGMENTS = 64
 type Point = [number, number]
+type Hole = Extract<
+  CircuitJson[number],
+  { type: "pcb_hole" | "pcb_plated_hole" }
+>
 
 /** Clip the panel in 2D, then extrude closed boundary loops with shared edges. */
 export function generatePanelSolids({
@@ -42,15 +47,7 @@ export function generatePanelSolids({
         shape === "rotated_pill" ||
         shape === "pill_hole_with_rect_pad"
       ) {
-        cuts.push([
-          capsule(
-            x,
-            y,
-            hole.hole_width,
-            hole.hole_height,
-            hole.ccw_rotation ?? 0,
-          ),
-        ])
+        cuts.push([capsule(item)])
       } else if (
         shape === "circle" ||
         shape === "circular_hole_with_rect_pad"
@@ -148,7 +145,7 @@ function rectangle(
     ],
     x,
     y,
-    rotation,
+    (rotation * Math.PI) / 180,
   )
 }
 function circle(x: number, y: number, radius: number): Ring {
@@ -161,35 +158,31 @@ function circle(x: number, y: number, radius: number): Ring {
     ],
   )
 }
-function capsule(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  rotation: number,
-): Ring {
-  if (!(width > 0 && height > 0))
+function capsule(hole: Hole): Ring {
+  const geom = getPillGeometry(hole)
+  if (!(geom.width > 0 && geom.height > 0))
     throw new Error("Panel hole dimensions must be positive")
-  const radius = Math.min(width, height) / 2
-  const half = Math.abs(width - height) / 2
   const points: Point[] = []
   for (let side = 0; side < 2; side++) {
     for (let i = 0; i <= SEGMENTS / 2; i++) {
       const angle = -Math.PI / 2 + side * Math.PI + (i * Math.PI * 2) / SEGMENTS
       points.push([
-        (side === 0 ? half : -half) + radius * Math.cos(angle),
-        radius * Math.sin(angle),
+        (side === 0 ? geom.straightHalfLength : -geom.straightHalfLength) +
+          geom.radius * Math.cos(angle),
+        geom.radius * Math.sin(angle),
       ])
     }
   }
-  return place(points, x, y, rotation + (height > width ? 90 : 0))
+  return place(
+    points,
+    geom.centerX,
+    geom.centerY,
+    geom.rotation + (geom.isHorizontal ? 0 : Math.PI / 2),
+  )
 }
 function place(points: Point[], x: number, y: number, rotation: number): Ring {
-  const radians = (rotation * Math.PI) / 180
-  return points.map(
-    ([a, b]): Point => [
-      x + a * Math.cos(radians) - b * Math.sin(radians),
-      y + a * Math.sin(radians) + b * Math.cos(radians),
-    ],
-  )
+  return points.map(([a, b]): Point => {
+    const point = rotatePoint(a, b, 0, 0, rotation)
+    return [x + point.x, y + point.y]
+  })
 }

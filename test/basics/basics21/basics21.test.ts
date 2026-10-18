@@ -84,6 +84,34 @@ test("basics21: panels preserve rails, edge mousebites, cutouts and components",
   expect(hasTopSurface(barePanel.meshes[0], 11, 19)).toBe(true)
 }, 30_000)
 
+test("basics21: panel slots use the board hole offsets and rotations", async () => {
+  for (const dimensions of [
+    { hole_width: 6, hole_height: 2, ccw_rotation: 90 },
+    { hole_width: 2, hole_height: 6, ccw_rotation: 0 },
+    { hole_width: 6, hole_height: 2, hole_ccw_rotation: 90 },
+  ]) {
+    const step = await circuitJsonToStep([
+      ...circuitJson.filter((item) => item.type === "pcb_panel"),
+      {
+        type: "pcb_plated_hole",
+        pcb_plated_hole_id: "slot",
+        shape: "pill_hole_with_rect_pad",
+        hole_shape: "pill",
+        x: 28,
+        y: 12,
+        hole_offset_x: 2,
+        hole_offset_y: -2,
+        ...dimensions,
+      },
+    ] as CircuitJson)
+    const panel = (await importStepWithOcct(step)).meshes[0]
+    expect(hasTopSurface(panel, 30, 10)).toBe(false)
+    expect(hasTopSurface(panel, 30, 12)).toBe(false)
+    expect(hasTopSurface(panel, 32, 10)).toBe(true)
+    expect(hasTopSurface(panel, 28, 12)).toBe(true)
+  }
+})
+
 function hasTopSurface(mesh: OcctMesh, x: number, y: number) {
   const positions = mesh.attributes.position.array
   const indices = mesh.index.array
