@@ -18,7 +18,7 @@ import {
 
 /** Arcs used to approximate a full circle. More arcs means a rounder hole and a
  * larger STEP file. */
-export const FULL_CIRCLE_SEGMENTS = 24
+export const fullCircleSegments = 24
 
 export interface PillGeometry {
   centerX: number

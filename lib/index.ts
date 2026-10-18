@@ -54,7 +54,7 @@ import {
   createLoopFromSegments,
   createVertexCache,
   createWallFaces,
-  FULL_CIRCLE_SEGMENTS,
+  fullCircleSegments,
   createPillHoleGeometry,
   type PillBoundarySegment,
 } from "./pill-geometry"
@@ -415,15 +415,13 @@ export async function circuitJsonToStep(
     const holeX = getHoleCoordinate(hole.x) + (hole.hole_offset_x ?? 0)
     const holeY = getHoleCoordinate(hole.y) + (hole.hole_offset_y ?? 0)
     const radius = (hole.hole_diameter ?? 0) / 2
-    const zMin = -halfBoardThickness
-    const zMax = halfBoardThickness
 
     // A single CIRCLE edge cannot bound a full hole, so only part of it was
     // being removed.
     const createBoundary = (z: number): PillBoundarySegment[] => {
       const getVertex = createVertexCache(repo, z)
       const segments: PillBoundarySegment[] = []
-      for (let i = 0; i < FULL_CIRCLE_SEGMENTS; i++) {
+      for (let i = 0; i < fullCircleSegments; i++) {
         segments.push(
           createArcSegment(
             repo,
@@ -431,8 +429,8 @@ export async function circuitJsonToStep(
             holeY,
             z,
             radius,
-            (i / FULL_CIRCLE_SEGMENTS) * Math.PI * 2,
-            ((i + 1) / FULL_CIRCLE_SEGMENTS) * Math.PI * 2,
+            (i / fullCircleSegments) * Math.PI * 2,
+            ((i + 1) / fullCircleSegments) * Math.PI * 2,
             0,
             holeX,
             holeY,
@@ -443,13 +441,19 @@ export async function circuitJsonToStep(
       return segments
     }
 
-    const bottomSegments = createBoundary(zMin)
-    const topSegments = createBoundary(zMax)
+    const bottomSegments = createBoundary(-halfBoardThickness)
+    const topSegments = createBoundary(halfBoardThickness)
 
     return {
       bottomLoop: createLoopFromSegments(repo, bottomSegments, false),
       topLoop: createLoopFromSegments(repo, topSegments, true),
-      wallFaces: createWallFaces(repo, bottomSegments, topSegments, zMin, zDir),
+      wallFaces: createWallFaces(
+        repo,
+        bottomSegments,
+        topSegments,
+        -halfBoardThickness,
+        zDir,
+      ),
     }
   }
 

@@ -59,6 +59,7 @@ const countCrossings = (mesh: OcctMesh, x: number, y: number): number => {
 }
 
 test("repro05: circular holes are only half cut in STEP exports", async () => {
+  // Two STEP renders, the close-up at 1600x1200, run past Bun's 5s default.
   const stepText = await circuitJsonToStep(structuredClone(circuitJson) as any)
 
   expect(stepText).toContain("ISO-10303-21")
@@ -109,4 +110,4 @@ test("repro05: circular holes are only half cut in STEP exports", async () => {
     lookAt: [1.98, 9.12, 0],
     fov: 40,
   })
-})
+}, 30_000)
