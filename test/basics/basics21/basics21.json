@@ -1,0 +1,175 @@
+[
+  {
+    "type": "pcb_panel",
+    "pcb_panel_id": "panel",
+    "center": {
+      "x": 30,
+      "y": 10
+    },
+    "width": 40,
+    "height": 20,
+    "thickness": 2
+  },
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "left",
+    "center": {
+      "x": 20,
+      "y": 10
+    },
+    "width": 14,
+    "height": 12,
+    "thickness": 1.6
+  },
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "right",
+    "center": {
+      "x": 40,
+      "y": 10
+    },
+    "width": 14,
+    "height": 12,
+    "thickness": 1.6
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "mousebite",
+    "hole_shape": "circle",
+    "hole_diameter": 1,
+    "x": 13,
+    "y": 8,
+    "subcircuit_id": "panel_group"
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "rail_mount",
+    "hole_shape": "circle",
+    "hole_diameter": 2,
+    "x": 11,
+    "y": 17,
+    "subcircuit_id": "panel_group"
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "routing_slot",
+    "shape": "rect",
+    "center": {
+      "x": 30,
+      "y": 10
+    },
+    "width": 2,
+    "height": 12
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "r1",
+    "name": "R1",
+    "ftype": "simple_resistor"
+  },
+  {
+    "type": "pcb_component",
+    "pcb_component_id": "r1_pcb",
+    "source_component_id": "r1",
+    "center": {
+      "x": 20,
+      "y": 10
+    },
+    "width": 2,
+    "height": 1,
+    "layer": "top",
+    "rotation": 0
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "r1_model",
+    "source_component_id": "r1",
+    "pcb_component_id": "r1_pcb",
+    "show_as_bounding_box": true,
+    "position": {
+      "x": 20,
+      "y": 10,
+      "z": 1.5
+    }
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "route_20_3.5",
+    "shape": "rect",
+    "center": {
+      "x": 20,
+      "y": 3.5
+    },
+    "width": 14,
+    "height": 1
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "route_20_16.5",
+    "shape": "rect",
+    "center": {
+      "x": 20,
+      "y": 16.5
+    },
+    "width": 14,
+    "height": 1
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "route_40_3.5",
+    "shape": "rect",
+    "center": {
+      "x": 40,
+      "y": 3.5
+    },
+    "width": 14,
+    "height": 1
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "route_40_16.5",
+    "shape": "rect",
+    "center": {
+      "x": 40,
+      "y": 16.5
+    },
+    "width": 14,
+    "height": 1
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "rail_mount_49_17",
+    "hole_shape": "circle",
+    "hole_diameter": 2,
+    "x": 49,
+    "y": 17,
+    "subcircuit_id": "panel_group"
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "rail_mount_11_3",
+    "hole_shape": "circle",
+    "hole_diameter": 2,
+    "x": 11,
+    "y": 3,
+    "subcircuit_id": "panel_group"
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "rail_mount_49_3",
+    "hole_shape": "circle",
+    "hole_diameter": 2,
+    "x": 49,
+    "y": 3,
+    "subcircuit_id": "panel_group"
+  },
+  {
+    "type": "pcb_hole",
+    "pcb_hole_id": "slot_mousebite",
+    "hole_shape": "circle",
+    "hole_diameter": 1,
+    "x": 29,
+    "y": 7,
+    "subcircuit_id": "panel_group"
+  }
+]
