@@ -48,16 +48,8 @@ import {
 } from "./step-style-utils"
 import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
-import {
-  createArcSegment,
-  createLineEdge,
-  createLoopFromSegments,
-  createVertexCache,
-  createWallFaces,
-  fullCircleSegments,
-  createPillHoleGeometry,
-  type PillBoundarySegment,
-} from "./pill-geometry"
+import { createLineEdge, createPillHoleGeometry } from "./pill-geometry"
+import { createCircularHoleGeometry } from "./circular-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
 
@@ -411,57 +403,20 @@ export async function circuitJsonToStep(
     return coordinate?.value ?? 0
   }
 
-  function createCircularHoleGeometry(hole: RuntimeHole): SharedHoleGeometry {
-    const holeX = getHoleCoordinate(hole.x) + (hole.hole_offset_x ?? 0)
-    const holeY = getHoleCoordinate(hole.y) + (hole.hole_offset_y ?? 0)
-    const radius = (hole.hole_diameter ?? 0) / 2
-
-    // A single CIRCLE edge cannot bound a full hole, so only part of it was
-    // being removed.
-    const createBoundary = (z: number): PillBoundarySegment[] => {
-      const getVertex = createVertexCache(repo, z)
-      const segments: PillBoundarySegment[] = []
-      for (let i = 0; i < fullCircleSegments; i++) {
-        segments.push(
-          createArcSegment(
-            repo,
-            holeX,
-            holeY,
-            z,
-            radius,
-            (i / fullCircleSegments) * Math.PI * 2,
-            ((i + 1) / fullCircleSegments) * Math.PI * 2,
-            0,
-            holeX,
-            holeY,
-            getVertex,
-          ),
-        )
-      }
-      return segments
-    }
-
-    const bottomSegments = createBoundary(-halfBoardThickness)
-    const topSegments = createBoundary(halfBoardThickness)
-
-    return {
-      bottomLoop: createLoopFromSegments(repo, bottomSegments, false),
-      topLoop: createLoopFromSegments(repo, topSegments, true),
-      wallFaces: createWallFaces(
-        repo,
-        bottomSegments,
-        topSegments,
-        -halfBoardThickness,
-        zDir,
-      ),
-    }
-  }
-
   const sharedHoleGeometries: SharedHoleGeometry[] = []
   for (const hole of holes) {
     const holeShape = hole.hole_shape ?? hole.shape
     if (holeShape === "circle") {
-      sharedHoleGeometries.push(createCircularHoleGeometry(hole))
+      const circularGeometry = createCircularHoleGeometry({
+        repo,
+        hole,
+        zMin: -halfBoardThickness,
+        zMax: halfBoardThickness,
+        zDir,
+      })
+      if (circularGeometry) {
+        sharedHoleGeometries.push(circularGeometry)
+      }
     } else if (holeShape === "rotated_pill" || holeShape === "pill") {
       sharedHoleGeometries.push(
         createPillHoleGeometry(

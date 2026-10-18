@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct, type OcctMesh } from "../../utils/occt/importer"
+import { parseRepository, type OrientedEdge, type Ref } from "stepts"
 import circuitJson from "./repro05.json"
 
 // Source: sample014-usb-c-power-adapter, from the circuit json dataset.
@@ -93,6 +94,43 @@ test("repro05: circular holes are only half cut in STEP exports", async () => {
   // Board material away from the holes is solid, entered and exited.
   expect(countCrossings(board, 6.1, 0.4)).toBe(2)
   expect(countCrossings(board, 0.2, -8.7)).toBe(2)
+
+  // Every emitted loop must be a closed chain: each oriented edge ends where
+  // the next one starts. Reversing a loop has to reverse the segment order as
+  // well as the edge orientations, otherwise the hole's bottom boundary comes
+  // out disconnected and occt accepts the file anyway.
+  const repo = parseRepository(stepText)
+  const loops = [...repo.entries()]
+    .map(([, entity]) => entity)
+    .filter((entity) => entity.type === "EDGE_LOOP")
+  expect(loops.length).toBeGreaterThan(0)
+  const disconnected: number[] = []
+  let multiEdgeLoops = 0
+  for (const loop of loops) {
+    const oriented = (
+      loop as unknown as { edges: Ref<OrientedEdge>[] }
+    ).edges.map((ref) => ref.resolve(repo))
+    if (oriented.length < 2) continue
+    multiEdgeLoops++
+    for (let i = 0; i < oriented.length; i++) {
+      const current = oriented[i]!
+      const next = oriented[(i + 1) % oriented.length]!
+      const currentCurve = current.edge.resolve(repo)
+      const nextCurve = next.edge.resolve(repo)
+      const currentEnd = (
+        current.orientation ? currentCurve.end : currentCurve.start
+      ).resolve(repo)
+      const nextStart = (
+        next.orientation ? nextCurve.start : nextCurve.end
+      ).resolve(repo)
+      if (currentEnd !== nextStart) {
+        disconnected.push(i)
+        break
+      }
+    }
+  }
+  expect(multiEdgeLoops).toBeGreaterThan(0)
+  expect(disconnected).toEqual([])
 
   // Capture the current output, in which the holes are not fully open, so a fix
   // can update this snapshot.
