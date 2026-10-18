@@ -80,12 +80,6 @@ ownership is an error. PCB components infer board thickness from a unique
 subcircuit match; ambiguous ownership with different board thicknesses is an
 error.
 
-Designs with a `pcb_panel` export one "PCB Panel" substrate, including its rails,
-tabs, mounting holes, mousebites and panel cutouts, alongside the CAD models.
-Panel holes and rounded slots use 64-segment outlines, clipped in 2D and
-extruded into closed solids with shared boundary edges. Child board substrates
-are not exported again inside the panel.
-
 Omitting `exportMode` always selects the complete assembly, including PCB-only
 designs with component models, mixed PCB and assembly designs, printed-only
 designs, multiple boards, and CAD models without source components. No special
