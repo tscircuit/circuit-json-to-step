@@ -169,10 +169,20 @@ export function importStepModelGeometry(
   targetRepo: Repository,
   stepText: string,
   modelName: string,
+  options: { context?: Ref<Entity>; rejectAssemblies?: boolean } = {},
 ) {
-  const sourceRepo = parseRepository(stepText)
-  let entries: RepositoryEntry[] = sourceRepo
-    .entries()
+  const sourceEntries = parseRepository(stepText).entries()
+  if (
+    options.rejectAssemblies &&
+    sourceEntries.some(
+      ([, entity]) => entity.type === "NEXT_ASSEMBLY_USAGE_OCCURRENCE",
+    )
+  ) {
+    throw new Error(
+      `Part "${modelName}" uses a nested STEP assembly, which is not supported for assembly export`,
+    )
+  }
+  let entries: RepositoryEntry[] = sourceEntries
     .map(([id, entity]) => [Number(id), entity] as const)
     .filter(([, entity]) => !EXCLUDED_ENTITY_TYPES.has(entity.type))
 
@@ -180,12 +190,6 @@ export function importStepModelGeometry(
 
   const idMapping = allocateIds(targetRepo, entries)
   remapReferences(entries, idMapping)
-
-  for (const [oldId, entity] of entries) {
-    const mappedId = idMapping.get(oldId)
-    if (mappedId === undefined) continue
-    targetRepo.set(eid(mappedId), entity)
-  }
 
   const solids: Ref<ManifoldSolidBrep>[] = []
   for (const [oldId, entity] of entries) {
@@ -207,7 +211,7 @@ export function importStepModelGeometry(
     new AdvancedBrepShapeRepresentation(
       modelName,
       solids,
-      getGeomContext(targetRepo),
+      options.context ?? getGeomContext(targetRepo),
     ),
   )
   return { entries, origin: mappingOrigin, representation, solids }
@@ -477,26 +481,13 @@ function allocateIds(
   targetRepo: Repository,
   entries: ReadonlyArray<RepositoryEntry>,
 ): Map<number, number> {
-  let nextId = getNextEntityId(targetRepo)
   const idMapping = new Map<number, number>()
 
-  for (const [oldId] of entries) {
-    idMapping.set(oldId, nextId)
-    nextId += 1
+  for (const [oldId, entity] of entries) {
+    idMapping.set(oldId, Number(targetRepo.add(entity).id))
   }
 
   return idMapping
-}
-
-function getNextEntityId(repo: Repository): number {
-  let maxId = 0
-  for (const [id] of repo.entries()) {
-    const numericId = Number(id)
-    if (numericId > maxId) {
-      maxId = numericId
-    }
-  }
-  return maxId + 1
 }
 
 function remapReferences(
