@@ -45,7 +45,6 @@ import {
   toRadians,
   transformDirection,
 } from "./step-model-merger/vector-utils"
-import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 
 /** Export all CAD parts and the PCB as distinct named children of one STEP assembly. */
@@ -400,7 +399,7 @@ export async function circuitJsonToAssemblyStep(
     throw new Error("No assembly geometry found to export")
   }
 
-  return normalizeStepNumericExponents(repo.toPartFile({ name: productName }))
+  return repo.toPartFile({ name: productName })
 
   async function addMeshChildren(
     componentJson: CircuitJson,

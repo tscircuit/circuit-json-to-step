@@ -50,7 +50,6 @@ import {
   createStyledItem,
   createStyledItems,
 } from "./step-style-utils"
-import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 import { createPillHoleGeometry } from "./pill-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
@@ -799,8 +798,7 @@ export async function circuitJsonToStep(
   repo.add(new ShapeDefinitionRepresentation(productDefShape, shapeRep))
 
   // Generate and return STEP file text
-  const stepText = repo.toPartFile({ name: productName })
-  return normalizeStepNumericExponents(stepText)
+  return repo.toPartFile({ name: productName })
 }
 
 export { getCircuitJsonToGltfModule } from "./get-circuit-json-to-gltf-module"
