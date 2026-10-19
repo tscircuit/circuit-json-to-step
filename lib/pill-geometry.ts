@@ -151,12 +151,17 @@ export function rotatePoint({
   }
 }
 
-function createVertexAt(
-  repo: Repository,
-  x: number,
-  y: number,
-  z: number,
-): Ref<VertexPoint> {
+function createVertexAt({
+  repo,
+  x,
+  y,
+  z,
+}: {
+  repo: Repository
+  x: number
+  y: number
+  z: number
+}): Ref<VertexPoint> {
   return repo.add(
     new VertexPoint("", repo.add(new CartesianPoint("", x, y, z))),
   )
@@ -174,17 +179,21 @@ export function createVertexCache(repo: Repository, z: number) {
     const existing = vertices.get(key)
     if (existing) return existing
 
-    const vertex = createVertexAt(repo, x, y, z)
+    const vertex = createVertexAt({ repo, x, y, z })
     vertices.set(key, vertex)
     return vertex
   }
 }
 
-export function createLineEdge(
-  repo: Repository,
-  v1: Ref<VertexPoint>,
-  v2: Ref<VertexPoint>,
-): Ref<EdgeCurve> {
+export function createLineEdge({
+  repo,
+  v1,
+  v2,
+}: {
+  repo: Repository
+  v1: Ref<VertexPoint>
+  v2: Ref<VertexPoint>
+}): Ref<EdgeCurve> {
   const p1 = v1.resolve(repo).pnt.resolve(repo)
   const p2 = v2.resolve(repo).pnt.resolve(repo)
   const dx = p2.x - p1.x
@@ -209,17 +218,22 @@ export function createLineEdge(
   return repo.add(new EdgeCurve("", v1, v2, line, true))
 }
 
-function createLineSegment(
-  repo: Repository,
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-  getVertex: (x: number, y: number) => Ref<VertexPoint>,
-): PillBoundarySegment {
+function createLineSegment({
+  repo,
+  start,
+  end,
+  getVertex,
+}: {
+  repo: Repository
+  start: { x: number; y: number }
+  end: { x: number; y: number }
+  getVertex: (x: number, y: number) => Ref<VertexPoint>
+}): PillBoundarySegment {
   const startVertex = getVertex(start.x, start.y)
   const endVertex = getVertex(end.x, end.y)
   return {
     kind: "line",
-    edge: createLineEdge(repo, startVertex, endVertex),
+    edge: createLineEdge({ repo, v1: startVertex, v2: endVertex }),
     start: startVertex,
     end: endVertex,
   }
@@ -301,11 +315,15 @@ export function createArcSegment({
   }
 }
 
-function createPillBoundarySegments(
-  repo: Repository,
-  hole: PillHole,
-  z: number,
-): PillBoundarySegment[] {
+function createPillBoundarySegments({
+  repo,
+  hole,
+  z,
+}: {
+  repo: Repository
+  hole: PillHole
+  z: number
+}): PillBoundarySegment[] {
   const geom = getPillGeometry(hole)
   const {
     centerX,
@@ -333,16 +351,16 @@ function createPillBoundarySegments(
         rotationCenterY: centerY,
         getVertex,
       }),
-      createLineSegment(
+      createLineSegment({
         repo,
-        rotatePoint({
+        start: rotatePoint({
           x: centerX + capOffset,
           y: centerY - radius,
           centerX,
           centerY,
           ccwRotationRadians,
         }),
-        rotatePoint({
+        end: rotatePoint({
           x: centerX - capOffset,
           y: centerY - radius,
           centerX,
@@ -350,7 +368,7 @@ function createPillBoundarySegments(
           ccwRotationRadians,
         }),
         getVertex,
-      ),
+      }),
       createArcSegment({
         repo,
         centerX: centerX - capOffset,
@@ -364,16 +382,16 @@ function createPillBoundarySegments(
         rotationCenterY: centerY,
         getVertex,
       }),
-      createLineSegment(
+      createLineSegment({
         repo,
-        rotatePoint({
+        start: rotatePoint({
           x: centerX - capOffset,
           y: centerY + radius,
           centerX,
           centerY,
           ccwRotationRadians,
         }),
-        rotatePoint({
+        end: rotatePoint({
           x: centerX + capOffset,
           y: centerY + radius,
           centerX,
@@ -381,7 +399,7 @@ function createPillBoundarySegments(
           ccwRotationRadians,
         }),
         getVertex,
-      ),
+      }),
     ]
   }
 
@@ -399,16 +417,16 @@ function createPillBoundarySegments(
       rotationCenterY: centerY,
       getVertex,
     }),
-    createLineSegment(
+    createLineSegment({
       repo,
-      rotatePoint({
+      start: rotatePoint({
         x: centerX + radius,
         y: centerY - capOffset,
         centerX,
         centerY,
         ccwRotationRadians,
       }),
-      rotatePoint({
+      end: rotatePoint({
         x: centerX + radius,
         y: centerY + capOffset,
         centerX,
@@ -416,7 +434,7 @@ function createPillBoundarySegments(
         ccwRotationRadians,
       }),
       getVertex,
-    ),
+    }),
     createArcSegment({
       repo,
       centerX,
@@ -430,16 +448,16 @@ function createPillBoundarySegments(
       rotationCenterY: centerY,
       getVertex,
     }),
-    createLineSegment(
+    createLineSegment({
       repo,
-      rotatePoint({
+      start: rotatePoint({
         x: centerX - radius,
         y: centerY + capOffset,
         centerX,
         centerY,
         ccwRotationRadians,
       }),
-      rotatePoint({
+      end: rotatePoint({
         x: centerX - radius,
         y: centerY - capOffset,
         centerX,
@@ -447,7 +465,7 @@ function createPillBoundarySegments(
         ccwRotationRadians,
       }),
       getVertex,
-    ),
+    }),
   ]
 }
 
@@ -477,15 +495,21 @@ export function createLoopFromSegments({
   )
 }
 
-export function createPillHoleGeometry(
-  repo: Repository,
-  hole: PillHole,
-  zMin: number,
-  zMax: number,
-  zDir: Ref<Direction>,
-): PillHoleGeometry {
-  const bottomSegments = createPillBoundarySegments(repo, hole, zMin)
-  const topSegments = createPillBoundarySegments(repo, hole, zMax)
+export function createPillHoleGeometry({
+  repo,
+  hole,
+  zMin,
+  zMax,
+  zDir,
+}: {
+  repo: Repository
+  hole: PillHole
+  zMin: number
+  zMax: number
+  zDir: Ref<Direction>
+}): PillHoleGeometry {
+  const bottomSegments = createPillBoundarySegments({ repo, hole, z: zMin })
+  const topSegments = createPillBoundarySegments({ repo, hole, z: zMax })
   const bottomLoop = createLoopFromSegments({ repo, segments: bottomSegments })
   const topLoop = createLoopFromSegments({ repo, segments: topSegments })
   const wallFaces = createWallFaces({
@@ -522,7 +546,11 @@ export function createWallFaces({
     const existing = verticalEdges.get(key)
     if (existing) return existing
 
-    const edge = createLineEdge(repo, bottomVertex, topVertex)
+    const edge = createLineEdge({
+      repo,
+      v1: bottomVertex,
+      v2: topVertex,
+    })
     verticalEdges.set(key, edge)
     return edge
   }
