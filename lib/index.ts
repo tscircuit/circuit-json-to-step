@@ -346,20 +346,24 @@ export async function circuitJsonToStep(
   for (let i = 0; i < bottomVertices.length; i++) {
     const v1 = bottomVertices[i]!
     const v2 = bottomVertices[(i + 1) % bottomVertices.length]!
-    bottomEdges.push(createLineEdge(repo, v1, v2))
+    bottomEdges.push(createLineEdge({ repo, v1, v2 }))
   }
 
   // Top edges (connect vertices in a loop)
   for (let i = 0; i < topVertices.length; i++) {
     const v1 = topVertices[i]!
     const v2 = topVertices[(i + 1) % topVertices.length]!
-    topEdges.push(createLineEdge(repo, v1, v2))
+    topEdges.push(createLineEdge({ repo, v1, v2 }))
   }
 
   // Vertical edges (connect bottom to top)
   for (let i = 0; i < bottomVertices.length; i++) {
     verticalEdges.push(
-      createLineEdge(repo, bottomVertices[i]!, topVertices[i]!),
+      createLineEdge({
+        repo,
+        v1: bottomVertices[i]!,
+        v2: topVertices[i]!,
+      }),
     )
   }
 
@@ -418,26 +422,26 @@ export async function circuitJsonToStep(
       }
     } else if (holeShape === "rotated_pill" || holeShape === "pill") {
       sharedHoleGeometries.push(
-        createPillHoleGeometry(
+        createPillHoleGeometry({
           repo,
           hole,
-          -halfBoardThickness,
-          halfBoardThickness,
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
           zDir,
-        ),
+        }),
       )
     } else if (holeShape === "oval" && hole.type === "pcb_plated_hole") {
       // pcb_plated_hole with shape "oval" has no hole_shape, so it reaches here
       // on `shape` alone. Gated to plated holes: the non-plated oval variant
       // falls through today and routing it would change pcb_hole output.
       sharedHoleGeometries.push(
-        createPillHoleGeometry(
+        createPillHoleGeometry({
           repo,
           hole,
-          -halfBoardThickness,
-          halfBoardThickness,
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
           zDir,
-        ),
+        }),
       )
     }
   }
