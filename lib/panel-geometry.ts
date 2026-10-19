@@ -177,12 +177,18 @@ function capsule(hole: Hole): Ring {
     points,
     geom.centerX,
     geom.centerY,
-    geom.rotation + (geom.isHorizontal ? 0 : Math.PI / 2),
+    geom.ccwRotationRadians + (geom.isHorizontal ? 0 : Math.PI / 2),
   )
 }
 function place(points: Point[], x: number, y: number, rotation: number): Ring {
   return points.map(([a, b]): Point => {
-    const point = rotatePoint(a, b, 0, 0, rotation)
+    const point = rotatePoint({
+      x: a,
+      y: b,
+      centerX: 0,
+      centerY: 0,
+      ccwRotationRadians: rotation,
+    })
     return [x + point.x, y + point.y]
   })
 }
