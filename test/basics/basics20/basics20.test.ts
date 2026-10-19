@@ -34,11 +34,35 @@ test("basics20: nested imported STEP assemblies fail explicitly and repeated mod
       cad_component_id: "copy",
       position: { x: 10, y: 0, z: 0 },
     })
+    repeated.push(
+      {
+        type: "source_component",
+        source_component_id: "logo",
+        name: "LOGO",
+        ftype: "simple_chip",
+      },
+      {
+        type: "pcb_component",
+        pcb_component_id: "logo_pcb",
+        source_component_id: "logo",
+        center: { x: 0, y: 10 },
+        width: 1,
+        height: 1,
+        layer: "top",
+        rotation: 0,
+        obstructs_within_bounds: false,
+      },
+    )
     const exported = await circuitJsonToStep(repeated, {
       exportMode: "assembly",
     })
     expect(exported.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g)).toHaveLength(2)
+    expect(exported.match(/= MANIFOLD_SOLID_BREP\(/g)).toHaveLength(1)
     expect(requests).toBe(1)
+    await expect(exported).toMatchStepSnapshot(
+      import.meta.path,
+      "repeated-step-models",
+    )
   } finally {
     globalThis.fetch = originalFetch
   }

@@ -45,7 +45,6 @@ import {
   toRadians,
   transformDirection,
 } from "./step-model-merger/vector-utils"
-import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
 
 /** Export all CAD parts and the PCB as distinct named children of one STEP assembly. */
@@ -263,15 +262,17 @@ export async function circuitJsonToAssemblyStep(
     )
   }
 
-  const coveredPcbIds = new Set<string>()
   const stepContents = new Map(Object.entries(fsMap ?? {}))
   const validatedStepModels = new Set<string>()
+  const importedStepModels = new Map<
+    string,
+    ReturnType<typeof importStepModelGeometry>
+  >()
   for (const model of models) {
     const part = parts.find(
       (item) => item.source_component_id === model.source_component_id,
     )
     const name = part?.name ?? model.cad_component_id
-    if (model.pcb_component_id) coveredPcbIds.add(model.pcb_component_id)
     if (model.model_jscad) {
       const modelOrigin = asVector3(model.model_origin_position)
       const scale = model.model_unit_to_mm_scale_factor ?? 1
@@ -334,15 +335,22 @@ export async function circuitJsonToAssemblyStep(
         model.model_origin_position ||
         model.model_unit_to_mm_scale_factor !== undefined
       ) {
-        const imported = importStepModelGeometry(repo, geometry, name)
-        if (imported.solids.length === 0)
-          throw new Error(`Part "${name}" has no solid geometry to export`)
-        imported.representation.resolve(repo).items.unshift(imported.origin)
-        transformStepGeometry(
-          imported.entries,
-          asVector3(model.model_origin_position),
-          model.model_unit_to_mm_scale_factor ?? 1,
-        )
+        const modelOrigin = asVector3(model.model_origin_position)
+        const scale = model.model_unit_to_mm_scale_factor ?? 1
+        const modelKey = JSON.stringify([
+          model.model_step_url,
+          modelOrigin,
+          scale,
+        ])
+        let imported = importedStepModels.get(modelKey)
+        if (!imported) {
+          imported = importStepModelGeometry(repo, geometry, name)
+          if (imported.solids.length === 0)
+            throw new Error(`Part "${name}" has no solid geometry to export`)
+          imported.representation.resolve(repo).items.unshift(imported.origin)
+          transformStepGeometry(imported.entries, modelOrigin, scale)
+          importedStepModels.set(modelKey, imported)
+        }
         addChild(
           model.cad_component_id,
           name,
@@ -385,26 +393,13 @@ export async function circuitJsonToAssemblyStep(
       hasExternalMesh || part?.ftype === "printedpart",
     )
   }
-  for (const component of pcbComponents) {
-    if (coveredPcbIds.has(component.pcb_component_id)) continue
-    const name =
-      parts.find(
-        (part) => part.source_component_id === component.source_component_id,
-      )?.name ?? component.pcb_component_id
-    const componentJson = circuitJson.filter((item) =>
-      item.type === "cad_component"
-        ? false
-        : item.type === "pcb_component"
-          ? item.pcb_component_id === component.pcb_component_id
-          : true,
-    )
-    await addMeshChildren(componentJson, component.pcb_component_id, name)
-  }
+  // Footprints without cad_components (e.g. silkscreen logos and mounting
+  // holes) have no body in the 3D viewer. Their PCB geometry is already above.
   if (representation.resolve(repo).items.length === 1) {
     throw new Error("No assembly geometry found to export")
   }
 
-  return normalizeStepNumericExponents(repo.toPartFile({ name: productName }))
+  return repo.toPartFile({ name: productName })
 
   async function addMeshChildren(
     componentJson: CircuitJson,
