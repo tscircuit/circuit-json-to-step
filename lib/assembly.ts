@@ -217,7 +217,7 @@ export async function circuitJsonToAssemblyStep(
     rotation?: { x: number; y: number; z: number },
     color?: [number, number, number],
   ) => {
-    const imported = importStepModelGeometry(repo, geometry, name)
+    const imported = importStepModelGeometry(repo, geometry, name, { context })
     if (imported.solids.length === 0) {
       throw new Error(`Part "${name}" has no solid geometry to export`)
     }
@@ -266,7 +266,10 @@ export async function circuitJsonToAssemblyStep(
   const validatedStepModels = new Set<string>()
   const importedStepModels = new Map<
     string,
-    ReturnType<typeof importStepModelGeometry>
+    Pick<
+      ReturnType<typeof importStepModelGeometry>,
+      "origin" | "representation"
+    >
   >()
   for (const model of models) {
     const part = parts.find(
@@ -316,20 +319,6 @@ export async function circuitJsonToAssemblyStep(
         geometry = await readStepFile(model.model_step_url)
         stepContents.set(model.model_step_url, geometry)
       }
-      if (!validatedStepModels.has(model.model_step_url)) {
-        if (
-          parseRepository(geometry)
-            .entries()
-            .some(
-              ([, entity]) => entity.type === "NEXT_ASSEMBLY_USAGE_OCCURRENCE",
-            )
-        ) {
-          throw new Error(
-            `Part "${name}" uses a nested STEP assembly, which is not supported for assembly export`,
-          )
-        }
-        validatedStepModels.add(model.model_step_url)
-      }
       if (
         !model.pcb_component_id ||
         model.model_origin_position ||
@@ -344,11 +333,20 @@ export async function circuitJsonToAssemblyStep(
         ])
         let imported = importedStepModels.get(modelKey)
         if (!imported) {
-          imported = importStepModelGeometry(repo, geometry, name)
-          if (imported.solids.length === 0)
+          const geometryModel = importStepModelGeometry(repo, geometry, name, {
+            context,
+            rejectAssemblies: true,
+          })
+          if (geometryModel.solids.length === 0)
             throw new Error(`Part "${name}" has no solid geometry to export`)
-          imported.representation.resolve(repo).items.unshift(imported.origin)
-          transformStepGeometry(imported.entries, modelOrigin, scale)
+          geometryModel.representation
+            .resolve(repo)
+            .items.unshift(geometryModel.origin)
+          transformStepGeometry(geometryModel.entries, modelOrigin, scale)
+          imported = {
+            origin: geometryModel.origin,
+            representation: geometryModel.representation,
+          }
           importedStepModels.set(modelKey, imported)
         }
         addChild(
@@ -360,6 +358,20 @@ export async function circuitJsonToAssemblyStep(
           asVector3(model.rotation),
         )
         continue
+      }
+      if (!validatedStepModels.has(model.model_step_url)) {
+        if (
+          parseRepository(geometry)
+            .entries()
+            .some(
+              ([, entity]) => entity.type === "NEXT_ASSEMBLY_USAGE_OCCURRENCE",
+            )
+        ) {
+          throw new Error(
+            `Part "${name}" uses a nested STEP assembly, which is not supported for assembly export`,
+          )
+        }
+        validatedStepModels.add(model.model_step_url)
       }
       const result = await mergeExternalStepModels({
         repo,
