@@ -19,7 +19,7 @@
     "prepare": "bun install --frozen-lockfile --ignore-scripts && bun run build"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.8",
+    "@biomejs/biome": "2.5.15",
     "@resvg/resvg-js": "^2.6.2",
     "@resvg/resvg-wasm": "^2.6.2",
     "@tscircuit/circuit-json-util": "^0.0.75",

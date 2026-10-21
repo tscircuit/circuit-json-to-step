@@ -49,6 +49,7 @@ import {
 import { VERSION } from "./version"
 import { createLineEdge, createPillHoleGeometry } from "./pill-geometry"
 import { createCircularHoleGeometry } from "./circular-hole-geometry"
+import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
 
@@ -420,6 +421,15 @@ export async function circuitJsonToStep(
       if (circularGeometry) {
         sharedHoleGeometries.push(circularGeometry)
       }
+    } else if (hole.type === "pcb_hole" && hole.hole_shape === "rect") {
+      sharedHoleGeometries.push(
+        createRectangularHoleGeometry({
+          repo,
+          hole,
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
+        }),
+      )
     } else if (holeShape === "rotated_pill" || holeShape === "pill") {
       sharedHoleGeometries.push(
         createPillHoleGeometry({
