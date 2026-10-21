@@ -97,6 +97,11 @@ test("imported STEP models preserve CAD color overrides", async () => {
   expect(sourceFaceColors).toContainEqual([0, 1, 0])
   expect(sourceFaceColors).toContainEqual([0, 1, 1])
 
+  await expect(multicolorCase).toMatchStepSnapshot(
+    import.meta.path,
+    "imported-step-color-override-source",
+  )
+
   const step = await circuitJsonToStep(circuitJson as CircuitJson, {
     fsMap: { "./blue-case.step": multicolorCase },
   })
