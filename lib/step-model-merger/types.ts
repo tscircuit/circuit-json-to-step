@@ -6,6 +6,7 @@ export type CadComponent = {
   cad_component_id?: string
   pcb_component_id?: string
   model_step_url?: string
+  color?: string
   position?: { x?: number; y?: number; z?: number }
   rotation?: { x?: number; y?: number; z?: number }
 }
