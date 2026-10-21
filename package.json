@@ -22,7 +22,7 @@
     "@biomejs/biome": "2.5.15",
     "@resvg/resvg-js": "^2.6.2",
     "@resvg/resvg-wasm": "^2.6.2",
-    "@tscircuit/circuit-json-util": "^0.0.123",
+    "@tscircuit/circuit-json-util": "^0.0.75",
     "@types/bun": "latest",
     "circuit-json": "^0.0.525",
     "circuit-to-svg": "^0.0.356",
@@ -30,7 +30,6 @@
     "occt-import-js": "^0.0.23",
     "poppygl": "^0.0.24",
     "schematic-symbols": "^0.0.221",
-    "tscircuit": "0.0.2983",
     "tsup": "^8.5.0"
   },
   "peerDependencies": {
