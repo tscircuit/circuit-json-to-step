@@ -53,6 +53,8 @@ export function generatePanelSolids({
         shape === "circular_hole_with_rect_pad"
       ) {
         cuts.push([circle(x, y, hole.hole_diameter / 2)])
+      } else if (shape === "rect" && item.type === "pcb_hole") {
+        cuts.push([rectangle(x, y, hole.hole_width, hole.hole_height)])
       } else throw new Error(`Unsupported panel hole shape: ${shape}`)
     }
     if (item.type === "pcb_cutout" && !item.pcb_board_id) {
