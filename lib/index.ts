@@ -428,7 +428,6 @@ export async function circuitJsonToStep(
           hole,
           zMin: -halfBoardThickness,
           zMax: halfBoardThickness,
-          zDir,
         }),
       )
     } else if (holeShape === "rotated_pill" || holeShape === "pill") {

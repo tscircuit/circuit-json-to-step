@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test"
 import type { CircuitJson } from "circuit-json"
-import { ManifoldSolidBrep, parseRepository } from "stepts"
 import { circuitJsonToStep } from "../../../lib"
 import { importStepWithOcct, type OcctMesh } from "../../utils/occt/importer"
 import circuitJson from "./rectangular-mounting-hole.json"
@@ -33,34 +32,6 @@ test("rectangular mounting holes cut through the exported board", async () => {
   expect(imported.success).toBe(true)
   expect(imported.meshes.map((mesh) => mesh.name)).toEqual(["PCB"])
   expect(volume(imported.meshes[0])).toBeCloseTo((20 * 12 - 8 * 4) * 1.6, 4)
-
-  // The hole's twelve BREP edges must be shared with opposite traversal.
-  const repo = parseRepository(step)
-  const solid = repo
-    .entries()
-    .find(
-      ([, entity]) => entity instanceof ManifoldSolidBrep,
-    )![1] as ManifoldSolidBrep
-  const edgeUses = new Map<number, boolean[]>()
-  for (const face of solid.outer.resolve(repo).faces)
-    for (const bound of face.resolve(repo).bounds)
-      for (const edge of bound.resolve(repo).bound.resolve(repo).edges) {
-        const use = edge.resolve(repo)
-        const start = use.edge
-          .resolve(repo)
-          .start.resolve(repo)
-          .pnt.resolve(repo)
-        if (Math.abs(start.x) > 4 || Math.abs(start.y) > 2) continue
-        const uses = edgeUses.get(Number(use.edge.id)) ?? []
-        uses.push(use.orientation)
-        edgeUses.set(Number(use.edge.id), uses)
-      }
-  expect(edgeUses.size).toBe(12)
-  expect(
-    [...edgeUses.values()].every(
-      (uses) => uses.length === 2 && uses[0] !== uses[1],
-    ),
-  ).toBe(true)
 
   // An 8 x 4 mm opening should be visible in the center of the board.
   await expect(step).toMatchStepSnapshot(

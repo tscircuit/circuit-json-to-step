@@ -218,7 +218,7 @@ export function createLineEdge({
   return repo.add(new EdgeCurve("", v1, v2, line, true))
 }
 
-export function createLineSegment({
+function createLineSegment({
   repo,
   start,
   end,

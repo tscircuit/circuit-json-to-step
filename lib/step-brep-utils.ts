@@ -53,27 +53,32 @@ function createEdge(
   return repo.add(new EdgeCurve("", vStart, vEnd, line, true))
 }
 
+export function createLoopFromVertices(
+  repo: Repository,
+  vertices: Ref<VertexPoint>[],
+  sharedEdges?: Map<string, Ref<EdgeCurve>>,
+): Ref<EdgeLoop> {
+  const edges = vertices.map((vertex, index) => {
+    const next = vertices[(index + 1) % vertices.length]!
+    const key = [Number(vertex.id), Number(next.id)]
+      .sort((a, b) => a - b)
+      .join(":")
+    const edge = sharedEdges?.get(key) ?? createEdge(repo, vertex, next)
+    sharedEdges?.set(key, edge)
+    return repo.add(
+      new OrientedEdge("", edge, edge.resolve(repo).start.id === vertex.id),
+    )
+  })
+  return repo.add(new EdgeLoop("", edges))
+}
+
 export function createFaceFromVertices(
   repo: Repository,
   vertices: Ref<VertexPoint>[],
   sharedEdges?: Map<string, Ref<EdgeCurve>>,
   holes: Ref<VertexPoint>[][] = [],
 ): Ref<AdvancedFace> {
-  const createLoop = (loop: Ref<VertexPoint>[]) => {
-    const edges = loop.map((vertex, index) => {
-      const next = loop[(index + 1) % loop.length]!
-      const key = [Number(vertex.id), Number(next.id)]
-        .sort((a, b) => a - b)
-        .join(":")
-      const edge = sharedEdges?.get(key) ?? createEdge(repo, vertex, next)
-      sharedEdges?.set(key, edge)
-      return repo.add(
-        new OrientedEdge("", edge, edge.resolve(repo).start.id === vertex.id),
-      )
-    })
-    return repo.add(new EdgeLoop("", edges))
-  }
-  const edgeLoop = createLoop(vertices)
+  const edgeLoop = createLoopFromVertices(repo, vertices, sharedEdges)
 
   const p1 = vertices[0]!.resolve(repo).pnt.resolve(repo)
   const p2 = vertices[1]!.resolve(repo).pnt.resolve(repo)
@@ -127,7 +132,13 @@ export function createFaceFromVertices(
       [
         repo.add(new FaceOuterBound("", edgeLoop, true)),
         ...holes.map((hole) =>
-          repo.add(new FaceBound("", createLoop(hole), true)),
+          repo.add(
+            new FaceBound(
+              "",
+              createLoopFromVertices(repo, hole, sharedEdges),
+              true,
+            ),
+          ),
         ),
       ],
       plane,

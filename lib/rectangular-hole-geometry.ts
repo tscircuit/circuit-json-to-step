@@ -1,12 +1,11 @@
 import type { PcbHoleRect } from "circuit-json"
-import type { Direction, Ref, Repository } from "stepts"
+import type { EdgeCurve, Ref, Repository } from "stepts"
+import { coordinateOf } from "./pill-geometry"
 import {
-  coordinateOf,
-  createLineSegment,
-  createLoopFromSegments,
-  createVertexCache,
-  createWallFaces,
-} from "./pill-geometry"
+  createFaceFromVertices,
+  createLoopFromVertices,
+  createVertex,
+} from "./step-brep-utils"
 
 /** Cut an axis-aligned rectangle through zMin..zMax in board-space mm. */
 export function createRectangularHoleGeometry({
@@ -14,13 +13,11 @@ export function createRectangularHoleGeometry({
   hole,
   zMin,
   zMax,
-  zDir,
 }: {
   repo: Repository
   hole: PcbHoleRect
   zMin: number
   zMax: number
-  zDir: Ref<Direction>
 }) {
   const x = coordinateOf(hole.x)
   const y = coordinateOf(hole.y)
@@ -33,32 +30,21 @@ export function createRectangularHoleGeometry({
     { x: x + halfWidth, y: y + halfHeight },
     { x: x + halfWidth, y: y - halfHeight },
   ]
-  const boundary = (z: number) => {
-    const getVertex = createVertexCache(repo, z)
-    return corners.map((start, index) =>
-      createLineSegment({
-        repo,
-        start,
-        end: corners[(index + 1) % corners.length],
-        getVertex,
-      }),
-    )
-  }
-  const bottomSegments = boundary(zMin)
-  const topSegments = boundary(zMax)
+  const bottom = corners.map((point) =>
+    createVertex(repo, { ...point, z: zMin }),
+  )
+  const top = corners.map((point) => createVertex(repo, { ...point, z: zMax }))
+  const edges = new Map<string, Ref<EdgeCurve>>()
   return {
-    bottomLoop: createLoopFromSegments({
-      repo,
-      segments: bottomSegments,
-      reversed: true,
-    }),
-    topLoop: createLoopFromSegments({ repo, segments: topSegments }),
-    wallFaces: createWallFaces({
-      repo,
-      bottomSegments,
-      topSegments,
-      zMin,
-      zDir,
+    bottomLoop: createLoopFromVertices(repo, [...bottom].reverse(), edges),
+    topLoop: createLoopFromVertices(repo, top, edges),
+    wallFaces: bottom.map((vertex, index) => {
+      const next = (index + 1) % bottom.length
+      return createFaceFromVertices(
+        repo,
+        [vertex, bottom[next], top[next], top[index]],
+        edges,
+      )
     }),
   }
 }
