@@ -330,12 +330,14 @@ export async function circuitJsonToAssemblyStep(
           model.model_step_url,
           modelOrigin,
           scale,
+          model.color,
         ])
         let imported = importedStepModels.get(modelKey)
         if (!imported) {
           const geometryModel = importStepModelGeometry(repo, geometry, name, {
             context,
             rejectAssemblies: true,
+            color: model.color,
           })
           if (geometryModel.solids.length === 0)
             throw new Error(`Part "${name}" has no solid geometry to export`)
