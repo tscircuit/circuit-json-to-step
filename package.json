@@ -1,7 +1,7 @@
 {
   "name": "circuit-json-to-step",
   "main": "dist/index.js",
-  "version": "0.0.58",
+  "version": "0.0.60",
   "repository": {
     "type": "git",
     "url": "https://github.com/tscircuit/circuit-json-to-step.git"
