@@ -1,5 +1,4 @@
 This project converts circuit json to step using `circuit-json` and `stepts` modules
-
 - Use `bun` for all tests/scripts
 - Create tests in `test/*` and use `import { test, expect } from 'bun:test'
 - One test per file
