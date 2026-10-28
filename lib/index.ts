@@ -52,6 +52,11 @@ import { createCircularHoleGeometry } from "./circular-hole-geometry"
 import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
+import {
+  applyCutoutsToBoardOutline,
+  createHoleGeometryFromSegments,
+  getCutoutBoundarySegments,
+} from "./cutout-geometry"
 
 type Hole = Extract<
   CircuitJson[number],
@@ -168,6 +173,7 @@ export async function circuitJsonToStep(
     (item): item is RuntimeHole =>
       item.type === "pcb_hole" || item.type === "pcb_plated_hole",
   )
+  const cutouts = circuitJson.filter((item) => item.type === "pcb_cutout")
 
   // Get dimensions from pcb_board or options
   const boardWidth = options.boardWidth ?? pcbBoard?.width
@@ -252,8 +258,7 @@ export async function circuitJsonToStep(
 
   // Create board vertices based on outline or rectangular shape
   const outline = pcbBoard?.outline
-  let bottomVertices: Ref<VertexPoint>[]
-  let topVertices: Ref<VertexPoint>[]
+  let boardOutline: { x: number; y: number }[]
 
   if (outline && Array.isArray(outline) && outline.length >= 3) {
     // Circuit JSON outline points are already in world coordinates.
@@ -277,66 +282,33 @@ export async function circuitJsonToStep(
       )
     }
 
-    bottomVertices = cleanedOutline.map((point) =>
-      repo.add(
-        new VertexPoint(
-          "",
-          repo.add(
-            new CartesianPoint("", point.x, point.y, -halfBoardThickness),
-          ),
-        ),
-      ),
-    )
-    topVertices = cleanedOutline.map((point) =>
-      repo.add(
-        new VertexPoint(
-          "",
-          repo.add(
-            new CartesianPoint("", point.x, point.y, halfBoardThickness),
-          ),
-        ),
-      ),
-    )
+    boardOutline = cleanedOutline
   } else {
     // Fall back to rectangular shape centered at (boardCenterX, boardCenterY)
     const halfWidth = boardWidth / 2
     const halfHeight = boardHeight / 2
-    const corners = [
-      [
-        boardCenterX - halfWidth,
-        boardCenterY - halfHeight,
-        -halfBoardThickness,
-      ],
-      [
-        boardCenterX + halfWidth,
-        boardCenterY - halfHeight,
-        -halfBoardThickness,
-      ],
-      [
-        boardCenterX + halfWidth,
-        boardCenterY + halfHeight,
-        -halfBoardThickness,
-      ],
-      [
-        boardCenterX - halfWidth,
-        boardCenterY + halfHeight,
-        -halfBoardThickness,
-      ],
-      [boardCenterX - halfWidth, boardCenterY - halfHeight, halfBoardThickness],
-      [boardCenterX + halfWidth, boardCenterY - halfHeight, halfBoardThickness],
-      [boardCenterX + halfWidth, boardCenterY + halfHeight, halfBoardThickness],
-      [boardCenterX - halfWidth, boardCenterY + halfHeight, halfBoardThickness],
+    boardOutline = [
+      { x: boardCenterX - halfWidth, y: boardCenterY - halfHeight },
+      { x: boardCenterX + halfWidth, y: boardCenterY - halfHeight },
+      { x: boardCenterX + halfWidth, y: boardCenterY + halfHeight },
+      { x: boardCenterX - halfWidth, y: boardCenterY + halfHeight },
     ]
-    const vertices = corners.map(([x, y, z]) =>
-      repo.add(
-        new VertexPoint("", repo.add(new CartesianPoint("", x!, y!, z!))),
-      ),
-    )
-    bottomVertices = [vertices[0]!, vertices[1]!, vertices[2]!, vertices[3]!]
-    topVertices = [vertices[4]!, vertices[5]!, vertices[6]!, vertices[7]!]
   }
 
-  // Helper to create edge between vertices
+  const { outline: cutBoardOutline, internalCutouts } =
+    applyCutoutsToBoardOutline({ outline: boardOutline, cutouts })
+
+  const createOutlineVertices = (z: number) =>
+    cutBoardOutline.map((point) =>
+      repo.add(
+        new VertexPoint(
+          "",
+          repo.add(new CartesianPoint("", point.x, point.y, z)),
+        ),
+      ),
+    )
+  const bottomVertices = createOutlineVertices(-halfBoardThickness)
+  const topVertices = createOutlineVertices(halfBoardThickness)
 
   // Create board edges
   const bottomEdges: Ref<EdgeCurve>[] = []
@@ -451,6 +423,38 @@ export async function circuitJsonToStep(
           zMin: -halfBoardThickness,
           zMax: halfBoardThickness,
           zDir,
+        }),
+      )
+    }
+  }
+
+  // pcb_cutouts remove board material just like holes do
+  for (const cutout of internalCutouts) {
+    if (cutout.shape === "circle") {
+      const circularGeometry = createCircularHoleGeometry({
+        repo,
+        hole: {
+          x: cutout.center.x,
+          y: cutout.center.y,
+          hole_diameter: cutout.radius * 2,
+        },
+        zMin: -halfBoardThickness,
+        zMax: halfBoardThickness,
+        zDir,
+      })
+      if (circularGeometry) {
+        sharedHoleGeometries.push(circularGeometry)
+      }
+      continue
+    }
+    const segments = getCutoutBoundarySegments(cutout)
+    if (segments?.length) {
+      sharedHoleGeometries.push(
+        createHoleGeometryFromSegments({
+          repo,
+          segments,
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
         }),
       )
     }
