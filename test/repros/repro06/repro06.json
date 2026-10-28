@@ -10,37 +10,29 @@
   {
     "type": "pcb_cutout",
     "pcb_cutout_id": "pcb_cutout_1",
-    "shape": "rect",
-    "center": { "x": -11, "y": 4 },
-    "width": 14,
-    "height": 3,
-    "rotation": 30,
-    "corner_radius": 1.5
+    "shape": "circle",
+    "center": { "x": -12, "y": 0 },
+    "radius": 4
   },
   {
     "type": "pcb_cutout",
     "pcb_cutout_id": "pcb_cutout_2",
     "shape": "rect",
-    "center": { "x": 11, "y": -4 },
-    "width": 10,
-    "height": 8,
-    "corner_radius": 2
+    "center": { "x": 0, "y": 0 },
+    "width": 8,
+    "height": 5,
+    "rotation": 30
   },
   {
     "type": "pcb_cutout",
     "pcb_cutout_id": "pcb_cutout_3",
-    "shape": "rect",
-    "center": { "x": -11, "y": -8 },
-    "width": 6,
-    "height": 6,
-    "corner_radius": 10
-  },
-  {
-    "type": "pcb_cutout",
-    "pcb_cutout_id": "pcb_cutout_4",
-    "shape": "rect",
-    "center": { "x": 0, "y": 12 },
-    "width": 8,
-    "height": 0
+    "shape": "polygon",
+    "points": [
+      { "x": 8, "y": -5 },
+      { "x": 16, "y": -5 },
+      { "x": 16, "y": 2 },
+      { "x": 12, "y": 6 },
+      { "x": 8, "y": 2 }
+    ]
   }
 ]

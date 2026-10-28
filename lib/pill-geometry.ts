@@ -16,18 +16,35 @@ import {
   VertexPoint,
 } from "stepts"
 
+/** Cache key for a vertex looked up by rounded position, so two arcs that meet
+ * at the same point share one VertexPoint instead of emitting a duplicate. */
+type CachedVertexKey = string
+
+/** Cache key pairing the two vertices a vertical wall edge connects. */
+type VerticalEdgeKey = string
+
+/**
+ * Arcs used to approximate a full circle.
+ *
+ * Two semicircles are enough, because a semicircle is exact. The count does not
+ * buy accuracy: occt tessellates each arc at its own fixed deflection, so the
+ * emitted boundary is subdivided the same way whether this is 2 or 24, and the
+ * wall faces and loop edges are what scale with it.
+ */
+export const fullCircleSegments = 2
+
 export interface PillGeometry {
   centerX: number
   centerY: number
   width: number
   height: number
-  rotation: number
+  ccwRotationRadians: number
   radius: number
   straightHalfLength: number
   isHorizontal: boolean
 }
 
-type PillBoundarySegment =
+export type PillBoundarySegment =
   | {
       kind: "arc"
       edge: Ref<EdgeCurve>
@@ -35,6 +52,8 @@ type PillBoundarySegment =
       end: Ref<VertexPoint>
       centerX: number
       centerY: number
+      refX: number
+      refY: number
       radius: number
     }
   | {
@@ -50,13 +69,49 @@ export interface PillHoleGeometry {
   wallFaces: Ref<AdvancedFace>[]
 }
 
-export function getPillGeometry(hole: any): PillGeometry {
-  const centerX = typeof hole.x === "number" ? hole.x : (hole.x as any).value
-  const centerY = typeof hole.y === "number" ? hole.y : (hole.y as any).value
+/** The pill fields getPillGeometry reads, loosened from the circuit json schema
+ * because a coordinate is typed number | { value } and the drill offset only
+ * exists on the plated pad variants. */
+export interface PillHole {
+  x?: number | { value: number }
+  y?: number | { value: number }
+  hole_width?: number
+  hole_height?: number
+  hole_offset_x?: number
+  hole_offset_y?: number
+  hole_ccw_rotation?: number
+  ccw_rotation?: number
+}
+
+/** Read a circuit json coordinate, which is typed as number or { value }. */
+export function coordinateOf(
+  coordinate: number | { value: number } | undefined,
+): number {
+  if (typeof coordinate === "number") return coordinate
+  return coordinate?.value ?? 0
+}
+
+export function getPillGeometry(hole: PillHole): PillGeometry {
+  const offsetX = hole.hole_offset_x ?? 0
+  const offsetY = hole.hole_offset_y ?? 0
+  const centerX = coordinateOf(hole.x) + offsetX
+  const centerY = coordinateOf(hole.y) + offsetY
+  // A pill hole carries both dimensions by definition, so a missing one means
+  // the record is malformed. The old signature took `hole: any` and read these
+  // untyped, which produced NaN geometry instead of failing; circuit json only
+  // types them as optional because it has to cover pcb_hole and its variants
+  // in one union. Every caller routes here on hole_shape "pill" or "rotated_pill",
+  // which always carries both, so this throw should be unreachable in practice
+  // and exists to keep the type honest rather than to handle a known case.
+  if (hole.hole_width === undefined || hole.hole_height === undefined) {
+    throw new Error("pill hole requires hole_width and hole_height")
+  }
   const width = hole.hole_width
   const height = hole.hole_height
-  const ccwRotation = hole.ccw_rotation ?? 0
-  const rotation = (ccwRotation * Math.PI) / 180
+  // rotated_pill_hole_with_rect_pad names this hole_ccw_rotation; the oval and
+  // polygon pad variants name it ccw_rotation.
+  const ccwRotation = hole.hole_ccw_rotation ?? hole.ccw_rotation ?? 0
+  const ccwRotationRadians = (ccwRotation * Math.PI) / 180
   const isHorizontal = width >= height
   const radius = Math.min(width, height) / 2
   const straightHalfLength = Math.abs(width - height) / 2
@@ -66,22 +121,28 @@ export function getPillGeometry(hole: any): PillGeometry {
     centerY,
     width,
     height,
-    rotation,
+    ccwRotationRadians,
     radius,
     straightHalfLength,
     isHorizontal,
   }
 }
 
-export function rotatePoint(
-  x: number,
-  y: number,
-  centerX: number,
-  centerY: number,
-  angle: number,
-): { x: number; y: number } {
-  const cos = Math.cos(angle)
-  const sin = Math.sin(angle)
+export function rotatePoint({
+  x,
+  y,
+  centerX,
+  centerY,
+  ccwRotationRadians,
+}: {
+  x: number
+  y: number
+  centerX: number
+  centerY: number
+  ccwRotationRadians: number
+}): { x: number; y: number } {
+  const cos = Math.cos(ccwRotationRadians)
+  const sin = Math.sin(ccwRotationRadians)
   const dx = x - centerX
   const dy = y - centerY
   return {
@@ -90,21 +151,26 @@ export function rotatePoint(
   }
 }
 
-function createVertexAt(
-  repo: Repository,
-  x: number,
-  y: number,
-  z: number,
-): Ref<VertexPoint> {
+function createVertexAt({
+  repo,
+  x,
+  y,
+  z,
+}: {
+  repo: Repository
+  x: number
+  y: number
+  z: number
+}): Ref<VertexPoint> {
   return repo.add(
     new VertexPoint("", repo.add(new CartesianPoint("", x, y, z))),
   )
 }
 
-function createVertexCache(repo: Repository, z: number) {
-  const vertices = new Map<string, Ref<VertexPoint>>()
-  const normalize = (value: number) => {
-    const rounded = Number(value.toFixed(9))
+export function createVertexCache(repo: Repository, z: number) {
+  const vertices = new Map<CachedVertexKey, Ref<VertexPoint>>()
+  const normalize = (coordinate: number) => {
+    const rounded = Number(coordinate.toFixed(9))
     return Object.is(rounded, -0) ? 0 : rounded
   }
 
@@ -113,17 +179,21 @@ function createVertexCache(repo: Repository, z: number) {
     const existing = vertices.get(key)
     if (existing) return existing
 
-    const vertex = createVertexAt(repo, x, y, z)
+    const vertex = createVertexAt({ repo, x, y, z })
     vertices.set(key, vertex)
     return vertex
   }
 }
 
-function createLineEdge(
-  repo: Repository,
-  v1: Ref<VertexPoint>,
-  v2: Ref<VertexPoint>,
-): Ref<EdgeCurve> {
+export function createLineEdge({
+  repo,
+  v1,
+  v2,
+}: {
+  repo: Repository
+  v1: Ref<VertexPoint>
+  v2: Ref<VertexPoint>
+}): Ref<EdgeCurve> {
   const p1 = v1.resolve(repo).pnt.resolve(repo)
   const p2 = v2.resolve(repo).pnt.resolve(repo)
   const dx = p2.x - p1.x
@@ -131,69 +201,101 @@ function createLineEdge(
   const dz = p2.z - p1.z
   const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
+  // Handle zero-length edges (duplicate vertices)
   if (length < 1e-10) {
+    // Use arbitrary direction for degenerate edge
     const dir = repo.add(new Direction("", 1, 0, 0))
     const vec = repo.add(new Vector("", dir, 1e-10))
     const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
     return repo.add(new EdgeCurve("", v1, v2, line, true))
   }
 
+  // Direction must be normalized (unit vector)
   const dir = repo.add(new Direction("", dx / length, dy / length, dz / length))
+  // Vector magnitude is the actual edge length
   const vec = repo.add(new Vector("", dir, length))
   const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
   return repo.add(new EdgeCurve("", v1, v2, line, true))
 }
 
-function createLineSegment(
-  repo: Repository,
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-  getVertex: (x: number, y: number) => Ref<VertexPoint>,
-): PillBoundarySegment {
+function createLineSegment({
+  repo,
+  start,
+  end,
+  getVertex,
+}: {
+  repo: Repository
+  start: { x: number; y: number }
+  end: { x: number; y: number }
+  getVertex: (x: number, y: number) => Ref<VertexPoint>
+}): PillBoundarySegment {
   const startVertex = getVertex(start.x, start.y)
   const endVertex = getVertex(end.x, end.y)
   return {
     kind: "line",
-    edge: createLineEdge(repo, startVertex, endVertex),
+    edge: createLineEdge({ repo, v1: startVertex, v2: endVertex }),
     start: startVertex,
     end: endVertex,
   }
 }
 
-function createArcSegment(
-  repo: Repository,
-  centerX: number,
-  centerY: number,
-  z: number,
-  radius: number,
-  startAngle: number,
-  endAngle: number,
-  rotation: number,
-  centerX0: number,
-  centerY0: number,
-  getVertex: (x: number, y: number) => Ref<VertexPoint>,
-): PillBoundarySegment {
-  const start = rotatePoint(
-    centerX + radius * Math.cos(startAngle),
-    centerY + radius * Math.sin(startAngle),
-    centerX0,
-    centerY0,
-    rotation,
-  )
-  const end = rotatePoint(
-    centerX + radius * Math.cos(endAngle),
-    centerY + radius * Math.sin(endAngle),
-    centerX0,
-    centerY0,
-    rotation,
-  )
-  const center = rotatePoint(centerX, centerY, centerX0, centerY0, rotation)
+export function createArcSegment({
+  repo,
+  centerX,
+  centerY,
+  z,
+  radius,
+  startAngle,
+  endAngle,
+  ccwRotationRadians,
+  rotationCenterX,
+  rotationCenterY,
+  getVertex,
+}: {
+  repo: Repository
+  centerX: number
+  centerY: number
+  z: number
+  radius: number
+  startAngle: number
+  endAngle: number
+  ccwRotationRadians: number
+  rotationCenterX: number
+  rotationCenterY: number
+  getVertex: (x: number, y: number) => Ref<VertexPoint>
+}): PillBoundarySegment {
+  const start = rotatePoint({
+    x: centerX + radius * Math.cos(startAngle),
+    y: centerY + radius * Math.sin(startAngle),
+    centerX: rotationCenterX,
+    centerY: rotationCenterY,
+    ccwRotationRadians,
+  })
+  const end = rotatePoint({
+    x: centerX + radius * Math.cos(endAngle),
+    y: centerY + radius * Math.sin(endAngle),
+    centerX: rotationCenterX,
+    centerY: rotationCenterY,
+    ccwRotationRadians,
+  })
+  const center = rotatePoint({
+    x: centerX,
+    y: centerY,
+    centerX: rotationCenterX,
+    centerY: rotationCenterY,
+    ccwRotationRadians,
+  })
   const startVertex = getVertex(start.x, start.y)
   const endVertex = getVertex(end.x, end.y)
   const centerPoint = repo.add(new CartesianPoint("", center.x, center.y, z))
   const normalDir = repo.add(new Direction("", 0, 0, -1))
   const refDir = repo.add(
-    new Direction("", Math.cos(rotation), Math.sin(rotation), 0),
+    new Direction(
+      "",
+      Math.cos(ccwRotationRadians),
+      Math.sin(ccwRotationRadians),
+      0,
+    ),
   )
   const placement = repo.add(
     new Axis2Placement3D("", centerPoint, normalDir, refDir),
@@ -205,24 +307,30 @@ function createArcSegment(
     edge: repo.add(new EdgeCurve("", startVertex, endVertex, circle, false)),
     start: startVertex,
     end: endVertex,
-    centerX,
-    centerY,
+    centerX: center.x,
+    centerY: center.y,
+    refX: Math.cos(ccwRotationRadians),
+    refY: Math.sin(ccwRotationRadians),
     radius,
   }
 }
 
-function createPillBoundarySegments(
-  repo: Repository,
-  hole: any,
-  z: number,
-): PillBoundarySegment[] {
+function createPillBoundarySegments({
+  repo,
+  hole,
+  z,
+}: {
+  repo: Repository
+  hole: PillHole
+  z: number
+}): PillBoundarySegment[] {
   const geom = getPillGeometry(hole)
   const {
     centerX,
     centerY,
     radius,
     straightHalfLength,
-    rotation,
+    ccwRotationRadians,
     isHorizontal,
   } = geom
   const capOffset = straightHalfLength
@@ -230,166 +338,206 @@ function createPillBoundarySegments(
 
   if (isHorizontal) {
     return [
-      createArcSegment(
+      createArcSegment({
         repo,
-        centerX + capOffset,
+        centerX: centerX + capOffset,
         centerY,
         z,
         radius,
-        -Math.PI / 2,
-        Math.PI / 2,
-        rotation,
-        centerX,
-        centerY,
+        startAngle: -Math.PI / 2,
+        endAngle: Math.PI / 2,
+        ccwRotationRadians,
+        rotationCenterX: centerX,
+        rotationCenterY: centerY,
         getVertex,
-      ),
-      createLineSegment(
+      }),
+      createLineSegment({
         repo,
-        rotatePoint(
-          centerX + capOffset,
-          centerY - radius,
+        start: rotatePoint({
+          x: centerX + capOffset,
+          y: centerY - radius,
           centerX,
           centerY,
-          rotation,
-        ),
-        rotatePoint(
-          centerX - capOffset,
-          centerY - radius,
+          ccwRotationRadians,
+        }),
+        end: rotatePoint({
+          x: centerX - capOffset,
+          y: centerY - radius,
           centerX,
           centerY,
-          rotation,
-        ),
+          ccwRotationRadians,
+        }),
         getVertex,
-      ),
-      createArcSegment(
+      }),
+      createArcSegment({
         repo,
-        centerX - capOffset,
+        centerX: centerX - capOffset,
         centerY,
         z,
         radius,
-        Math.PI / 2,
-        (3 * Math.PI) / 2,
-        rotation,
-        centerX,
-        centerY,
+        startAngle: Math.PI / 2,
+        endAngle: (3 * Math.PI) / 2,
+        ccwRotationRadians,
+        rotationCenterX: centerX,
+        rotationCenterY: centerY,
         getVertex,
-      ),
-      createLineSegment(
+      }),
+      createLineSegment({
         repo,
-        rotatePoint(
-          centerX - capOffset,
-          centerY + radius,
+        start: rotatePoint({
+          x: centerX - capOffset,
+          y: centerY + radius,
           centerX,
           centerY,
-          rotation,
-        ),
-        rotatePoint(
-          centerX + capOffset,
-          centerY + radius,
+          ccwRotationRadians,
+        }),
+        end: rotatePoint({
+          x: centerX + capOffset,
+          y: centerY + radius,
           centerX,
           centerY,
-          rotation,
-        ),
+          ccwRotationRadians,
+        }),
         getVertex,
-      ),
+      }),
     ]
   }
 
   return [
-    createArcSegment(
+    createArcSegment({
       repo,
       centerX,
-      centerY - capOffset,
+      centerY: centerY - capOffset,
       z,
       radius,
-      Math.PI,
-      0,
-      rotation,
-      centerX,
-      centerY,
+      startAngle: Math.PI,
+      endAngle: 0,
+      ccwRotationRadians,
+      rotationCenterX: centerX,
+      rotationCenterY: centerY,
       getVertex,
-    ),
-    createLineSegment(
+    }),
+    createLineSegment({
       repo,
-      rotatePoint(
-        centerX + radius,
-        centerY - capOffset,
+      start: rotatePoint({
+        x: centerX + radius,
+        y: centerY - capOffset,
         centerX,
         centerY,
-        rotation,
-      ),
-      rotatePoint(
-        centerX + radius,
-        centerY + capOffset,
+        ccwRotationRadians,
+      }),
+      end: rotatePoint({
+        x: centerX + radius,
+        y: centerY + capOffset,
         centerX,
         centerY,
-        rotation,
-      ),
+        ccwRotationRadians,
+      }),
       getVertex,
-    ),
-    createArcSegment(
+    }),
+    createArcSegment({
       repo,
       centerX,
-      centerY + capOffset,
+      centerY: centerY + capOffset,
       z,
       radius,
-      0,
-      Math.PI,
-      rotation,
-      centerX,
-      centerY,
+      startAngle: 0,
+      endAngle: Math.PI,
+      ccwRotationRadians,
+      rotationCenterX: centerX,
+      rotationCenterY: centerY,
       getVertex,
-    ),
-    createLineSegment(
+    }),
+    createLineSegment({
       repo,
-      rotatePoint(
-        centerX - radius,
-        centerY + capOffset,
+      start: rotatePoint({
+        x: centerX - radius,
+        y: centerY + capOffset,
         centerX,
         centerY,
-        rotation,
-      ),
-      rotatePoint(
-        centerX - radius,
-        centerY - capOffset,
+        ccwRotationRadians,
+      }),
+      end: rotatePoint({
+        x: centerX - radius,
+        y: centerY - capOffset,
         centerX,
         centerY,
-        rotation,
-      ),
+        ccwRotationRadians,
+      }),
       getVertex,
-    ),
+    }),
   ]
 }
 
-function createLoopFromSegments(
-  repo: Repository,
-  segments: PillBoundarySegment[],
-  orientation: boolean,
-): Ref<EdgeLoop> {
+/**
+ * Build a closed loop from a boundary. Setting `reversed` flips the traversal
+ * direction of every edge, which also requires visiting them in reverse order:
+ * flipping orientation alone leaves the chain walking away from where it just
+ * came, so the loop comes out disconnected.
+ */
+export function createLoopFromSegments({
+  repo,
+  segments,
+  reversed = false,
+}: {
+  repo: Repository
+  segments: PillBoundarySegment[]
+  reversed?: boolean
+}): Ref<EdgeLoop> {
+  const ordered = reversed ? [...segments].reverse() : segments
   return repo.add(
     new EdgeLoop(
       "",
-      segments.map((segment) =>
-        repo.add(new OrientedEdge("", segment.edge, orientation)),
+      ordered.map((segment) =>
+        repo.add(new OrientedEdge("", segment.edge, !reversed)),
       ),
     ),
   )
 }
 
-export function createPillHoleGeometry(
-  repo: Repository,
-  hole: any,
-  zMin: number,
-  zMax: number,
-  zDir: Ref<Direction>,
-): PillHoleGeometry {
-  const geom = getPillGeometry(hole)
-  const bottomSegments = createPillBoundarySegments(repo, hole, zMin)
-  const topSegments = createPillBoundarySegments(repo, hole, zMax)
-  const bottomLoop = createLoopFromSegments(repo, bottomSegments, true)
-  const topLoop = createLoopFromSegments(repo, topSegments, true)
+export function createPillHoleGeometry({
+  repo,
+  hole,
+  zMin,
+  zMax,
+  zDir,
+}: {
+  repo: Repository
+  hole: PillHole
+  zMin: number
+  zMax: number
+  zDir: Ref<Direction>
+}): PillHoleGeometry {
+  const bottomSegments = createPillBoundarySegments({ repo, hole, z: zMin })
+  const topSegments = createPillBoundarySegments({ repo, hole, z: zMax })
+  const bottomLoop = createLoopFromSegments({ repo, segments: bottomSegments })
+  const topLoop = createLoopFromSegments({ repo, segments: topSegments })
+  const wallFaces = createWallFaces({
+    repo,
+    bottomSegments,
+    topSegments,
+    zMin,
+    zDir,
+  })
+  return { bottomLoop, topLoop, wallFaces }
+}
+
+/** Sweep a boundary between two z planes; each segment becomes one wall face. */
+export function createWallFaces({
+  repo,
+  bottomSegments,
+  topSegments,
+  zMin,
+  zDir,
+}: {
+  repo: Repository
+  bottomSegments: PillBoundarySegment[]
+  topSegments: PillBoundarySegment[]
+  zMin: number
+  zDir: Ref<Direction>
+}): Ref<AdvancedFace>[] {
   const wallFaces: Ref<AdvancedFace>[] = []
-  const verticalEdges = new Map<string, Ref<EdgeCurve>>()
+  const verticalEdges = new Map<VerticalEdgeKey, Ref<EdgeCurve>>()
   const getVerticalEdge = (
     bottomVertex: Ref<VertexPoint>,
     topVertex: Ref<VertexPoint>,
@@ -398,7 +546,11 @@ export function createPillHoleGeometry(
     const existing = verticalEdges.get(key)
     if (existing) return existing
 
-    const edge = createLineEdge(repo, bottomVertex, topVertex)
+    const edge = createLineEdge({
+      repo,
+      v1: bottomVertex,
+      v2: topVertex,
+    })
     verticalEdges.set(key, edge)
     return edge
   }
@@ -418,18 +570,16 @@ export function createPillHoleGeometry(
     )
 
     if (bottomSegment.kind === "arc") {
-      const center = rotatePoint(
-        bottomSegment.centerX,
-        bottomSegment.centerY,
-        geom.centerX,
-        geom.centerY,
-        geom.rotation,
-      )
       const bottomCenter = repo.add(
-        new CartesianPoint("", center.x, center.y, zMin),
+        new CartesianPoint(
+          "",
+          bottomSegment.centerX,
+          bottomSegment.centerY,
+          zMin,
+        ),
       )
       const refDir = repo.add(
-        new Direction("", Math.cos(geom.rotation), Math.sin(geom.rotation), 0),
+        new Direction("", bottomSegment.refX, bottomSegment.refY, 0),
       )
       const cylinderPlacement = repo.add(
         new Axis2Placement3D("", bottomCenter, zDir, refDir),
@@ -482,5 +632,5 @@ export function createPillHoleGeometry(
     )
   }
 
-  return { bottomLoop, topLoop, wallFaces }
+  return wallFaces
 }

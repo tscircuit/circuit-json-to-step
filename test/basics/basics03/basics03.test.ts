@@ -5,6 +5,7 @@ import circuitJson from "./basics03.json"
 
 test("basics03: convert pcb_board with arrow outline and pcb_plated_holes to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     productName: "TestPCB_ArrowWithPlatedHoles",
   })
 

@@ -5,6 +5,7 @@ import circuitJson from "./basics04.json"
 
 test("basics04: convert circuit json with components to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     includeComponents: true,
     includeExternalMeshes: true,
     productName: "TestPCB_with_components",

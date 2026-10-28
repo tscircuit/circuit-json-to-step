@@ -14,17 +14,13 @@ import {
   Direction,
   Axis2Placement3D,
   Plane,
-  CylindricalSurface,
   VertexPoint,
   EdgeCurve,
-  Line,
-  Vector,
   EdgeLoop,
   OrientedEdge,
   FaceOuterBound,
   FaceBound,
   AdvancedFace,
-  Circle,
   ClosedShell,
   ManifoldSolidBrep,
   ColourRgb,
@@ -45,13 +41,17 @@ import {
 import { generateComponentMeshes } from "./mesh-generation"
 import { mergeExternalStepModels } from "./step-model-merger"
 import {
+  PCB_SUBSTRATE_COLOR_RGB,
   createStyleCache,
   createStyledItem,
   createStyledItems,
 } from "./step-style-utils"
-import { normalizeStepNumericExponents } from "./step-text-utils"
 import { VERSION } from "./version"
-import { createPillHoleGeometry } from "./pill-geometry"
+import { createLineEdge, createPillHoleGeometry } from "./pill-geometry"
+import { createCircularHoleGeometry } from "./circular-hole-geometry"
+import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
+import { circuitJsonToAssemblyStep } from "./assembly"
+import { selectBoardGeometry } from "./select-board-geometry"
 import {
   createHoleGeometryFromSegments,
   getCutoutBoundarySegments,
@@ -72,20 +72,29 @@ type RuntimeHole = Hole & {
   hole_shape?: string
   shape?: string
   hole_diameter?: number
+  // Drill offset from the pad centre. Present only on the four pad variants of
+  // pcb_plated_hole; absent on the plain circle and oval variants.
+  hole_offset_x?: number
+  hole_offset_y?: number
+  // Drill rotation. Only rotated_pill_hole_with_rect_pad carries this name; the
+  // oval and polygon pad variants use ccw_rotation instead.
+  hole_ccw_rotation?: number
 }
 
 export interface CircuitJsonToStepOptions {
+  /** Export one STEP file. Defaults to the complete assembly, including all PCBs and parts. Explicit "pcb" retains PCB-only behavior. */
+  exportMode?: "pcb" | "assembly"
   /** Board width in mm (optional if pcb_board is present) */
   boardWidth?: number
   /** Board height in mm (optional if pcb_board is present) */
   boardHeight?: number
   /** Board thickness in mm (default: 1.6mm or from pcb_board) */
   boardThickness?: number
-  /** Product name (default: "PCB") */
+  /** Root product name (default: "Combined Assembly", or "PCB" in explicit PCB mode). */
   productName?: string
-  /** Include component meshes (default: false) */
+  /** Include component meshes in PCB mode (default: false). Assembly mode includes all parts. */
   includeComponents?: boolean
-  /** Include external model meshes from model_*_url fields (default: false). Only applicable when includeComponents is true. */
+  /** Include external model meshes from model_*_url fields (default: false in PCB mode, true in assembly mode). */
   includeExternalMeshes?: boolean
   /**
    * Pre-loaded STEP file contents, keyed by URL/path.
@@ -96,12 +105,65 @@ export interface CircuitJsonToStepOptions {
 }
 
 /**
- * Converts circuit JSON to STEP format, creating holes in a PCB board
+ * Converts Circuit JSON to one STEP file containing a PCB or a named assembly.
  */
 export async function circuitJsonToStep(
   circuitJson: CircuitJson,
   options: CircuitJsonToStepOptions = {},
 ): Promise<string> {
+  const boards = circuitJson.filter((item) => item.type === "pcb_board")
+  if (options.exportMode !== "pcb") {
+    const pcbSteps: { id: string; name: string; stepText: string }[] = []
+    // A panel is one substrate, including the boards, rails and connecting tabs.
+    // Its holes and cutouts cannot be scoped to individual board outlines.
+    const panel = circuitJson.find((item) => item.type === "pcb_panel")
+    for (const board of panel ? [] : boards) {
+      const name = boards.length === 1 ? "PCB" : board.pcb_board_id
+      pcbSteps.push({
+        id: board.pcb_board_id,
+        name,
+        stepText: await circuitJsonToStep(
+          boards.length === 1
+            ? circuitJson
+            : selectBoardGeometry(circuitJson, board),
+          {
+            ...options,
+            exportMode: "pcb",
+            productName: name,
+            includeComponents: false,
+          },
+        ),
+      })
+    }
+    if (
+      !panel &&
+      boards.length === 0 &&
+      options.boardWidth &&
+      options.boardHeight
+    ) {
+      pcbSteps.push({
+        id: "pcb",
+        name: "PCB",
+        stepText: await circuitJsonToStep(circuitJson, {
+          ...options,
+          exportMode: "pcb",
+          productName: "PCB",
+          includeComponents: false,
+        }),
+      })
+    }
+    return circuitJsonToAssemblyStep(circuitJson, {
+      productName: options.productName,
+      pcbSteps,
+      fsMap: options.fsMap,
+      boardThickness:
+        options.boardThickness ??
+        panel?.thickness ??
+        boards[0]?.thickness ??
+        1.6,
+      includeExternalMeshes: options.includeExternalMeshes ?? true,
+    })
+  }
   const repo = new Repository()
 
   // Extract pcb_board and holes from circuit JSON
@@ -199,7 +261,7 @@ export async function circuitJsonToStep(
   let topVertices: Ref<VertexPoint>[]
 
   if (outline && Array.isArray(outline) && outline.length >= 3) {
-    // Use custom outline (points are already relative to board center)
+    // Circuit JSON outline points are already in world coordinates.
     // Filter out duplicate consecutive vertices (including first/last wrap-around)
     const cleanedOutline: { x: number; y: number }[] = []
     for (let i = 0; i < outline.length; i++) {
@@ -280,35 +342,6 @@ export async function circuitJsonToStep(
   }
 
   // Helper to create edge between vertices
-  function createEdge(
-    v1: Ref<VertexPoint>,
-    v2: Ref<VertexPoint>,
-  ): Ref<EdgeCurve> {
-    const p1 = v1.resolve(repo).pnt.resolve(repo)
-    const p2 = v2.resolve(repo).pnt.resolve(repo)
-    const dx = p2.x - p1.x
-    const dy = p2.y - p1.y
-    const dz = p2.z - p1.z
-    const length = Math.sqrt(dx * dx + dy * dy + dz * dz)
-
-    // Handle zero-length edges (duplicate vertices)
-    if (length < 1e-10) {
-      // Use arbitrary direction for degenerate edge
-      const dir = repo.add(new Direction("", 1, 0, 0))
-      const vec = repo.add(new Vector("", dir, 1e-10))
-      const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
-      return repo.add(new EdgeCurve("", v1, v2, line, true))
-    }
-
-    // Direction must be normalized (unit vector)
-    const dir = repo.add(
-      new Direction("", dx / length, dy / length, dz / length),
-    )
-    // Vector magnitude is the actual edge length
-    const vec = repo.add(new Vector("", dir, length))
-    const line = repo.add(new Line("", v1.resolve(repo).pnt, vec))
-    return repo.add(new EdgeCurve("", v1, v2, line, true))
-  }
 
   // Create board edges
   const bottomEdges: Ref<EdgeCurve>[] = []
@@ -319,19 +352,25 @@ export async function circuitJsonToStep(
   for (let i = 0; i < bottomVertices.length; i++) {
     const v1 = bottomVertices[i]!
     const v2 = bottomVertices[(i + 1) % bottomVertices.length]!
-    bottomEdges.push(createEdge(v1, v2))
+    bottomEdges.push(createLineEdge({ repo, v1, v2 }))
   }
 
   // Top edges (connect vertices in a loop)
   for (let i = 0; i < topVertices.length; i++) {
     const v1 = topVertices[i]!
     const v2 = topVertices[(i + 1) % topVertices.length]!
-    topEdges.push(createEdge(v1, v2))
+    topEdges.push(createLineEdge({ repo, v1, v2 }))
   }
 
   // Vertical edges (connect bottom to top)
   for (let i = 0; i < bottomVertices.length; i++) {
-    verticalEdges.push(createEdge(bottomVertices[i]!, topVertices[i]!))
+    verticalEdges.push(
+      createLineEdge({
+        repo,
+        v1: bottomVertices[i]!,
+        v2: topVertices[i]!,
+      }),
+    )
   }
 
   const origin = repo.add(new CartesianPoint("", 0, 0, -halfBoardThickness))
@@ -373,111 +412,51 @@ export async function circuitJsonToStep(
     return coordinate?.value ?? 0
   }
 
-  function createCircularHoleGeometry(hole: RuntimeHole): SharedHoleGeometry {
-    const holeX = getHoleCoordinate(hole.x)
-    const holeY = getHoleCoordinate(hole.y)
-    const radius = (hole.hole_diameter ?? 0) / 2
-
-    const bottomHoleCenter = repo.add(
-      new CartesianPoint("", holeX, holeY, -halfBoardThickness),
-    )
-    const bottomHoleVertex = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint("", holeX + radius, holeY, -halfBoardThickness),
-        ),
-      ),
-    )
-    const bottomHolePlacement = repo.add(
-      new Axis2Placement3D(
-        "",
-        bottomHoleCenter,
-        repo.add(new Direction("", 0, 0, -1)),
-        xDir,
-      ),
-    )
-    const bottomHoleCircle = repo.add(
-      new Circle("", bottomHolePlacement, radius),
-    )
-    const bottomHoleEdge = repo.add(
-      new EdgeCurve(
-        "",
-        bottomHoleVertex,
-        bottomHoleVertex,
-        bottomHoleCircle,
-        true,
-      ),
-    )
-
-    const topHoleCenter = repo.add(
-      new CartesianPoint("", holeX, holeY, halfBoardThickness),
-    )
-    const topHoleVertex = repo.add(
-      new VertexPoint(
-        "",
-        repo.add(
-          new CartesianPoint("", holeX + radius, holeY, halfBoardThickness),
-        ),
-      ),
-    )
-    const topHolePlacement = repo.add(
-      new Axis2Placement3D("", topHoleCenter, zDir, xDir),
-    )
-    const topHoleCircle = repo.add(new Circle("", topHolePlacement, radius))
-    const topHoleEdge = repo.add(
-      new EdgeCurve("", topHoleVertex, topHoleVertex, topHoleCircle, true),
-    )
-    // A cylindrical face's boundary wire needs seam edges to connect the
-    // bottom and top circular edges. Reuse one seam edge in both directions.
-    const wallSeamEdge = createEdge(bottomHoleVertex, topHoleVertex)
-
-    const bottomLoop = repo.add(
-      new EdgeLoop("", [repo.add(new OrientedEdge("", bottomHoleEdge, false))]),
-    )
-    const topLoop = repo.add(
-      new EdgeLoop("", [repo.add(new OrientedEdge("", topHoleEdge, true))]),
-    )
-    const wallLoop = repo.add(
-      new EdgeLoop("", [
-        repo.add(new OrientedEdge("", bottomHoleEdge, true)),
-        repo.add(new OrientedEdge("", wallSeamEdge, true)),
-        repo.add(new OrientedEdge("", topHoleEdge, false)),
-        repo.add(new OrientedEdge("", wallSeamEdge, false)),
-      ]),
-    )
-    const holeCylinderPlacement = repo.add(
-      new Axis2Placement3D("", bottomHoleCenter, zDir, xDir),
-    )
-    const holeCylinderSurface = repo.add(
-      new CylindricalSurface("", holeCylinderPlacement, radius),
-    )
-    const wallFace = repo.add(
-      new AdvancedFace(
-        "",
-        [repo.add(new FaceOuterBound("", wallLoop, true))],
-        holeCylinderSurface,
-        false,
-      ),
-    )
-
-    return { bottomLoop, topLoop, wallFaces: [wallFace] }
-  }
-
   const sharedHoleGeometries: SharedHoleGeometry[] = []
   for (const hole of holes) {
     const holeShape = hole.hole_shape ?? hole.shape
     if (holeShape === "circle") {
-      sharedHoleGeometries.push(createCircularHoleGeometry(hole))
-    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
+      const circularGeometry = createCircularHoleGeometry({
+        repo,
+        hole,
+        zMin: -halfBoardThickness,
+        zMax: halfBoardThickness,
+        zDir,
+      })
+      if (circularGeometry) {
+        sharedHoleGeometries.push(circularGeometry)
+      }
+    } else if (hole.type === "pcb_hole" && hole.hole_shape === "rect") {
       sharedHoleGeometries.push(
-        createPillHoleGeometry(
+        createRectangularHoleGeometry({
           repo,
           hole,
-          -halfBoardThickness,
-          halfBoardThickness,
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
+        }),
+      )
+    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
+      sharedHoleGeometries.push(
+        createPillHoleGeometry({
+          repo,
+          hole,
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
           zDir,
-        ),
+        }),
+      )
+    } else if (holeShape === "oval" && hole.type === "pcb_plated_hole") {
+      // pcb_plated_hole with shape "oval" has no hole_shape, so it reaches here
+      // on `shape` alone. Gated to plated holes: the non-plated oval variant
+      // falls through today and routing it would change pcb_hole output.
+      sharedHoleGeometries.push(
+        createPillHoleGeometry({
+          repo,
+          hole,
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
+          zDir,
+        }),
       )
     }
   }
@@ -485,24 +464,31 @@ export async function circuitJsonToStep(
   // pcb_cutouts remove board material just like holes do
   for (const cutout of cutouts) {
     if (cutout.shape === "circle") {
-      sharedHoleGeometries.push(
-        createCircularHoleGeometry({
+      const circularGeometry = createCircularHoleGeometry({
+        repo,
+        hole: {
           x: cutout.center.x,
           y: cutout.center.y,
           hole_diameter: cutout.radius * 2,
-        } as RuntimeHole),
-      )
+        },
+        zMin: -halfBoardThickness,
+        zMax: halfBoardThickness,
+        zDir,
+      })
+      if (circularGeometry) {
+        sharedHoleGeometries.push(circularGeometry)
+      }
       continue
     }
     const segments = getCutoutBoundarySegments(cutout)
     if (segments?.length) {
       sharedHoleGeometries.push(
-        createHoleGeometryFromSegments(
+        createHoleGeometryFromSegments({
           repo,
           segments,
-          -halfBoardThickness,
-          halfBoardThickness,
-        ),
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
+        }),
       )
     }
   }
@@ -591,7 +577,7 @@ export async function circuitJsonToStep(
   const styleCache = createStyleCache()
   const boardStyledItems = createStyledItems(repo, {
     itemRefs: allFaces,
-    rgb: [0.2, 0.6, 0.2],
+    rgb: PCB_SUBSTRATE_COLOR_RGB,
     styleCache,
   })
 
@@ -751,8 +737,7 @@ export async function circuitJsonToStep(
   repo.add(new ShapeDefinitionRepresentation(productDefShape, shapeRep))
 
   // Generate and return STEP file text
-  const stepText = repo.toPartFile({ name: productName })
-  return normalizeStepNumericExponents(stepText)
+  return repo.toPartFile({ name: productName })
 }
 
 export { getCircuitJsonToGltfModule } from "./get-circuit-json-to-gltf-module"

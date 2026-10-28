@@ -7,6 +7,7 @@ import {
   EdgeCurve,
   EdgeLoop,
   FaceOuterBound,
+  FaceBound,
   Line,
   OrientedEdge,
   Plane,
@@ -27,7 +28,7 @@ export function createVertex(
   )
 }
 
-export function createEdge(
+function createEdge(
   repo: Repository,
   vStart: Ref<VertexPoint>,
   vEnd: Ref<VertexPoint>,
@@ -52,35 +53,53 @@ export function createEdge(
   return repo.add(new EdgeCurve("", vStart, vEnd, line, true))
 }
 
+export function createLoopFromVertices(
+  repo: Repository,
+  vertices: Ref<VertexPoint>[],
+  sharedEdges?: Map<string, Ref<EdgeCurve>>,
+): Ref<EdgeLoop> {
+  const edges = vertices.map((vertex, index) => {
+    const next = vertices[(index + 1) % vertices.length]!
+    const key = [Number(vertex.id), Number(next.id)]
+      .sort((a, b) => a - b)
+      .join(":")
+    const edge = sharedEdges?.get(key) ?? createEdge(repo, vertex, next)
+    sharedEdges?.set(key, edge)
+    return repo.add(
+      new OrientedEdge("", edge, edge.resolve(repo).start.id === vertex.id),
+    )
+  })
+  return repo.add(new EdgeLoop("", edges))
+}
+
 export function createFaceFromVertices(
   repo: Repository,
   vertices: Ref<VertexPoint>[],
+  sharedEdges?: Map<string, Ref<EdgeCurve>>,
+  holes: Ref<VertexPoint>[][] = [],
 ): Ref<AdvancedFace> {
-  const edges = vertices.map((vertex, index) =>
-    createEdge(repo, vertex, vertices[(index + 1) % vertices.length]!),
-  )
-
-  const edgeLoop = repo.add(
-    new EdgeLoop(
-      "",
-      edges.map((edge) => repo.add(new OrientedEdge("", edge, true))),
-    ),
-  )
+  const edgeLoop = createLoopFromVertices(repo, vertices, sharedEdges)
 
   const p1 = vertices[0]!.resolve(repo).pnt.resolve(repo)
   const p2 = vertices[1]!.resolve(repo).pnt.resolve(repo)
-  const p3 = vertices[2]!.resolve(repo).pnt.resolve(repo)
 
   const ux = p2.x - p1.x
   const uy = p2.y - p1.y
   const uz = p2.z - p1.z
-  const vx = p3.x - p1.x
-  const vy = p3.y - p1.y
-  const vz = p3.z - p1.z
-
-  const nx = uy * vz - uz * vy
-  const ny = uz * vx - ux * vz
-  const nz = ux * vy - uy * vx
+  let nx = 0,
+    ny = 0,
+    nz = 0
+  // Clipped boundary loops may start with several collinear vertices.
+  for (const vertex of vertices.slice(2)) {
+    const point = vertex.resolve(repo).pnt.resolve(repo)
+    const vx = point.x - p1.x,
+      vy = point.y - p1.y,
+      vz = point.z - p1.z
+    nx = uy * vz - uz * vy
+    ny = uz * vx - ux * vz
+    nz = ux * vy - uy * vx
+    if (nx * nx + ny * ny + nz * nz > 1e-20) break
+  }
   const normalLength = Math.sqrt(nx * nx + ny * ny + nz * nz)
   const normal =
     normalLength < 1e-10
@@ -110,7 +129,18 @@ export function createFaceFromVertices(
   return repo.add(
     new AdvancedFace(
       "",
-      [repo.add(new FaceOuterBound("", edgeLoop, true))],
+      [
+        repo.add(new FaceOuterBound("", edgeLoop, true)),
+        ...holes.map((hole) =>
+          repo.add(
+            new FaceBound(
+              "",
+              createLoopFromVertices(repo, hole, sharedEdges),
+              true,
+            ),
+          ),
+        ),
+      ],
       plane,
       true,
     ),

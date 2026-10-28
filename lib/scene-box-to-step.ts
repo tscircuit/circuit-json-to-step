@@ -1,4 +1,10 @@
-import type { Ref, Repository, StyledItem } from "stepts"
+import type {
+  Ref,
+  Repository,
+  StyledItem,
+  EdgeCurve,
+  VertexPoint,
+} from "stepts"
 import { ClosedShell, ManifoldSolidBrep } from "stepts"
 import type {
   GeneratedSceneSolid,
@@ -12,9 +18,10 @@ import { createFaceFromVertices, createVertex } from "./step-brep-utils"
 export function createSceneBoxSolid(
   repo: Repository,
   box: SceneBox,
+  { weldMeshTopology = false }: { weldMeshTopology?: boolean } = {},
 ): GeneratedSceneSolid {
   if (box.mesh?.triangles?.length) {
-    return createSceneMeshSolid(repo, box)
+    return createSceneMeshSolid(repo, box, weldMeshTopology)
   }
 
   const localBounds = box.mesh?.boundingBox
@@ -81,9 +88,14 @@ export function createSceneBoxSolid(
 function createSceneMeshSolid(
   repo: Repository,
   box: SceneBox,
+  weldMeshTopology: boolean,
 ): GeneratedSceneSolid {
   const styleCache = createStyleCache()
   const styledItems: Ref<StyledItem>[] = []
+  const vertexCache = new Map<string, Ref<VertexPoint>>()
+  const edgeCache = weldMeshTopology
+    ? new Map<string, Ref<EdgeCurve>>()
+    : undefined
 
   const faces = box.mesh!.triangles!.map((triangle) => {
     const vertices = triangle.vertices.map((vertex) => {
@@ -93,10 +105,16 @@ function createSceneMeshSolid(
         y: rotated.z + box.center.z,
         z: rotated.y + box.center.y,
       }
-      return createVertex(repo, translated)
+      if (!weldMeshTopology) return createVertex(repo, translated)
+      const key = [translated.x, translated.y, translated.z]
+        .map((value) => value.toFixed(9))
+        .join(":")
+      const stepVertex = vertexCache.get(key) ?? createVertex(repo, translated)
+      vertexCache.set(key, stepVertex)
+      return stepVertex
     })
 
-    const face = createFaceFromVertices(repo, vertices)
+    const face = createFaceFromVertices(repo, vertices, edgeCache)
     const faceColor = normalizeTriangleColor(triangle.color)
     if (faceColor) {
       styledItems.push(

@@ -1,0 +1,57 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "board",
+    "width": 20,
+    "height": 20,
+    "thickness": 1.6,
+    "center": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "printed",
+    "ftype": "printedpart",
+    "name": "BRACKET"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_printed",
+    "source_component_id": "printed",
+    "position": {
+      "x": 5,
+      "y": 10,
+      "z": 20
+    },
+    "model_jscad": {
+      "type": "cuboid",
+      "size": [4, 6, 2]
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "motor",
+    "ftype": "motor",
+    "name": "MOTOR"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_motor",
+    "source_component_id": "motor",
+    "position": {
+      "x": 1000,
+      "y": 1000,
+      "z": 1000
+    },
+    "model_jscad": {
+      "type": "cuboid",
+      "size": [100, 100, 100]
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  }
+]

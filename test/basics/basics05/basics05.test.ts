@@ -2,9 +2,11 @@ import { test, expect } from "bun:test"
 import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import circuitJson from "./basics05.json"
+import { fullCircleSegments } from "../../../lib/pill-geometry"
 
 test("basics05: new test to cause a diff error", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     boardWidth: 20,
     boardHeight: 15,
     boardThickness: 1.6,
@@ -23,13 +25,13 @@ test("basics05: new test to cause a diff error", async () => {
   expect(stepText).toContain("CIRCLE")
   expect(stepText).toContain("CYLINDRICAL_SURFACE")
 
-  // Count CIRCLE occurrences - should have 6 (3 holes × 2 shared top/bottom boundary circles
+  // Each circular hole is bounded by fullCircleSegments arcs on both planes,
+  // and each arc becomes one cylindrical wall.
   const circleCount = (stepText.match(/CIRCLE/g) || []).length
-  expect(circleCount).toBe(6)
+  expect(circleCount).toBe(3 * 2 * fullCircleSegments)
 
-  // Count CYLINDRICAL_SURFACE occurrences - should have 3 (one per hole)
   const cylinderCount = (stepText.match(/CYLINDRICAL_SURFACE/g) || []).length
-  expect(cylinderCount).toBe(3)
+  expect(cylinderCount).toBe(3 * fullCircleSegments)
 
   // Write STEP file to debug-output
   const outputPath = "debug-output/basics05.step"

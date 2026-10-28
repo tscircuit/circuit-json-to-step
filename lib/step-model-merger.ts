@@ -1,3 +1,4 @@
+import Color from "color"
 import {
   AdvancedBrepShapeRepresentation,
   Axis2Placement3D,
@@ -5,6 +6,7 @@ import {
   Direction,
   Entity,
   ManifoldSolidBrep,
+  MechanicalDesignGeometricPresentationRepresentation,
   Ref,
   Repository,
   Unknown,
@@ -21,6 +23,7 @@ import {
   rotateVector,
 } from "./step-model-merger/vector-utils"
 import { readStepFile } from "./step-model-merger/read-step-file"
+import { createStyleCache, createStyledItems } from "./step-style-utils"
 import type {
   CadComponent,
   PcbComponent,
@@ -54,20 +57,31 @@ export async function mergeExternalStepModels(
   const handledComponentIds = new Set<string>()
   const handledPcbComponentIds = new Set<string>()
   const importedModels = new Map<string, ImportedStepModel>()
+  const stepContents = new Map(Object.entries(fsMap ?? {}))
 
   for (const component of cadComponents) {
     const componentId = component.cad_component_id ?? ""
     const stepUrl = component.model_step_url!
+    const modelKey = JSON.stringify([stepUrl, component.color])
 
     try {
-      let importedModel = importedModels.get(stepUrl)
+      let importedModel = importedModels.get(modelKey)
       if (!importedModel) {
-        const stepText = fsMap?.[stepUrl] ?? (await readStepFile(stepUrl))
+        let stepText = stepContents.get(stepUrl)
+        if (stepText === undefined) {
+          stepText = await readStepFile(stepUrl)
+          stepContents.set(stepUrl, stepText)
+        }
         if (!stepText.trim()) {
           throw new Error("STEP file is empty")
         }
-        importedModel = importStepModelOnce(repo, stepText, stepUrl)
-        importedModels.set(stepUrl, importedModel)
+        importedModel = importStepModelOnce(
+          repo,
+          stepText,
+          stepUrl,
+          component.color,
+        )
+        importedModels.set(modelKey, importedModel)
       }
 
       const pcbComponent = component.pcb_component_id
@@ -152,23 +166,54 @@ function importStepModelOnce(
   targetRepo: Repository,
   stepText: string,
   modelName: string,
+  color?: string,
 ): ImportedStepModel {
-  const sourceRepo = parseRepository(stepText)
-  let entries: RepositoryEntry[] = sourceRepo
-    .entries()
+  const { entries, origin, representation } = importStepModelGeometry(
+    targetRepo,
+    stepText,
+    modelName,
+    { color },
+  )
+  const representationMap = targetRepo.add(
+    new RepresentationMap(origin, representation),
+  )
+  return { entries, representationMap }
+}
+
+/** Import geometry without retaining the source file's product structure. */
+export function importStepModelGeometry(
+  targetRepo: Repository,
+  stepText: string,
+  modelName: string,
+  options: {
+    context?: Ref<Entity>
+    rejectAssemblies?: boolean
+    color?: string
+  } = {},
+) {
+  const sourceEntries = parseRepository(stepText).entries()
+  if (
+    options.rejectAssemblies &&
+    sourceEntries.some(
+      ([, entity]) => entity.type === "NEXT_ASSEMBLY_USAGE_OCCURRENCE",
+    )
+  ) {
+    throw new Error(
+      `Part "${modelName}" uses a nested STEP assembly, which is not supported for assembly export`,
+    )
+  }
+  let entries: RepositoryEntry[] = sourceEntries
     .map(([id, entity]) => [Number(id), entity] as const)
     .filter(([, entity]) => !EXCLUDED_ENTITY_TYPES.has(entity.type))
+    // Face styles take precedence over solid styles, so replace them on override.
+    .filter(
+      ([, entity]) => !options.color || !entity.type.endsWith("STYLED_ITEM"),
+    )
 
   entries = pruneInvalidEntries(entries)
 
   const idMapping = allocateIds(targetRepo, entries)
   remapReferences(entries, idMapping)
-
-  for (const [oldId, entity] of entries) {
-    const mappedId = idMapping.get(oldId)
-    if (mappedId === undefined) continue
-    targetRepo.set(eid(mappedId), entity)
-  }
 
   const solids: Ref<ManifoldSolidBrep>[] = []
   for (const [oldId, entity] of entries) {
@@ -186,18 +231,25 @@ function importStepModelOnce(
   const mappingOrigin = targetRepo.add(
     new Axis2Placement3D("", originPoint, zDirection, xDirection),
   )
+  const context = options.context ?? getGeomContext(targetRepo)
+  if (options.color) {
+    const [r, g, b] = Color(options.color).rgb().unitArray()
+    targetRepo.add(
+      new MechanicalDesignGeometricPresentationRepresentation(
+        "",
+        createStyledItems(targetRepo, {
+          itemRefs: solids,
+          rgb: [r, g, b],
+          styleCache: createStyleCache(),
+        }),
+        context,
+      ),
+    )
+  }
   const representation = targetRepo.add(
-    new AdvancedBrepShapeRepresentation(
-      modelName,
-      solids,
-      getGeomContext(targetRepo),
-    ),
+    new AdvancedBrepShapeRepresentation(modelName, solids, context),
   )
-  const representationMap = targetRepo.add(
-    new RepresentationMap(mappingOrigin, representation),
-  )
-
-  return { entries, representationMap }
+  return { entries, origin: mappingOrigin, representation, solids }
 }
 
 function createMappedStepModelInstance({
@@ -464,26 +516,13 @@ function allocateIds(
   targetRepo: Repository,
   entries: ReadonlyArray<RepositoryEntry>,
 ): Map<number, number> {
-  let nextId = getNextEntityId(targetRepo)
   const idMapping = new Map<number, number>()
 
-  for (const [oldId] of entries) {
-    idMapping.set(oldId, nextId)
-    nextId += 1
+  for (const [oldId, entity] of entries) {
+    idMapping.set(oldId, Number(targetRepo.add(entity).id))
   }
 
   return idMapping
-}
-
-function getNextEntityId(repo: Repository): number {
-  let maxId = 0
-  for (const [id] of repo.entries()) {
-    const numericId = Number(id)
-    if (numericId > maxId) {
-      maxId = numericId
-    }
-  }
-  return maxId + 1
 }
 
 function remapReferences(

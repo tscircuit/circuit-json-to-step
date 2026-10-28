@@ -1,0 +1,20 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "LEFT_PCB",
+    "subcircuit_id": "left",
+    "width": 10,
+    "height": 6,
+    "thickness": 1.6,
+    "center": { "x": -15, "y": 0 }
+  },
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "RIGHT_PCB",
+    "subcircuit_id": "right",
+    "width": 8,
+    "height": 4,
+    "thickness": 2,
+    "center": { "x": 15, "y": 0 }
+  }
+]

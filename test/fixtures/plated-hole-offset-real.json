@@ -1,0 +1,114 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_altium",
+    "center": {
+      "x": 81.07679999999999,
+      "y": 75.8952
+    },
+    "width": 121.92,
+    "height": 78.74,
+    "shape": "polygon",
+    "outline": [
+      {
+        "x": 20.116799999999998,
+        "y": 36.5252
+      },
+      {
+        "x": 20.116799999999998,
+        "y": 115.2652
+      },
+      {
+        "x": 142.0368,
+        "y": 115.2652
+      },
+      {
+        "x": 142.0368,
+        "y": 36.5252
+      },
+      {
+        "x": 20.116799999999998,
+        "y": 36.5252
+      }
+    ],
+    "thickness": 1.6,
+    "num_layers": 6,
+    "material": "fr4"
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "pcb_plated_hole_altium_1896",
+    "shape": "circular_hole_with_rect_pad",
+    "hole_shape": "circle",
+    "pad_shape": "rect",
+    "hole_diameter": 6.4516,
+    "rect_pad_width": 17.272,
+    "rect_pad_height": 12.7,
+    "rect_ccw_rotation": 270,
+    "hole_offset_x": 4.199313874276274e-16,
+    "hole_offset_y": 2.286,
+    "x": 69.7484,
+    "y": 103.124,
+    "layers": ["top", "bottom"],
+    "pcb_port_id": "pcb_port_altium_1896",
+    "port_hints": ["1"],
+    "pcb_component_id": "pcb_component_altium_6"
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "pcb_plated_hole_altium_1897",
+    "shape": "circular_hole_with_rect_pad",
+    "hole_shape": "circle",
+    "pad_shape": "rect",
+    "hole_diameter": 6.4516,
+    "rect_pad_width": 17.272,
+    "rect_pad_height": 12.7,
+    "rect_ccw_rotation": 270,
+    "hole_offset_x": 4.199313874276274e-16,
+    "hole_offset_y": 2.286,
+    "x": 86.0552,
+    "y": 103.1494,
+    "layers": ["top", "bottom"],
+    "pcb_port_id": "pcb_port_altium_1897",
+    "port_hints": ["1"],
+    "pcb_component_id": "pcb_component_altium_7"
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "pcb_plated_hole_altium_1898",
+    "shape": "circular_hole_with_rect_pad",
+    "hole_shape": "circle",
+    "pad_shape": "rect",
+    "hole_diameter": 6.4516,
+    "rect_pad_width": 17.272,
+    "rect_pad_height": 12.7,
+    "rect_ccw_rotation": 90,
+    "hole_offset_x": -1.3997712914254247e-16,
+    "hole_offset_y": -2.286,
+    "x": 42.9768,
+    "y": 48.768,
+    "layers": ["top", "bottom"],
+    "pcb_port_id": "pcb_port_altium_1898",
+    "port_hints": ["1"],
+    "pcb_component_id": "pcb_component_altium_8"
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "pcb_plated_hole_altium_1899",
+    "shape": "circular_hole_with_rect_pad",
+    "hole_shape": "circle",
+    "pad_shape": "rect",
+    "hole_diameter": 6.4516,
+    "rect_pad_width": 17.272,
+    "rect_pad_height": 12.7,
+    "rect_ccw_rotation": 90,
+    "hole_offset_x": -1.3997712914254247e-16,
+    "hole_offset_y": -2.286,
+    "x": 60.096399999999996,
+    "y": 48.641,
+    "layers": ["top", "bottom"],
+    "pcb_port_id": "pcb_port_altium_1899",
+    "port_hints": ["1"],
+    "pcb_component_id": "pcb_component_altium_9"
+  }
+]

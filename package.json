@@ -1,7 +1,11 @@
 {
   "name": "circuit-json-to-step",
   "main": "dist/index.js",
-  "version": "0.0.41",
+  "version": "0.0.61",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tscircuit/circuit-json-to-step.git"
+  },
   "type": "module",
   "scripts": {
     "pull-reference": "git clone https://github.com/tscircuit/circuit-json.git && find circuit-json/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\; && git clone https://github.com/tscircuit/stepts.git && find stepts/tests -name '*.test.ts' -exec bash -c 'mv \"$0\" \"${0%.test.ts}.ts\"' {} \\;",
@@ -11,20 +15,21 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "start": "bun site/index.html",
-    "build:site": "bun build site/index.html --outdir=site-export"
+    "build:site": "bun build site/index.html --outdir=site-export",
+    "prepare": "bun install --frozen-lockfile --ignore-scripts && bun run build"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.8",
-    "circuit-to-svg": "^0.0.356",
+    "@biomejs/biome": "2.5.15",
     "@resvg/resvg-js": "^2.6.2",
     "@resvg/resvg-wasm": "^2.6.2",
     "@tscircuit/circuit-json-util": "^0.0.75",
     "@types/bun": "latest",
-    "circuit-json": "^0.0.425",
+    "circuit-json": "^0.0.525",
+    "circuit-to-svg": "^0.0.356",
     "looks-same": "^10.0.1",
     "occt-import-js": "^0.0.23",
-    "schematic-symbols": "^0.0.221",
     "poppygl": "^0.0.24",
+    "schematic-symbols": "^0.0.221",
     "tsup": "^8.5.0"
   },
   "peerDependencies": {
@@ -35,6 +40,9 @@
   "dependencies": {
     "circuit-json-to-connectivity-map": "^0.0.22",
     "circuit-json-to-gltf": "^0.0.106",
-    "stepts": "^0.0.4"
+    "color": "^5.0.3",
+    "jscad-to-step": "^0.0.11",
+    "polygon-clipping": "^0.15.7",
+    "stepts": "^0.0.7"
   }
 }

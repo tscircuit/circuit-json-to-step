@@ -9,12 +9,6 @@ const fileSize = document.getElementById("fileSize")!
 const convertBtn = document.getElementById("convertBtn")! as HTMLButtonElement
 const clearBtn = document.getElementById("clearBtn")!
 const status = document.getElementById("status")!
-const includeComponentsCheckbox = document.getElementById(
-  "includeComponents",
-)! as HTMLInputElement
-const includeExternalMeshesCheckbox = document.getElementById(
-  "includeExternalMeshes",
-)! as HTMLInputElement
 
 // STEP models upload elements
 const stepModelsSection = document.getElementById("stepModelsSection")!
@@ -70,30 +64,6 @@ uploadArea.addEventListener("drop", (e) => {
     handleFile(e.dataTransfer.files[0])
   }
 })
-
-// Handle includeComponents checkbox change
-includeComponentsCheckbox.addEventListener("change", () => {
-  if (!includeComponentsCheckbox.checked) {
-    includeExternalMeshesCheckbox.checked = false
-    includeExternalMeshesCheckbox.disabled = true
-    stepModelsSection.style.display = "none"
-  } else {
-    includeExternalMeshesCheckbox.disabled = false
-  }
-})
-
-// Handle includeExternalMeshes checkbox change
-includeExternalMeshesCheckbox.addEventListener("change", () => {
-  if (includeExternalMeshesCheckbox.checked && requiredStepModels.length > 0) {
-    stepModelsSection.style.display = "block"
-    updateStepModelsList()
-  } else {
-    stepModelsSection.style.display = "none"
-  }
-})
-
-// Initialize external meshes checkbox state
-includeExternalMeshesCheckbox.disabled = true
 
 // STEP file upload handlers
 stepUploadArea.addEventListener("click", () => {
@@ -208,11 +178,9 @@ async function handleFile(file: File) {
     stepFilesMap = {}
 
     // Update STEP models section visibility
-    if (
-      includeExternalMeshesCheckbox.checked &&
-      requiredStepModels.length > 0
-    ) {
-      stepModelsSection.style.display = "block"
+    stepModelsSection.style.display =
+      requiredStepModels.length > 0 ? "block" : "none"
+    if (requiredStepModels.length > 0) {
       updateStepModelsList()
     }
 
@@ -252,10 +220,6 @@ convertBtn.addEventListener("click", async () => {
     // Get base filename without extension
     const baseName = currentFile!.name.replace(/\.json$/i, "")
 
-    // Get options from checkboxes
-    const includeComponents = includeComponentsCheckbox.checked
-    const includeExternalMeshes = includeExternalMeshesCheckbox.checked
-
     // Capture console warnings during conversion
     const warnings: string[] = []
     const originalWarn = console.warn
@@ -277,21 +241,19 @@ convertBtn.addEventListener("click", async () => {
 
     // Convert to STEP
     const stepContent = await circuitJsonToStep(circuitJson, {
-      includeComponents,
-      includeExternalMeshes: includeComponents && includeExternalMeshes,
       fsMap: Object.keys(stepFilesMap).length > 0 ? stepFilesMap : undefined,
+      productName: baseName,
     })
 
     // Restore console.warn
     console.warn = originalWarn
 
-    // Download the STEP file
     downloadFile(`${baseName}.step`, stepContent)
 
     if (warnings.length > 0) {
       showStatusWithWarnings(warnings)
     } else {
-      showStatus("Conversion complete! File downloaded.", "success")
+      showStatus("Conversion complete! STEP file downloaded.", "success")
     }
     convertBtn.disabled = false
   } catch (error) {

@@ -13,7 +13,7 @@ import {
   Plane,
   VertexPoint,
 } from "stepts"
-import { createEdge } from "./step-brep-utils"
+import { createLineEdge } from "./pill-geometry"
 
 export interface CutoutHoleGeometry {
   bottomLoop: Ref<EdgeLoop>
@@ -175,12 +175,17 @@ export function getCutoutBoundarySegments(
  * the shape of the circular/pill hole geometries. Straight segments get planar
  * walls, arcs get cylindrical ones.
  */
-export function createHoleGeometryFromSegments(
-  repo: Repository,
-  segments: BoundarySegment[],
-  zMin: number,
-  zMax: number,
-): CutoutHoleGeometry {
+export function createHoleGeometryFromSegments({
+  repo,
+  segments,
+  zMin,
+  zMax,
+}: {
+  repo: Repository
+  segments: BoundarySegment[]
+  zMin: number
+  zMax: number
+}): CutoutHoleGeometry {
   const zDir = repo.add(new Direction("", 0, 0, 1))
   const xDir = repo.add(new Direction("", 1, 0, 0))
 
@@ -216,7 +221,9 @@ export function createHoleGeometryFromSegments(
   ): Ref<EdgeCurve> => {
     const start = getVertex(segmentStart(segment))
     const end = getVertex(segmentEnd(segment))
-    if (segment.kind === "line") return createEdge(repo, start, end)
+    if (segment.kind === "line") {
+      return createLineEdge({ repo, v1: start, v2: end })
+    }
 
     // +Z normal makes the circle run counter-clockwise, matching the boundary.
     const placement = repo.add(
@@ -238,11 +245,11 @@ export function createHoleGeometryFromSegments(
     createSegmentEdge(segment, zMax, vertexCaches[1]!),
   )
   const verticalEdges = segments.map((segment) =>
-    createEdge(
+    createLineEdge({
       repo,
-      vertexCaches[0]!(segmentStart(segment)),
-      vertexCaches[1]!(segmentStart(segment)),
-    ),
+      v1: vertexCaches[0]!(segmentStart(segment)),
+      v2: vertexCaches[1]!(segmentStart(segment)),
+    }),
   )
 
   const bottomLoop = repo.add(

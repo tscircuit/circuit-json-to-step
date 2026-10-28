@@ -249,9 +249,43 @@ function gltfFromOcctMeshes(meshes: OcctMesh[]) {
   return { gltf, buffers }
 }
 
+/**
+ * Options for `renderStepToPNG`.
+ *
+ * `width`, `height` and `ambient` only affect the raster size and the fill light.
+ * The rest place the camera. All of them are optional: anything left out keeps
+ * the renderer's own default, which frames the whole model. Omitting a camera
+ * key matters, because the renderer merges these options over its defaults and
+ * an explicit `undefined` would override the default rather than fall back to
+ * it.
+ */
+type RenderOptions = {
+  /** Raster width in pixels. Defaults to 800. */
+  width?: number
+  /** Raster height in pixels. Defaults to 600. */
+  height?: number
+  /** Fill light level, 0 to 1. Defaults to 0.2. */
+  ambient?: number
+  /**
+   * Where the camera sits, in model units, as `[x, y, z]`. Omit to let the
+   * renderer choose a position that fits the whole model.
+   */
+  camPos?: readonly [number, number, number]
+  /**
+   * The point the camera aims at, in model units, as `[x, y, z]`. Omit to aim
+   * at the centre of the model.
+   */
+  lookAt?: readonly [number, number, number]
+  /**
+   * Field of view in degrees: how much of the scene fits across the frame.
+   * Defaults to 60. Smaller values zoom in, larger values pull back.
+   */
+  fov?: number
+}
+
 async function renderStepToPNG(
   stepInput: string | Uint8Array | ArrayBuffer,
-  opts?: { width?: number; height?: number; ambient?: number },
+  opts?: RenderOptions,
 ): Promise<Uint8Array> {
   const { width = 800, height = 600, ambient = 0.2 } = opts ?? {}
 
@@ -263,15 +297,15 @@ async function renderStepToPNG(
   const { gltf, buffers } = gltfFromOcctMeshes(result.meshes)
   const scene = createSceneFromGLTF(gltf, { buffers, images: [] })
 
-  const { bitmap } = renderSceneFromGLTF(
-    scene,
-    {
-      width,
-      height,
-      ambient,
-    },
-    createUint8Bitmap,
-  )
+  // Only forward camera keys that were actually given. The renderer spreads
+  // options over its own defaults, so an explicit `fov: undefined` would
+  // override the default and reach the projection as NaN.
+  const camera: RenderOptions = { width, height, ambient }
+  if (opts?.camPos !== undefined) camera.camPos = opts.camPos
+  if (opts?.lookAt !== undefined) camera.lookAt = opts.lookAt
+  if (opts?.fov !== undefined) camera.fov = opts.fov
+
+  const { bitmap } = renderSceneFromGLTF(scene, camera, createUint8Bitmap)
 
   return encodePNG(bitmap)
 }
@@ -289,6 +323,7 @@ async function toMatchStepSnapshot(
   received: unknown,
   testPathOriginal: string,
   pngName?: string,
+  opts?: RenderOptions,
 ) {
   if (
     typeof received !== "string" &&
@@ -300,7 +335,7 @@ async function toMatchStepSnapshot(
     )
   }
 
-  const png = await renderStepToPNG(received)
+  const png = await renderStepToPNG(received, opts)
   // Delegate to existing PNG matcher for snapshot compare/update UX
   return await expect(png).toMatchPngSnapshot(testPathOriginal, pngName)
 }
@@ -314,6 +349,7 @@ declare module "bun:test" {
     toMatchStepSnapshot(
       testPath: string,
       pngName?: string,
+      renderOptions?: RenderOptions,
     ): Promise<import("bun:test").MatcherResult>
   }
 }

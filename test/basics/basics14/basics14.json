@@ -1,0 +1,102 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "board",
+    "width": 20,
+    "height": 20,
+    "thickness": 1.6,
+    "center": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "CASE_BASE",
+    "ftype": "printedpart",
+    "name": "CASE_BASE"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_CASE_BASE",
+    "source_component_id": "CASE_BASE",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "model_jscad": {
+      "type": "subtract",
+      "shapes": [
+        {
+          "type": "cuboid",
+          "size": [10, 8, 4]
+        },
+        {
+          "type": "translate",
+          "vector": [0, 0, 1],
+          "shape": {
+            "type": "cuboid",
+            "size": [8, 6, 4]
+          }
+        }
+      ]
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "SWITCH_PLATE",
+    "ftype": "printedpart",
+    "name": "SWITCH_PLATE"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_SWITCH_PLATE",
+    "source_component_id": "SWITCH_PLATE",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 2.5
+    },
+    "model_jscad": {
+      "type": "subtract",
+      "shapes": [
+        {
+          "type": "cuboid",
+          "size": [10, 8, 1]
+        },
+        {
+          "type": "cuboid",
+          "size": [3, 3, 3]
+        }
+      ]
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "SCREW",
+    "ftype": "part",
+    "name": "SCREW"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_SCREW",
+    "source_component_id": "SCREW",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "model_jscad": {
+      "type": "cylinder",
+      "radius": 1,
+      "height": 8
+    },
+    "model_object_fit": "contain_within_bounds",
+    "anchor_alignment": "center"
+  }
+]

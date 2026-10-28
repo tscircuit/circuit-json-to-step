@@ -98,6 +98,7 @@ test("kicad-step: switch fixture renders consistently", async () => {
 test("kicad-step: merges KiCad STEP models referenced via model_step_url", async () => {
   const fsMap = await loadStepFilesFromCircuitJson(circuitJson)
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     includeComponents: true,
     includeExternalMeshes: true,
     productName: "KiCadStepMerge",

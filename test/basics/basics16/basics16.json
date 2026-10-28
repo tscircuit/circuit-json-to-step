@@ -1,0 +1,50 @@
+[
+  {
+    "type": "source_component",
+    "source_component_id": "orange_case",
+    "ftype": "printedpart",
+    "name": "ORANGE_CASE"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_orange_case",
+    "source_component_id": "orange_case",
+    "position": { "x": 0, "y": 0, "z": 0 },
+    "color": "#ff6600",
+    "model_jscad": {
+      "type": "colorize",
+      "color": [0.2, 0.4, 0.6],
+      "shape": {
+        "type": "subtract",
+        "shapes": [
+          { "type": "cuboid", "size": [10, 8, 4] },
+          {
+            "type": "translate",
+            "vector": [0, 0, 1],
+            "shape": { "type": "cuboid", "size": [8, 6, 4] }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "source_component",
+    "source_component_id": "red_plate",
+    "ftype": "printedpart",
+    "name": "RED_PLATE"
+  },
+  {
+    "type": "cad_component",
+    "cad_component_id": "cad_red_plate",
+    "source_component_id": "red_plate",
+    "position": { "x": 0, "y": 0, "z": 0 },
+    "color": "red",
+    "model_jscad": {
+      "type": "subtract",
+      "shapes": [
+        { "type": "cuboid", "size": [10, 8, 2] },
+        { "type": "cuboid", "size": [3, 3, 4] }
+      ]
+    }
+  }
+]

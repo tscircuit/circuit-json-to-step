@@ -4,6 +4,7 @@ import { circuitJsonToStep } from "../../../lib/index"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import "../../fixtures/step-snapshot"
 import circuitJson from "./repro04.json"
+import { fullCircleSegments } from "../../../lib/pill-geometry"
 
 function getBounds(positions: number[]) {
   const min = [Infinity, Infinity, Infinity]
@@ -59,6 +60,7 @@ function getBoardOuterLoopBreakCounts(stepText: string) {
 
 test("repro04: convert a rounded business-card outline with holes to STEP", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
+    exportMode: "pcb",
     includeComponents: false,
     productName: "Repro04_BusinessViaCard",
   })
@@ -68,8 +70,14 @@ test("repro04: convert a rounded business-card outline with holes to STEP", asyn
   expect(stepText).toContain("Repro04_BusinessViaCard")
   expect(stepText).toContain("MANIFOLD_SOLID_BREP")
 
-  expect((stepText.match(/CIRCLE/g) || []).length).toBe(10)
-  expect((stepText.match(/CYLINDRICAL_SURFACE/g) || []).length).toBe(5)
+  // Each circular hole is bounded by fullCircleSegments arcs on both planes,
+  // and each arc becomes one cylindrical wall.
+  expect((stepText.match(/CIRCLE/g) || []).length).toBe(
+    5 * 2 * fullCircleSegments,
+  )
+  expect((stepText.match(/CYLINDRICAL_SURFACE/g) || []).length).toBe(
+    5 * fullCircleSegments,
+  )
   expect(getBoardOuterLoopBreakCounts(stepText)).toEqual([0, 0])
 
   const occtResult = await importStepWithOcct(stepText)

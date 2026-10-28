@@ -5,9 +5,9 @@ import { expectFaceCoverage } from "../../utils/mesh-coverage"
 import "../../fixtures/step-snapshot"
 import circuitJson from "./repro06.json"
 
-test("repro06: rect pcb_cutout corners are rounded by corner_radius", async () => {
+test("repro06: pcb_cutout circle/rect/polygon are cut out of the board", async () => {
   const stepText = await circuitJsonToStep(circuitJson as any, {
-    productName: "Repro06_RoundedCutouts",
+    productName: "Repro06_Cutouts",
   })
 
   const occtResult = await importStepWithOcct(stepText)
@@ -19,37 +19,31 @@ test("repro06: rect pcb_cutout corners are rounded by corner_radius", async () =
     zTop: 0.8,
   }
 
+  // Points inside each cutout must not be covered by the top or bottom face.
   expectFaceCoverage(
     mesh,
     [
-      [-11, 4], // rotated slot (corner_radius == height / 2)
-      [11, -4], // partially rounded rect
-      [-11, -8], // corner_radius clamped to half the smaller side
+      [-12, 0], // circle
+      [0, 0], // rect
+      [12, -2], // polygon
     ],
     false,
   )
-
+  // Points that must still be solid board.
   expectFaceCoverage(
     mesh,
     [
-      // Past the rotated slot's rounded end (half length 7 along 30deg).
-      [-11 + 8 * Math.cos(Math.PI / 6), 4 + 8 * Math.sin(Math.PI / 6)],
-      // Corner of cutout 2's bounding rect, outside its r=2 corner arc.
-      [15.8, -0.2],
-      // Corner of cutout 3's bounding rect, outside its r=3 corner arc.
-      [-13.9, -10.9],
-      // Cutout 4 sits here with height 0; it must be skipped rather than
-      // built as a zero-area hole.
+      [-18, 12],
       [0, 12],
+      [18, -12],
+      [12, 7], // just past the polygon cutout's apex at (12, 6)
     ],
     true,
   )
 
-  // Four rounded corners per rect, and none of them collapsed into planes.
-  expect((stepText.match(/CYLINDRICAL_SURFACE/g) || []).length).toBe(12)
-  // Two inner bounds (top and bottom) per cutout, so the zero-height cutout 4
-  // contributed nothing at all rather than a zero-area hole occt would ignore.
-  expect((stepText.match(/FACE_BOUND\(/g) || []).length).toBe(3 * 2)
+  // circle cutout -> two half-arc cylindrical walls (same as a drilled hole);
+  // rect (4) + polygon (5) -> planar walls
+  expect((stepText.match(/CYLINDRICAL_SURFACE/g) || []).length).toBe(2)
 
   await expect(stepText).toMatchStepSnapshot(import.meta.path, "repro06")
 }, 20000)

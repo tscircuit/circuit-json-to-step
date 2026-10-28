@@ -1,0 +1,137 @@
+import { expect, test } from "bun:test"
+import type { CircuitJson } from "circuit-json"
+import { ManifoldSolidBrep, parseRepository } from "stepts"
+import { circuitJsonToStep } from "../../../lib/index"
+import { importStepWithOcct, type OcctMesh } from "../../utils/occt/importer"
+import circuitJson from "./basics21.json"
+
+test("basics21: panels preserve rails, edge mousebites, cutouts and components", async () => {
+  const step = await circuitJsonToStep(circuitJson as CircuitJson)
+  const repo = parseRepository(step)
+  const solid = repo
+    .entries()
+    .map(([, entity]) => entity)
+    .find(
+      (entity): entity is ManifoldSolidBrep =>
+        entity instanceof ManifoldSolidBrep && entity.name === "PCB Panel",
+    )!
+  const edgeUses = new Map<number, boolean[]>()
+  for (const face of solid.outer.resolve(repo).faces) {
+    for (const bound of face.resolve(repo).bounds) {
+      for (const edge of bound.resolve(repo).bound.resolve(repo).edges) {
+        const use = edge.resolve(repo)
+        const uses = edgeUses.get(Number(use.edge.id)) ?? []
+        uses.push(use.orientation)
+        edgeUses.set(Number(use.edge.id), uses)
+      }
+    }
+  }
+  // A closed panel uses every edge twice, in opposite directions.
+  expect(
+    [...edgeUses.values()].every(
+      (uses) => uses.length === 2 && uses[0] !== uses[1],
+    ),
+  ).toBe(true)
+  const imported = await importStepWithOcct(step)
+  expect(imported.root.children[0].children.map((child) => child.name)).toEqual(
+    ["PCB Panel", "R1"],
+  )
+  // Component mesh generation must not create another copy of the panel.
+  expect(imported.root.children[0].children[0].meshes).toHaveLength(1)
+  expect(imported.root.children[0].children[1].meshes.length).toBeGreaterThan(0)
+  const panel = imported.meshes[0]
+  for (const [axis, min, max] of [
+    [0, 10, 50],
+    [1, 0, 20],
+    [2, -1, 1],
+  ]) {
+    const values = panel.attributes.position.array.filter(
+      (_, i) => i % 3 === axis,
+    )
+    expect(Math.min(...values)).toBeCloseTo(min)
+    expect(Math.max(...values)).toBeCloseTo(max)
+  }
+  expect(hasTopSurface(panel, 11, 17)).toBe(false) // Rail mounting hole
+  expect(hasTopSurface(panel, 13, 8)).toBe(false) // On a child board's edge
+  expect(hasTopSurface(panel, 30, 10)).toBe(false) // Routing slot
+  expect(hasTopSurface(panel, 28.75, 7)).toBe(false) // Mousebite at slot edge
+  expect(hasTopSurface(panel, 20, 3.5)).toBe(false) // Route below left board
+  expect(hasTopSurface(panel, 30, 19)).toBe(true) // Rail between boards
+  expect(hasTopSurface(panel, 20, 10)).toBe(true) // Board material
+  await expect(step).toMatchStepSnapshot(import.meta.path, "panel-assembly")
+
+  const panelOnly = circuitJson.filter(
+    (item) =>
+      ![
+        "pcb_component",
+        "source_component",
+        "pcb_board",
+        "cad_component",
+      ].includes(item.type),
+  )
+  const panelOnlyStep = await circuitJsonToStep(panelOnly as CircuitJson)
+  expect((await importStepWithOcct(panelOnlyStep)).meshes).toHaveLength(1)
+  await expect(panelOnlyStep).toMatchStepSnapshot(
+    import.meta.path,
+    "panel-only",
+  )
+  const barePanel = await importStepWithOcct(
+    await circuitJsonToStep(
+      circuitJson.filter((item) => item.type === "pcb_panel") as CircuitJson,
+    ),
+  )
+  expect(barePanel.meshes).toHaveLength(1)
+  expect(hasTopSurface(barePanel.meshes[0], 11, 19)).toBe(true)
+}, 30_000)
+
+test("basics21: panel slots use the board hole offsets and rotations", async () => {
+  for (const dimensions of [
+    { hole_width: 6, hole_height: 2, ccw_rotation: 90 },
+    { hole_width: 2, hole_height: 6, ccw_rotation: 0 },
+    { hole_width: 6, hole_height: 2, hole_ccw_rotation: 90 },
+  ]) {
+    const step = await circuitJsonToStep([
+      ...circuitJson.filter((item) => item.type === "pcb_panel"),
+      {
+        type: "pcb_plated_hole",
+        pcb_plated_hole_id: "slot",
+        shape: "pill_hole_with_rect_pad",
+        hole_shape: "pill",
+        x: 28,
+        y: 12,
+        hole_offset_x: 2,
+        hole_offset_y: -2,
+        ...dimensions,
+      },
+    ] as CircuitJson)
+    const panel = (await importStepWithOcct(step)).meshes[0]
+    expect(hasTopSurface(panel, 30, 10)).toBe(false)
+    expect(hasTopSurface(panel, 30, 12)).toBe(false)
+    expect(hasTopSurface(panel, 32, 10)).toBe(true)
+    expect(hasTopSurface(panel, 28, 12)).toBe(true)
+  }
+})
+
+function hasTopSurface(mesh: OcctMesh, x: number, y: number) {
+  const positions = mesh.attributes.position.array
+  const indices = mesh.index.array
+  for (let i = 0; i < indices.length; i += 3) {
+    const points = indices
+      .slice(i, i + 3)
+      .map((index) => positions.slice(index * 3, index * 3 + 3))
+    if (points.some((point) => Math.abs(point[2] - 1) > 1e-6)) continue
+    const signs = points.map((point, j) => {
+      const next = points[(j + 1) % 3]
+      return (
+        (x - point[0]) * (next[1] - point[1]) -
+        (y - point[1]) * (next[0] - point[0])
+      )
+    })
+    if (
+      signs.every((value) => value >= -1e-6) ||
+      signs.every((value) => value <= 1e-6)
+    )
+      return true
+  }
+  return false
+}
