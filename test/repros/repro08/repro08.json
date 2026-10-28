@@ -1,0 +1,52 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_1",
+    "width": 40,
+    "height": 30,
+    "thickness": 1.6,
+    "center": { "x": 0, "y": 0 }
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "usb_notch",
+    "shape": "rect",
+    "center": { "x": 0, "y": 15 },
+    "width": 10,
+    "height": 6,
+    "corner_radius": 1
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "edge_half_circle",
+    "shape": "circle",
+    "center": { "x": 20, "y": 0 },
+    "radius": 3
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "corner_notch",
+    "shape": "polygon",
+    "points": [
+      { "x": -22, "y": -17 },
+      { "x": -16, "y": -17 },
+      { "x": -16, "y": -11 },
+      { "x": -22, "y": -11 }
+    ]
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "internal_hole",
+    "shape": "circle",
+    "center": { "x": -8, "y": 0 },
+    "radius": 2
+  },
+  {
+    "type": "pcb_cutout",
+    "pcb_cutout_id": "off_board",
+    "shape": "rect",
+    "center": { "x": 40, "y": 40 },
+    "width": 4,
+    "height": 4
+  }
+]

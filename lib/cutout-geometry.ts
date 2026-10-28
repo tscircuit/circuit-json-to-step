@@ -1,3 +1,4 @@
+import polygonClipping, { type Ring } from "polygon-clipping"
 import type { Ref, Repository } from "stepts"
 import {
   AdvancedFace,
@@ -332,4 +333,92 @@ export function createHoleGeometryFromSegments({
   }
 
   return { bottomLoop, topLoop, wallFaces }
+}
+
+const ARC_SEGMENTS_PER_QUARTER = 8
+
+/** Counter-clockwise polygon approximating a cutout, for 2D clipping. */
+function getCutoutRing(cutout: any): Ring | null {
+  if (cutout.shape === "circle") {
+    if (!(cutout.radius > 0)) return null
+    const count = ARC_SEGMENTS_PER_QUARTER * 4
+    return Array.from({ length: count }, (_, i): [number, number] => {
+      const angle = (i / count) * Math.PI * 2
+      return [
+        cutout.center.x + cutout.radius * Math.cos(angle),
+        cutout.center.y + cutout.radius * Math.sin(angle),
+      ]
+    })
+  }
+  const segments = getCutoutBoundarySegments(cutout)
+  if (!segments) return null
+  const ring: Ring = []
+  for (const segment of segments) {
+    if (segment.kind === "line") {
+      ring.push([segment.from.x, segment.from.y])
+      continue
+    }
+    for (let i = 0; i < ARC_SEGMENTS_PER_QUARTER; i++) {
+      const angle =
+        segment.startAngle +
+        ((segment.endAngle - segment.startAngle) * i) / ARC_SEGMENTS_PER_QUARTER
+      ring.push([
+        segment.center.x + segment.radius * Math.cos(angle),
+        segment.center.y + segment.radius * Math.sin(angle),
+      ])
+    }
+  }
+  return ring
+}
+
+/**
+ * Splits cutouts by where they sit relative to the board outline.
+ *
+ * Cutouts fully inside the board become inner bounds with true line/arc walls.
+ * A cutout that crosses the board edge (a notch) can't be an inner bound, as
+ * its loop would cross the outer one, so it is subtracted from the outline
+ * instead. Cutouts entirely off the board are dropped.
+ */
+export function applyCutoutsToBoardOutline({
+  outline,
+  cutouts,
+}: {
+  outline: Point[]
+  cutouts: any[]
+}): { outline: Point[]; internalCutouts: any[] } {
+  const boardPolygon = [outline.map((p): [number, number] => [p.x, p.y])]
+  const internalCutouts: any[] = []
+  const edgeCutoutRings: Ring[] = []
+  for (const cutout of cutouts) {
+    const ring = getCutoutRing(cutout)
+    if (!ring) continue
+    if (polygonClipping.difference([ring], boardPolygon).length === 0) {
+      internalCutouts.push(cutout)
+    } else if (polygonClipping.intersection([ring], boardPolygon).length > 0) {
+      edgeCutoutRings.push(ring)
+    }
+  }
+  if (edgeCutoutRings.length === 0) return { outline, internalCutouts }
+
+  const clipped = polygonClipping.difference(
+    boardPolygon,
+    ...edgeCutoutRings.map((ring) => [ring]),
+  )
+  // A notch leaves one piece; if cutouts split the board, keep the largest.
+  const ringArea = (ring: Ring) =>
+    Math.abs(
+      ring.reduce((sum, [x, y], i) => {
+        const [nx, ny] = ring[(i + 1) % ring.length]!
+        return sum + x * ny - nx * y
+      }, 0),
+    ) / 2
+  const largest = clipped
+    .map((polygon) => polygon[0]!)
+    .sort((a, b) => ringArea(b) - ringArea(a))[0]
+  if (!largest) return { outline, internalCutouts }
+  // polygon-clipping closes rings by repeating the first point.
+  return {
+    outline: largest.slice(0, -1).map(([x, y]) => ({ x, y })),
+    internalCutouts,
+  }
 }
