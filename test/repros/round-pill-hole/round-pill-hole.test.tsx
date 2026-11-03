@@ -1,4 +1,5 @@
 import { beforeAll, expect, test } from "bun:test"
+import { fileURLToPath } from "node:url"
 import { Resvg } from "@resvg/resvg-js"
 import { Circuit } from "@tscircuit/core"
 import type { CircuitJson } from "circuit-json"
@@ -51,12 +52,17 @@ test("repro: the full LoRa board generated from TSX cannot export to STEP", asyn
     height: 1200,
     layer: "top",
   })
-  // Bundle one font so silkscreen labels render identically on macOS and Linux.
-  // Source Code Pro from polished 4.3.1; see fonts/LICENSE.txt.
+  // Use the same packaged font on macOS and Linux for stable silkscreen labels.
   const png = new Resvg(svg, {
     font: {
       loadSystemFonts: false,
-      fontFiles: [`${import.meta.dir}/fonts/SourceCodePro-Regular.ttf`],
+      fontFiles: [
+        fileURLToPath(
+          import.meta.resolve(
+            "polished/docs/assets/fonts/TTF/SourceCodePro-Regular.ttf",
+          ),
+        ),
+      ],
       defaultFontFamily: "Source Code Pro",
       sansSerifFamily: "Source Code Pro",
     },
