@@ -7,7 +7,7 @@ import { convertCircuitJsonToPcbSvg } from "circuit-to-svg"
 import { circuitJsonToStep } from "../../../lib"
 import "../../fixtures/png-matcher"
 import { importStepWithOcct } from "../../utils/occt/importer"
-import LoRaDevice from "./lora-device/index.circuit"
+import LoRaDevice from "./index.circuit"
 
 // Full board source: https://tscircuit.com/gokul/lora-device (v0.1.6).
 // Component CAD meshes and unused routing caches are omitted; all components,
