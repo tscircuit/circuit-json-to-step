@@ -382,10 +382,19 @@ export async function circuitJsonToStep(
   const sharedHoleGeometries: SharedHoleGeometry[] = []
   for (const hole of holes) {
     const holeShape = hole.hole_shape ?? hole.shape
-    if (holeShape === "circle") {
+    const isRoundPillDrill =
+      (holeShape === "pill" ||
+        holeShape === "rotated_pill" ||
+        (holeShape === "oval" && hole.type === "pcb_plated_hole")) &&
+      "hole_width" in hole &&
+      "hole_height" in hole &&
+      hole.hole_width === hole.hole_height
+    if (holeShape === "circle" || isRoundPillDrill) {
       const circularGeometry = createCircularHoleGeometry({
         repo,
-        hole,
+        hole: isRoundPillDrill
+          ? { ...hole, hole_diameter: hole.hole_width }
+          : hole,
         zMin: -halfBoardThickness,
         zMax: halfBoardThickness,
         zDir,
