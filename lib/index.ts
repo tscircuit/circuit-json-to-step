@@ -47,7 +47,11 @@ import {
   createStyledItems,
 } from "./step-style-utils"
 import { VERSION } from "./version"
-import { createLineEdge, createPillHoleGeometry } from "./pill-geometry"
+import {
+  createLineEdge,
+  createPillHoleGeometry,
+  getRoundPillDiameter,
+} from "./pill-geometry"
 import { createCircularHoleGeometry } from "./circular-hole-geometry"
 import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
@@ -379,6 +383,36 @@ export async function circuitJsonToStep(
     return coordinate?.value ?? 0
   }
 
+  // A pill with a round drill is built as the circular hole it is, since the
+  // pill boundary would give it zero-length straight sides.
+  function createPillOrCircularHoleGeometry(
+    hole: RuntimeHole,
+  ): SharedHoleGeometry | null {
+    const roundDiameter = getRoundPillDiameter(hole)
+    if (roundDiameter === null) {
+      return createPillHoleGeometry({
+        repo,
+        hole,
+        zMin: -halfBoardThickness,
+        zMax: halfBoardThickness,
+        zDir,
+      })
+    }
+    return createCircularHoleGeometry({
+      repo,
+      hole: {
+        x: hole.x,
+        y: hole.y,
+        hole_offset_x: hole.hole_offset_x,
+        hole_offset_y: hole.hole_offset_y,
+        hole_diameter: roundDiameter,
+      },
+      zMin: -halfBoardThickness,
+      zMax: halfBoardThickness,
+      zDir,
+    })
+  }
+
   const sharedHoleGeometries: SharedHoleGeometry[] = []
   for (const hole of holes) {
     const holeShape = hole.hole_shape ?? hole.shape
@@ -402,29 +436,18 @@ export async function circuitJsonToStep(
           zMax: halfBoardThickness,
         }),
       )
-    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
-      sharedHoleGeometries.push(
-        createPillHoleGeometry({
-          repo,
-          hole,
-          zMin: -halfBoardThickness,
-          zMax: halfBoardThickness,
-          zDir,
-        }),
-      )
-    } else if (holeShape === "oval" && hole.type === "pcb_plated_hole") {
+    } else if (
+      holeShape === "rotated_pill" ||
+      holeShape === "pill" ||
       // pcb_plated_hole with shape "oval" has no hole_shape, so it reaches here
       // on `shape` alone. Gated to plated holes: the non-plated oval variant
       // falls through today and routing it would change pcb_hole output.
-      sharedHoleGeometries.push(
-        createPillHoleGeometry({
-          repo,
-          hole,
-          zMin: -halfBoardThickness,
-          zMax: halfBoardThickness,
-          zDir,
-        }),
-      )
+      (holeShape === "oval" && hole.type === "pcb_plated_hole")
+    ) {
+      const pillGeometry = createPillOrCircularHoleGeometry(hole)
+      if (pillGeometry) {
+        sharedHoleGeometries.push(pillGeometry)
+      }
     }
   }
 

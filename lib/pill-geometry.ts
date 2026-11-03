@@ -128,6 +128,27 @@ export function getPillGeometry(hole: PillHole): PillGeometry {
   }
 }
 
+/**
+ * Drill width and height closer than this (mm) make a pill a circle. It sits
+ * well under any drill tolerance, and above the 1e-9 the vertex cache rounds
+ * to, so the near-equal values a unit conversion leaves behind cannot collapse
+ * a straight side into a zero-length edge.
+ */
+const roundPillTolerance = 1e-6
+
+/**
+ * The drill diameter when a pill's drill is round, otherwise null.
+ *
+ * A round drill leaves the pill no straight sides. Built as a pill anyway,
+ * those sides are zero-length edges, and the wall plane swept from each one
+ * normalises a zero vector into NaN directions. KiCad's JST XH pads are one
+ * common source: an oval pad around a round drill.
+ */
+export function getRoundPillDiameter(hole: PillHole): number | null {
+  const { width, height } = getPillGeometry(hole)
+  return Math.abs(width - height) < roundPillTolerance ? width : null
+}
+
 export function rotatePoint({
   x,
   y,
