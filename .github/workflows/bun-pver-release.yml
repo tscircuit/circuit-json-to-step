@@ -65,6 +65,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.TSCIRCUIT_BOT_GITHUB_TOKEN }}
 
+      - name: Wait for npm publication
+        if: env.UPSTREAM_REPOS && env.UPSTREAM_PACKAGES_TO_UPDATE
+        env:
+          EXPECTED_VERSION: ${{ steps.package-version.outputs.version }}
+        run: |
+          for attempt in $(seq 1 30); do
+            published_version=$(npm view circuit-json-to-step@latest version --prefer-online 2>/dev/null || true)
+            if [ -n "$published_version" ] && bun -e 'process.exit(Bun.semver.satisfies(process.argv[1], ">=" + process.argv[2]) ? 0 : 1)' "$published_version" "$EXPECTED_VERSION"; then
+              exit 0
+            fi
+            echo "Waiting for circuit-json-to-step@$EXPECTED_VERSION on npm ($attempt/30)."
+            sleep 10
+          done
+          echo "::error::The published STEP converter is not available from npm yet."
+          exit 1
+
       - name: Trigger upstream repo updates
         if: env.UPSTREAM_REPOS && env.UPSTREAM_PACKAGES_TO_UPDATE
         run: |
