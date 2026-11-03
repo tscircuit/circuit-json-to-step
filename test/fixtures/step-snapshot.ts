@@ -283,7 +283,7 @@ type RenderOptions = {
   fov?: number
 }
 
-async function renderStepToPNG(
+export async function renderStepToPNG(
   stepInput: string | Uint8Array | ArrayBuffer,
   opts?: RenderOptions,
 ): Promise<Uint8Array> {
