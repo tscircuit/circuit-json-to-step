@@ -1,3 +1,6 @@
+// Footprint adapted from KiCad Package_SO/VSSOP-8_2.3x2mm_P0.5mm.
+// KiCad library contributors; CC BY-SA 4.0 with the KiCad design exception:
+// https://www.kicad.org/libraries/license/
 import { type ChipProps } from "@tscircuit/props"
 export const UartBufferFootprint = (props: ChipProps) => (
   <chip

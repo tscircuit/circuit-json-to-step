@@ -1,3 +1,6 @@
+// Footprint adapted from KiCad RF_GPS/u-blox_SAM-M8Q.
+// KiCad library contributors; CC BY-SA 4.0 with the KiCad design exception:
+// https://www.kicad.org/libraries/license/
 import { type ChipProps } from "@tscircuit/props"
 export const GnssFootprint = (props: ChipProps) => (
   <chip

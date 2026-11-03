@@ -8,6 +8,8 @@ import "../../fixtures/png-matcher"
 import { importStepWithOcct } from "../../utils/occt/importer"
 import LoRaDevice from "./lora-device/index.circuit"
 
+// Full board source: https://tscircuit.com/gokul/lora-device (v0.1.6).
+// Component CAD meshes are omitted; PCB geometry and connections are retained.
 let circuitJson: CircuitJson
 let j2Pin3Fixture: CircuitJson
 
@@ -48,10 +50,19 @@ test("repro: the full LoRa board generated from TSX cannot export to STEP", asyn
     height: 1200,
     layer: "top",
   })
-  await expect(new Resvg(svg).render().asPng()).toMatchPngSnapshot(
-    import.meta.path,
-    "lora-device-input",
-  )
+  // Bundle one font so silkscreen labels render identically on macOS and Linux.
+  // Source Code Pro from polished 4.3.1; see fonts/LICENSE.txt.
+  const png = new Resvg(svg, {
+    font: {
+      loadSystemFonts: false,
+      fontFiles: [`${import.meta.dir}/fonts/SourceCodePro-Regular.ttf`],
+      defaultFontFamily: "Source Code Pro",
+      sansSerifFamily: "Source Code Pro",
+    },
+  })
+    .render()
+    .asPng()
+  await expect(png).toMatchPngSnapshot(import.meta.path, "lora-device-input")
 
   // Preserve the original close-up, now extracted from Core's fresh output.
   const holeSvg = convertCircuitJsonToPcbSvg(j2Pin3Fixture, {
