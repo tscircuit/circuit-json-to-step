@@ -1,4 +1,3 @@
-import { createTrackerAutorouter } from "./routing/autorouter"
 import { PowerSection } from "./sections/PowerSection"
 import { ControllerSection } from "./sections/ControllerSection"
 import { RadioGnssSection } from "./sections/RadioGnssSection"
@@ -109,12 +108,6 @@ export default function IndiaLoRaTracker() {
           boardEdgeMargin={0.3}
         />
       </group>
-      <autoroutingphase
-        name="SignalsAndPower"
-        phaseIndex={0}
-        algorithmFn={createTrackerAutorouter}
-        autorouter="auto_local"
-      />
       <UsbRouting />
       <BoardLegend />
       {/* Give the USB locating holes 0.25 mm copper clearance, including polygon approximation. */}

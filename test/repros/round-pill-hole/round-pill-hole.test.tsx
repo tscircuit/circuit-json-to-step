@@ -9,7 +9,8 @@ import { importStepWithOcct } from "../../utils/occt/importer"
 import LoRaDevice from "./lora-device/index.circuit"
 
 // Full board source: https://tscircuit.com/gokul/lora-device (v0.1.6).
-// Component CAD meshes are omitted; PCB geometry and connections are retained.
+// Component CAD meshes and unused routing caches are omitted; all components,
+// PCB footprints and connections are retained.
 let circuitJson: CircuitJson
 let j2Pin3Fixture: CircuitJson
 
