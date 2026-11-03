@@ -1,0 +1,67 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_0",
+    "center": { "x": 0, "y": 0 },
+    "width": 10,
+    "height": 10,
+    "thickness": 1.6,
+    "num_layers": 2,
+    "material": "fr4"
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "jst_xh_pad",
+    "shape": "pill",
+    "x": -2.5,
+    "y": 2,
+    "outer_width": 1.7,
+    "outer_height": 1.95,
+    "hole_width": 0.95,
+    "hole_height": 0.95,
+    "ccw_rotation": 0,
+    "layers": ["top", "bottom"]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "jst_xh_pad_rotated",
+    "shape": "pill",
+    "x": 2.5,
+    "y": 2,
+    "outer_width": 1.7,
+    "outer_height": 1.95,
+    "hole_width": 0.95,
+    "hole_height": 0.95,
+    "ccw_rotation": 180,
+    "layers": ["top", "bottom"]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "near_equal_drill",
+    "shape": "pill",
+    "x": -2.5,
+    "y": -2,
+    "outer_width": 1.7,
+    "outer_height": 1.95,
+    "hole_width": 0.95,
+    "hole_height": 0.9500000000000001,
+    "ccw_rotation": 0,
+    "layers": ["top", "bottom"]
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "round_drill_with_rect_pad",
+    "shape": "pill_hole_with_rect_pad",
+    "hole_shape": "pill",
+    "pad_shape": "rect",
+    "x": 2,
+    "y": -2,
+    "hole_width": 0.95,
+    "hole_height": 0.95,
+    "rect_pad_width": 1.7,
+    "rect_pad_height": 1.95,
+    "hole_offset_x": 0.5,
+    "hole_offset_y": 0,
+    "layers": ["top", "bottom"]
+  }
+]
