@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import { Resvg, initWasm } from "@resvg/resvg-wasm"
-import alphabetFont from "@tscircuit/alphabet/base64font"
+import { fileURLToPath } from "node:url"
+import { Resvg } from "@resvg/resvg-js"
 import type { CircuitJson } from "circuit-json"
 import { convertCircuitJsonToPcbSvg } from "circuit-to-svg"
 import { circuitJsonToStep } from "../../../lib"
@@ -51,15 +51,18 @@ test("repro: the full LoRa board cannot export round pill drills to STEP", async
     height: 1200,
     layer: "top",
   })
-  // Use the same WASM renderer and bundled font on macOS and Linux.
-  await initWasm(
-    Bun.file(
-      new URL(import.meta.resolve("@resvg/resvg-wasm/index_bg.wasm")),
-    ).arrayBuffer(),
-  )
+  // Use the same packaged font on macOS and Linux for stable silkscreen labels.
   const png = new Resvg(svg, {
     font: {
-      fontBuffers: [Buffer.from(alphabetFont, "base64")],
+      loadSystemFonts: false,
+      fontFiles: [
+        fileURLToPath(
+          new URL(
+            "./TscircuitAlphabet.ttf",
+            import.meta.resolve("@tscircuit/alphabet"),
+          ),
+        ),
+      ],
       defaultFontFamily: "TscircuitAlphabet",
       sansSerifFamily: "TscircuitAlphabet",
     },
