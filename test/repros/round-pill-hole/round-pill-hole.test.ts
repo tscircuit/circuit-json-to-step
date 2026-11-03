@@ -1,38 +1,39 @@
 import { expect, test } from "bun:test"
 import { fileURLToPath } from "node:url"
 import { Resvg } from "@resvg/resvg-js"
-import { Circuit } from "@tscircuit/core"
 import type { CircuitJson } from "circuit-json"
 import { convertCircuitJsonToPcbSvg } from "circuit-to-svg"
 import { circuitJsonToStep } from "../../../lib"
 import "../../fixtures/png-matcher"
 import { importStepWithOcct } from "../../utils/occt/importer"
-import LoRaDevice from "./index.circuit"
+import generatedCircuitJson from "./round-pill-hole.json"
 
 // Full board source: https://tscircuit.com/gokul/lora-device (v0.1.6).
-// Component CAD meshes and unused routing caches are omitted; all components,
-// PCB footprints and connections are retained.
-test("repro: the full LoRa board generated from TSX cannot export to STEP", async () => {
-  const circuit = new Circuit()
-  // Hole geometry is generated during PCB component rendering. Skip schematic
-  // layout and trace routing; retain the complete board, footprints and nets.
-  circuit.schematicDisabled = true
-  circuit.pcbRoutingDisabled = true
-  circuit.add(<LoRaDevice />)
-  await circuit.renderUntilSettled()
-  const circuitJson = circuit.getCircuitJson()
-
-  expect(circuit.db.source_component.list()).toHaveLength(58)
-  const j2 = circuit.db.source_component.getWhere({ name: "J2" })!
-  const j2Pcb = circuit.db.pcb_component.getWhere({
-    source_component_id: j2.source_component_id,
-  })!
-  const j2RoundHoles = circuit.db.pcb_plated_hole
-    .list()
+// round-pill-hole.json was generated from index.circuit.tsx with @tscircuit/core
+// 0.0.2172: add <LoRaDevice /> to a Circuit, set schematicDisabled and
+// pcbRoutingDisabled to true, await renderUntilSettled(), then getCircuitJson().
+// The TSX is a source fixture; this test uses its stored output so Core and its
+// rendering dependencies do not need to be added to this converter repository.
+test("repro: the full LoRa board cannot export round pill drills to STEP", async () => {
+  const circuitJson = generatedCircuitJson as CircuitJson
+  const sourceComponents = circuitJson.filter(
+    (element) => element.type === "source_component",
+  )
+  expect(sourceComponents).toHaveLength(58)
+  const j2 = sourceComponents.find((component) => component.name === "J2")!
+  const j2Pcb = circuitJson.find(
+    (element) =>
+      element.type === "pcb_component" &&
+      element.source_component_id === j2.source_component_id,
+  )!
+  if (j2Pcb.type !== "pcb_component")
+    throw new Error("Missing J2 PCB component")
+  const j2RoundHoles = circuitJson
+    .filter((element) => element.type === "pcb_plated_hole")
     .filter(
-      (hole) =>
-        hole.pcb_component_id === j2Pcb.pcb_component_id &&
-        hole.shape === "pill",
+      (element) =>
+        element.pcb_component_id === j2Pcb.pcb_component_id &&
+        element.shape === "pill",
     )
   expect(j2RoundHoles).toHaveLength(2)
   for (const hole of j2RoundHoles) {
@@ -40,7 +41,10 @@ test("repro: the full LoRa board generated from TSX cannot export to STEP", asyn
   }
   const pin3Hole = j2RoundHoles.find((hole) => hole.port_hints?.includes("3"))!
   expect(pin3Hole).toBeDefined()
-  const j2Pin3Fixture: CircuitJson = [circuit.db.pcb_board.list()[0]!, pin3Hole]
+  const j2Pin3Fixture: CircuitJson = [
+    circuitJson.find((element) => element.type === "pcb_board")!,
+    pin3Hole,
+  ]
 
   const svg = convertCircuitJsonToPcbSvg(circuitJson, {
     width: 800,
@@ -53,20 +57,21 @@ test("repro: the full LoRa board generated from TSX cannot export to STEP", asyn
       loadSystemFonts: false,
       fontFiles: [
         fileURLToPath(
-          import.meta.resolve(
-            "polished/docs/assets/fonts/TTF/SourceCodePro-Regular.ttf",
+          new URL(
+            "./TscircuitAlphabet.ttf",
+            import.meta.resolve("@tscircuit/alphabet"),
           ),
         ),
       ],
-      defaultFontFamily: "Source Code Pro",
-      sansSerifFamily: "Source Code Pro",
+      defaultFontFamily: "TscircuitAlphabet",
+      sansSerifFamily: "TscircuitAlphabet",
     },
   })
     .render()
     .asPng()
   await expect(png).toMatchPngSnapshot(import.meta.path, "lora-device-input")
 
-  // Preserve the original close-up, now extracted from Core's fresh output.
+  // Preserve the original close-up, extracted from the same stored Circuit JSON.
   const holeSvg = convertCircuitJsonToPcbSvg(j2Pin3Fixture, {
     width: 560,
     height: 480,

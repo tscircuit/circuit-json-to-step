@@ -26,5 +26,11 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  "exclude": ["circuit-json", "stepts", "site"]
+  "exclude": [
+    "circuit-json",
+    "stepts",
+    "site",
+    // Source-only fixture; the test consumes its pre-generated Circuit JSON.
+    "test/repros/round-pill-hole/index.circuit.tsx"
+  ]
 }
