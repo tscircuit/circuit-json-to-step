@@ -1,4 +1,4 @@
-import { beforeAll, expect, test } from "bun:test"
+import { expect, test } from "bun:test"
 import { fileURLToPath } from "node:url"
 import { Resvg } from "@resvg/resvg-js"
 import { Circuit } from "@tscircuit/core"
@@ -12,10 +12,7 @@ import LoRaDevice from "./index.circuit"
 // Full board source: https://tscircuit.com/gokul/lora-device (v0.1.6).
 // Component CAD meshes and unused routing caches are omitted; all components,
 // PCB footprints and connections are retained.
-let circuitJson: CircuitJson
-let j2Pin3Fixture: CircuitJson
-
-beforeAll(async () => {
+test("repro: the full LoRa board generated from TSX cannot export to STEP", async () => {
   const circuit = new Circuit()
   // Hole geometry is generated during PCB component rendering. Skip schematic
   // layout and trace routing; retain the complete board, footprints and nets.
@@ -23,7 +20,7 @@ beforeAll(async () => {
   circuit.pcbRoutingDisabled = true
   circuit.add(<LoRaDevice />)
   await circuit.renderUntilSettled()
-  circuitJson = circuit.getCircuitJson()
+  const circuitJson = circuit.getCircuitJson()
 
   expect(circuit.db.source_component.list()).toHaveLength(58)
   const j2 = circuit.db.source_component.getWhere({ name: "J2" })!
@@ -43,10 +40,8 @@ beforeAll(async () => {
   }
   const pin3Hole = j2RoundHoles.find((hole) => hole.port_hints?.includes("3"))!
   expect(pin3Hole).toBeDefined()
-  j2Pin3Fixture = [circuit.db.pcb_board.list()[0]!, pin3Hole]
-}, 30_000)
+  const j2Pin3Fixture: CircuitJson = [circuit.db.pcb_board.list()[0]!, pin3Hole]
 
-test("repro: the full LoRa board generated from TSX cannot export to STEP", async () => {
   const svg = convertCircuitJsonToPcbSvg(circuitJson, {
     width: 800,
     height: 1200,
@@ -91,9 +86,8 @@ test("repro: the full LoRa board generated from TSX cannot export to STEP", asyn
   await expect(
     circuitJsonToStep(circuitJson, { exportMode: "pcb" }),
   ).rejects.toThrow("STEP real must be finite")
-}, 30_000)
 
-test("the generated J2 pad exports when its round drill becomes a slot", async () => {
+  // Control: the same generated pad exports when its round drill becomes a slot.
   await expect(
     circuitJsonToStep(j2Pin3Fixture, { exportMode: "pcb" }),
   ).rejects.toThrow("STEP real must be finite")
@@ -106,4 +100,4 @@ test("the generated J2 pad exports when its round drill becomes a slot", async (
   const imported = await importStepWithOcct(step)
   expect(imported.success).toBe(true)
   expect(imported.meshes).toHaveLength(1)
-})
+}, 30_000)
