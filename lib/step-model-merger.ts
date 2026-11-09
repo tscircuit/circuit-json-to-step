@@ -27,12 +27,14 @@ import { createStyleCache, createStyledItems } from "./step-style-utils"
 import type {
   CadComponent,
   PcbComponent,
+  FailedStepModel,
   MergeStepModelOptions,
   MergeStepModelResult,
   MergeTransform,
 } from "./step-model-merger/types"
 
 export type {
+  FailedStepModel,
   MergeStepModelOptions,
   MergeStepModelResult,
 } from "./step-model-merger/types"
@@ -56,6 +58,9 @@ export async function mergeExternalStepModels(
   const solids: Ref<Entity>[] = []
   const handledComponentIds = new Set<string>()
   const handledPcbComponentIds = new Set<string>()
+  const failedComponentIds = new Set<string>()
+  const failedPcbComponentIds = new Set<string>()
+  const failedStepModels: FailedStepModel[] = []
   const importedModels = new Map<string, ImportedStepModel>()
   const stepContents = new Map(Object.entries(fsMap ?? {}))
 
@@ -114,11 +119,30 @@ export async function mergeExternalStepModels(
       }
       solids.push(...componentSolids)
     } catch (error) {
+      if (componentId) {
+        failedComponentIds.add(componentId)
+      }
+      if (component.pcb_component_id) {
+        failedPcbComponentIds.add(component.pcb_component_id)
+      }
+      failedStepModels.push({
+        cadComponentId: componentId || undefined,
+        pcbComponentId: component.pcb_component_id,
+        stepUrl,
+        error: error instanceof Error ? error.message : String(error),
+      })
       console.warn(`Failed to merge STEP model from ${stepUrl}:`, error)
     }
   }
 
-  return { solids, handledComponentIds, handledPcbComponentIds }
+  return {
+    solids,
+    handledComponentIds,
+    handledPcbComponentIds,
+    failedComponentIds,
+    failedPcbComponentIds,
+    failedStepModels,
+  }
 }
 
 type PlacementOptions = {
@@ -172,7 +196,7 @@ function importStepModelOnce(
     targetRepo,
     stepText,
     modelName,
-    { color },
+    { color, requireSolids: true },
   )
   const representationMap = targetRepo.add(
     new RepresentationMap(origin, representation),
@@ -188,6 +212,7 @@ export function importStepModelGeometry(
   options: {
     context?: Ref<Entity>
     rejectAssemblies?: boolean
+    requireSolids?: boolean
     color?: string
   } = {},
 ) {
@@ -211,6 +236,12 @@ export function importStepModelGeometry(
     )
 
   entries = pruneInvalidEntries(entries)
+  if (
+    options.requireSolids &&
+    !entries.some(([, entity]) => entity instanceof ManifoldSolidBrep)
+  ) {
+    throw new Error(`Part "${modelName}" has no solid geometry to export`)
+  }
 
   const idMapping = allocateIds(targetRepo, entries)
   remapReferences(entries, idMapping)
