@@ -587,15 +587,23 @@ export async function circuitJsonToStep(
   // Generate component mesh fallback if requested
   // Only call mesh generation if there are components that need it
   if (options.includeComponents) {
-    // Build set of pcb_component_ids covered by cad_components with model_step_url
+    // Build set of pcb_component_ids covered by cad_components with model_step_url.
+    // When external meshes are enabled, only count components whose STEP merge succeeded
+    // so components whose STEP model failed to load or parse fall back to generated meshes.
     const pcbComponentIdsWithStepUrl = new Set<string>()
-    for (const item of circuitJson) {
-      if (
-        item.type === "cad_component" &&
-        item.model_step_url &&
-        item.pcb_component_id
-      ) {
-        pcbComponentIdsWithStepUrl.add(item.pcb_component_id)
+    if (options.includeExternalMeshes) {
+      for (const pcbComponentId of handledPcbComponentIds) {
+        pcbComponentIdsWithStepUrl.add(pcbComponentId)
+      }
+    } else {
+      for (const item of circuitJson) {
+        if (
+          item.type === "cad_component" &&
+          item.model_step_url &&
+          item.pcb_component_id
+        ) {
+          pcbComponentIdsWithStepUrl.add(item.pcb_component_id)
+        }
       }
     }
 
@@ -618,8 +626,8 @@ export async function circuitJsonToStep(
         ) {
           return false
         }
-        // Needs mesh if no model_step_url
-        return !item.model_step_url
+        // Needs mesh if no model_step_url, or if external STEP merging failed for this component
+        return Boolean(options.includeExternalMeshes || !item.model_step_url)
       }
       if (item.type === "pcb_component") {
         // Skip if already handled
