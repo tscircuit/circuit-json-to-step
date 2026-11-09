@@ -389,8 +389,12 @@ function adjustTransformForPlacement(
     const halfThickness = boardThickness / 2
     const offsetZ = targetZ
     if (normalizedLayer === "bottom") {
-      transform.translation.z = -maxZ + offsetZ
-      transform.rotation.x = normalizeDegrees(transform.rotation.x + 180)
+      if (isFlippedToBottomFace(transform.rotation)) {
+        transform.translation.z = -maxZ + offsetZ
+      } else {
+        transform.translation.z = -halfThickness - maxZ + offsetZ
+        transform.rotation.x = normalizeDegrees(transform.rotation.x + 180)
+      }
     } else {
       transform.translation.z = halfThickness - minZ + offsetZ
     }
@@ -399,6 +403,11 @@ function adjustTransformForPlacement(
     transform.translation.z = targetZ - center.z
   }
   // For through-hole components, Z is already set above
+}
+
+function isFlippedToBottomFace(rotation: MergeTransform["rotation"]): boolean {
+  const [, , axisZ] = transformDirection([0, 0, 1], toRadians(rotation))
+  return axisZ < 0
 }
 
 function normalizeDegrees(value: number): number {
