@@ -4,7 +4,7 @@ import { jscadToStep } from "jscad-to-step"
 import { circuitJsonToStep } from "../../../lib/index"
 import circuit from "./repro09.json"
 
-test.failing("repro09: requested STEP models must not disappear from successful PCB exports", async () => {
+test("repro09: requested STEP models must not disappear from successful PCB exports", async () => {
   const valid = jscadToStep({ type: "cuboid", size: [4, 3, 4] })
   const inputs = [
     "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n#1 = THIS_IS_NOT ( VALID STEP\nENDSEC;\nEND-ISO-10303-21;",

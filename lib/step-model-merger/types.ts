@@ -3,6 +3,7 @@ import type { Entity, Ref, Repository } from "stepts"
 
 export type CadComponent = {
   type: "cad_component"
+  source_component_id?: string
   cad_component_id?: string
   pcb_component_id?: string
   model_step_url?: string

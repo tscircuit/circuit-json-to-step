@@ -114,7 +114,19 @@ export async function mergeExternalStepModels(
       }
       solids.push(...componentSolids)
     } catch (error) {
-      console.warn(`Failed to merge STEP model from ${stepUrl}:`, error)
+      const sourceComponent = circuitJson.find(
+        (item) =>
+          item.type === "source_component" &&
+          item.source_component_id === component.source_component_id,
+      )
+      const componentName =
+        sourceComponent?.type === "source_component"
+          ? sourceComponent.name
+          : componentId || component.pcb_component_id || "unnamed component"
+      throw new Error(
+        `Failed to import STEP model for component "${componentName}" (${stepUrl})`,
+        { cause: error },
+      )
     }
   }
 
@@ -168,12 +180,15 @@ function importStepModelOnce(
   modelName: string,
   color?: string,
 ): ImportedStepModel {
-  const { entries, origin, representation } = importStepModelGeometry(
+  const { entries, origin, representation, solids } = importStepModelGeometry(
     targetRepo,
     stepText,
     modelName,
     { color },
   )
+  if (solids.length === 0) {
+    throw new Error("STEP model contains no solid geometry")
+  }
   const representationMap = targetRepo.add(
     new RepresentationMap(origin, representation),
   )
