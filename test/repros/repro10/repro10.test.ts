@@ -1,5 +1,6 @@
 import { expect, spyOn, test } from "bun:test"
 import type { CircuitJson } from "circuit-json"
+import { fileURLToPath } from "node:url"
 import { Resvg } from "@resvg/resvg-js"
 import { jscadToStep } from "jscad-to-step"
 import { circuitJsonToStep } from "../../../lib/index"
@@ -55,10 +56,10 @@ test("repro10: visualize valid control and unreadable STEP export outcome", asyn
     right =
       '<text x="900" y="310" text-anchor="middle" fill="#fbbf24" font-size="24">No STEP file produced</text>'
   }
-  const png =
-    new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600">
+  const png = new Resvg(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600">
     <rect width="1200" height="600" fill="#101820"/>
-    <g fill="white" font-family="sans-serif" font-size="22" text-anchor="middle">
+    <g fill="white" font-family="KenPixel" font-size="22" text-anchor="middle">
       <text x="300" y="40">Valid control: PCB + U1 + R1</text>
       <text x="900" y="40">Same board, unreadable U1 STEP</text>
       <text x="900" y="80" font-size="18">${status}</text>
@@ -66,8 +67,23 @@ test("repro10: visualize valid control and unreadable STEP export outcome", asyn
     </g>
     <image x="0" y="100" width="600" height="450" href="data:image/png;base64,${Buffer.from(controlPng).toString("base64")}"/>
     ${right}
-  </svg>`)
-      .render()
-      .asPng()
+  </svg>`,
+    {
+      font: {
+        loadSystemFonts: false,
+        defaultFontFamily: "KenPixel",
+        fontFiles: [
+          fileURLToPath(
+            new URL(
+              "../../../node_modules/three/examples/fonts/ttf/kenpixel.ttf",
+              import.meta.url,
+            ),
+          ),
+        ],
+      },
+    },
+  )
+    .render()
+    .asPng()
   await expect(png).toMatchPngSnapshot(import.meta.path, "unreadable-step")
 }, 30_000)
