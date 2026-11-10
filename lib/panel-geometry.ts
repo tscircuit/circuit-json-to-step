@@ -45,7 +45,10 @@ export function generatePanelSolids({
       if (
         shape === "pill" ||
         shape === "rotated_pill" ||
-        shape === "pill_hole_with_rect_pad"
+        shape === "pill_hole_with_rect_pad" ||
+        // An oval plated hole has no hole_shape and is drilled as a slot, the
+        // same way the single board export cuts it.
+        (shape === "oval" && item.type === "pcb_plated_hole")
       ) {
         cuts.push([capsule(item)])
       } else if (
