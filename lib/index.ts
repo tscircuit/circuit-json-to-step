@@ -385,7 +385,7 @@ export async function circuitJsonToStep(
     const isRoundPillDrill =
       (holeShape === "pill" ||
         holeShape === "rotated_pill" ||
-        (holeShape === "oval" && hole.type === "pcb_plated_hole")) &&
+        holeShape === "oval") &&
       "hole_width" in hole &&
       "hole_height" in hole &&
       hole.hole_width === hole.hole_height
@@ -411,20 +411,11 @@ export async function circuitJsonToStep(
           zMax: halfBoardThickness,
         }),
       )
-    } else if (holeShape === "rotated_pill" || holeShape === "pill") {
-      sharedHoleGeometries.push(
-        createPillHoleGeometry({
-          repo,
-          hole,
-          zMin: -halfBoardThickness,
-          zMax: halfBoardThickness,
-          zDir,
-        }),
-      )
-    } else if (holeShape === "oval" && hole.type === "pcb_plated_hole") {
-      // pcb_plated_hole with shape "oval" has no hole_shape, so it reaches here
-      // on `shape` alone. Gated to plated holes: the non-plated oval variant
-      // falls through today and routing it would change pcb_hole output.
+    } else if (
+      holeShape === "rotated_pill" ||
+      holeShape === "pill" ||
+      holeShape === "oval"
+    ) {
       sharedHoleGeometries.push(
         createPillHoleGeometry({
           repo,
