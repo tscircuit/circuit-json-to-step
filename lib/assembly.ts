@@ -314,82 +314,106 @@ export async function circuitJsonToAssemblyStep(
           : true,
     )
     if (model.model_step_url) {
-      let geometry = stepContents.get(model.model_step_url)
-      if (geometry === undefined) {
-        geometry = await readStepFile(model.model_step_url)
-        stepContents.set(model.model_step_url, geometry)
-      }
-      if (
-        !model.pcb_component_id ||
-        model.model_origin_position ||
-        model.model_unit_to_mm_scale_factor !== undefined
-      ) {
-        const modelOrigin = asVector3(model.model_origin_position)
-        const scale = model.model_unit_to_mm_scale_factor ?? 1
-        const modelKey = JSON.stringify([
-          model.model_step_url,
-          modelOrigin,
-          scale,
-          model.color,
-        ])
-        let imported = importedStepModels.get(modelKey)
-        if (!imported) {
-          const geometryModel = importStepModelGeometry(repo, geometry, name, {
-            context,
-            rejectAssemblies: true,
-            color: model.color,
-          })
-          if (geometryModel.solids.length === 0)
-            throw new Error(`Part "${name}" has no solid geometry to export`)
-          geometryModel.representation
-            .resolve(repo)
-            .items.unshift(geometryModel.origin)
-          transformStepGeometry(geometryModel.entries, modelOrigin, scale)
-          imported = {
-            origin: geometryModel.origin,
-            representation: geometryModel.representation,
-          }
-          importedStepModels.set(modelKey, imported)
-        }
-        addChild(
-          model.cad_component_id,
-          name,
-          imported.representation,
-          imported.origin,
-          asVector3(model.position),
-          asVector3(model.rotation),
-        )
-        continue
-      }
-      if (!validatedStepModels.has(model.model_step_url)) {
-        if (
-          parseRepository(geometry)
-            .entries()
-            .some(
-              ([, entity]) => entity.type === "NEXT_ASSEMBLY_USAGE_OCCURRENCE",
-            )
-        ) {
-          throw new Error(
-            `Part "${name}" uses a nested STEP assembly, which is not supported for assembly export`,
-          )
-        }
-        validatedStepModels.add(model.model_step_url)
-      }
-      const result = await mergeExternalStepModels({
-        repo,
-        circuitJson: componentJson,
-        boardThickness: thicknessForComponents(componentJson),
-        fsMap: { [model.model_step_url]: geometry },
-      })
-      if (result.solids.length === 0) {
-        throw new Error(`Part "${name}" could not load its STEP geometry`)
-      }
-      // Keep mapped instances in the representation; extracting only BREPs would lose their placements.
-      const childRepresentation = repo.add(
-        new ShapeRepresentation(name, [origin, ...result.solids], context),
+      const canFallbackToPcbComponentMesh = Boolean(
+        model.pcb_component_id &&
+          !(part && ["printedpart", "part"].includes(part.ftype)),
       )
-      addChild(model.cad_component_id, name, childRepresentation, origin)
-      continue
+      try {
+        let geometry = stepContents.get(model.model_step_url)
+        if (geometry === undefined) {
+          geometry = await readStepFile(model.model_step_url)
+          stepContents.set(model.model_step_url, geometry)
+        }
+        if (
+          !model.pcb_component_id ||
+          model.model_origin_position ||
+          model.model_unit_to_mm_scale_factor !== undefined
+        ) {
+          const modelOrigin = asVector3(model.model_origin_position)
+          const scale = model.model_unit_to_mm_scale_factor ?? 1
+          const modelKey = JSON.stringify([
+            model.model_step_url,
+            modelOrigin,
+            scale,
+            model.color,
+          ])
+          let imported = importedStepModels.get(modelKey)
+          if (!imported) {
+            const geometryModel = importStepModelGeometry(
+              repo,
+              geometry,
+              name,
+              {
+                context,
+                rejectAssemblies: true,
+                requireSolids: true,
+                color: model.color,
+              },
+            )
+            if (geometryModel.solids.length === 0)
+              throw new Error(`Part "${name}" has no solid geometry to export`)
+            geometryModel.representation
+              .resolve(repo)
+              .items.unshift(geometryModel.origin)
+            transformStepGeometry(geometryModel.entries, modelOrigin, scale)
+            imported = {
+              origin: geometryModel.origin,
+              representation: geometryModel.representation,
+            }
+            importedStepModels.set(modelKey, imported)
+          }
+          addChild(
+            model.cad_component_id,
+            name,
+            imported.representation,
+            imported.origin,
+            asVector3(model.position),
+            asVector3(model.rotation),
+          )
+          continue
+        }
+        if (!validatedStepModels.has(model.model_step_url)) {
+          if (
+            parseRepository(geometry)
+              .entries()
+              .some(
+                ([, entity]) =>
+                  entity.type === "NEXT_ASSEMBLY_USAGE_OCCURRENCE",
+              )
+          ) {
+            throw new Error(
+              `Part "${name}" uses a nested STEP assembly, which is not supported for assembly export`,
+            )
+          }
+          validatedStepModels.add(model.model_step_url)
+        }
+        const result = await mergeExternalStepModels({
+          repo,
+          circuitJson: componentJson,
+          boardThickness: thicknessForComponents(componentJson),
+          fsMap: { [model.model_step_url]: geometry },
+        })
+        if (result.solids.length === 0) {
+          throw new Error(`Part "${name}" could not load its STEP geometry`)
+        }
+        // Keep mapped instances in the representation; extracting only BREPs would lose their placements.
+        const childRepresentation = repo.add(
+          new ShapeRepresentation(name, [origin, ...result.solids], context),
+        )
+        addChild(model.cad_component_id, name, childRepresentation, origin)
+        continue
+      } catch (error) {
+        const isNestedAssemblyError =
+          error instanceof Error &&
+          error.message.includes("uses a nested STEP assembly")
+        if (!canFallbackToPcbComponentMesh || isNestedAssemblyError) {
+          throw error
+        }
+        console.warn(
+          `Failed to merge STEP model from ${model.model_step_url}:`,
+          error,
+        )
+      }
     }
     const hasExternalMesh = Boolean(
       model.model_glb_url ||

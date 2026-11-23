@@ -28,10 +28,20 @@ export type MergeTransform = {
   rotation: Vector3
 }
 
+export type FailedStepModel = {
+  cadComponentId?: string
+  pcbComponentId?: string
+  stepUrl: string
+  error: string
+}
+
 export type MergeStepModelResult = {
   solids: Ref<Entity>[]
   handledComponentIds: Set<string>
   handledPcbComponentIds: Set<string>
+  failedComponentIds: Set<string>
+  failedPcbComponentIds: Set<string>
+  failedStepModels: FailedStepModel[]
 }
 
 export interface MergeStepModelOptions {

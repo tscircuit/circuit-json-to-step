@@ -69,7 +69,11 @@ export async function generateComponentMeshes(
           return false
         }
 
-        if (element.type === "cad_component" && element.model_step_url) {
+        if (
+          element.type === "cad_component" &&
+          element.model_step_url &&
+          !includeExternalMeshes
+        ) {
           return false
         }
 
@@ -84,15 +88,35 @@ export async function generateComponentMeshes(
         return true
       })
       .map((element) => {
-        if (!includeExternalMeshes && element.type === "cad_component") {
-          return {
-            ...element,
-            model_3mf_url: undefined,
-            model_obj_url: undefined,
-            model_stl_url: undefined,
-            model_glb_url: undefined,
-            model_gltf_url: undefined,
+        if (element.type === "cad_component") {
+          const fallbackCadComponent = element.model_step_url
+            ? {
+                ...element,
+                model_step_url: undefined,
+                ...(element.footprinter_string ||
+                element.model_3mf_url ||
+                element.model_obj_url ||
+                element.model_stl_url ||
+                element.model_glb_url ||
+                element.model_gltf_url ||
+                element.model_jscad
+                  ? {}
+                  : { show_as_bounding_box: true }),
+              }
+            : element
+
+          if (!includeExternalMeshes) {
+            return {
+              ...fallbackCadComponent,
+              model_3mf_url: undefined,
+              model_obj_url: undefined,
+              model_stl_url: undefined,
+              model_glb_url: undefined,
+              model_gltf_url: undefined,
+            }
           }
+
+          return fallbackCadComponent
         }
 
         return element
