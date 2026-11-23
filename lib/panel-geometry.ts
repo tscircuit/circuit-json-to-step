@@ -10,6 +10,7 @@ import {
 import type { GeneratedSceneSolid } from "./scene-geometry"
 import { createFaceFromVertices, createVertex } from "./step-brep-utils"
 import { getPillGeometry, rotatePoint } from "./pill-geometry"
+import { getOvalHolePoints } from "./oval-hole-geometry"
 
 const SEGMENTS = 64
 type Point = [number, number]
@@ -55,6 +56,8 @@ export function generatePanelSolids({
         cuts.push([circle(x, y, hole.hole_diameter / 2)])
       } else if (shape === "rect" && item.type === "pcb_hole") {
         cuts.push([rectangle(x, y, hole.hole_width, hole.hole_height)])
+      } else if (item.type === "pcb_hole" && item.hole_shape === "oval") {
+        cuts.push([getOvalHolePoints(item).map(({ x, y }): Point => [x, y])])
       } else throw new Error(`Unsupported panel hole shape: ${shape}`)
     }
     if (item.type === "pcb_cutout" && !item.pcb_board_id) {
