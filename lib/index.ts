@@ -50,6 +50,7 @@ import { VERSION } from "./version"
 import { createLineEdge, createPillHoleGeometry } from "./pill-geometry"
 import { createCircularHoleGeometry } from "./circular-hole-geometry"
 import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
+import { getOvalHolePoints } from "./oval-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
 import {
@@ -411,6 +412,18 @@ export async function circuitJsonToStep(
           zMax: halfBoardThickness,
         }),
       )
+    } else if (hole.type === "pcb_hole" && hole.hole_shape === "oval") {
+      sharedHoleGeometries.push(
+        createHoleGeometryFromSegments({
+          repo,
+          segments: getCutoutBoundarySegments({
+            shape: "polygon",
+            points: getOvalHolePoints(hole),
+          })!,
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
+        }),
+      )
     } else if (holeShape === "rotated_pill" || holeShape === "pill") {
       sharedHoleGeometries.push(
         createPillHoleGeometry({
@@ -423,8 +436,7 @@ export async function circuitJsonToStep(
       )
     } else if (holeShape === "oval" && hole.type === "pcb_plated_hole") {
       // pcb_plated_hole with shape "oval" has no hole_shape, so it reaches here
-      // on `shape` alone. Gated to plated holes: the non-plated oval variant
-      // falls through today and routing it would change pcb_hole output.
+      // on `shape` alone. Non-plated ovals are ellipses, handled above.
       sharedHoleGeometries.push(
         createPillHoleGeometry({
           repo,
