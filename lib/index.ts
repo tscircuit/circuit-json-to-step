@@ -53,7 +53,7 @@ import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
 import { getOvalHolePoints } from "./oval-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
-import { isThroughVia } from "./through-vias"
+import { isThroughVia } from "./is-through-via"
 import {
   applyCutoutsToBoardOutline,
   createHoleGeometryFromSegments,

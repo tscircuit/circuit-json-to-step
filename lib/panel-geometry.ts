@@ -11,7 +11,7 @@ import type { GeneratedSceneSolid } from "./scene-geometry"
 import { createFaceFromVertices, createVertex } from "./step-brep-utils"
 import { getPillGeometry, rotatePoint } from "./pill-geometry"
 import { getOvalHolePoints } from "./oval-hole-geometry"
-import { isThroughVia } from "./through-vias"
+import { isThroughVia } from "./is-through-via"
 
 const SEGMENTS = 64
 type Point = [number, number]

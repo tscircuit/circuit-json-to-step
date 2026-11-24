@@ -1,5 +1,5 @@
 import type { CircuitJson } from "circuit-json"
-import { isThroughVia } from "./through-vias"
+import { isThroughVia } from "./is-through-via"
 
 type Board = Extract<CircuitJson[number], { type: "pcb_board" }>
 
