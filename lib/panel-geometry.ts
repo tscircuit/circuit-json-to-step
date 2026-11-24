@@ -46,12 +46,14 @@ export function generatePanelSolids({
       if (
         shape === "pill" ||
         shape === "rotated_pill" ||
-        shape === "pill_hole_with_rect_pad"
+        shape === "pill_hole_with_rect_pad" ||
+        shape === "rotated_pill_hole_with_rect_pad"
       ) {
         cuts.push([capsule(item)])
       } else if (
         shape === "circle" ||
-        shape === "circular_hole_with_rect_pad"
+        shape === "circular_hole_with_rect_pad" ||
+        shape === "circular_hole_with_polygon_pad"
       ) {
         cuts.push([circle(x, y, hole.hole_diameter / 2)])
       } else if (shape === "rect" && item.type === "pcb_hole") {
