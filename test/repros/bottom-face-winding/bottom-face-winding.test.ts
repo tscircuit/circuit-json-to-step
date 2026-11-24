@@ -9,7 +9,7 @@ import { renderWoundShell } from "./render-wound-shell"
 // #197, generated with @tscircuit/core@0.0.2464 (tscircuit@0.0.3288):
 // export default () => <board width="50mm" height="30mm" />
 for (const exportMode of ["pcb", "assembly"] as const) {
-  test(`#197: ${exportMode} board bottom face is wound against its normal`, async () => {
+  test(`#197: ${exportMode} board bottom face is wound around its outward normal`, async () => {
     const step = await circuitJsonToStep(fixture as CircuitJson, { exportMode })
     const { faces, inconsistentEdges } = readBoardShell(step)
 
@@ -22,31 +22,23 @@ for (const exportMode of ["pcb", "assembly"] as const) {
       [25, 15],
       [-25, 15],
     ])
-    // Bug: bottom runs the same way, so seen from its own -Z normal it is
-    // clockwise. It should run the opposite way to the top loop.
+    // Bottom runs the opposite way, counter-clockwise seen from its -Z normal.
     expect(bottom.loop.map(({ x, y }) => [x, y])).toEqual([
       [-25, -15],
-      [25, -15],
-      [25, 15],
       [-25, 15],
+      [25, 15],
+      [25, -15],
     ])
 
-    // Consequence: each bottom perimeter edge is walked the same way by the
-    // bottom face and its side wall, so a strict reader sees an open shell.
-    expect(inconsistentEdges).toEqual([
-      ["+X", "-Z"],
-      ["+Y", "-Z"],
-      ["-X", "-Z"],
-      ["-Y", "-Z"],
-    ])
+    // Each edge is now walked once in each direction: a closed shell.
+    expect(inconsistentEdges).toEqual([])
 
     // OCCT heals the loop on import, so an OCCT render cannot catch this.
     expect((await importStepWithOcct(step)).success).toBe(true)
 
     if (exportMode === "pcb") {
       // Faces drawn with the winding written in the STEP, back faces culled.
-      // Left, from above: the top face renders. Right, from below: the
-      // bottom face is culled as a back face, so the board is see-through.
+      // Left, from above; right, from below: both caps now render.
       await expect(
         await renderWoundShell(faces, [
           { camPos: [30, -45, 45], lookAt: [0, 0, 0] },
@@ -56,3 +48,43 @@ for (const exportMode of ["pcb", "assembly"] as const) {
     }
   })
 }
+
+test("#197: concave and edge-notched boards form closed shells", async () => {
+  const board = (fixture as CircuitJson).find(
+    (item) => item.type === "pcb_board",
+  )!
+  const concave: CircuitJson = [
+    {
+      ...board,
+      width: 40,
+      height: 30,
+      center: { x: 20, y: 15 },
+      outline: [
+        { x: 0, y: 0 },
+        { x: 40, y: 0 },
+        { x: 40, y: 15 },
+        { x: 20, y: 15 },
+        { x: 20, y: 30 },
+        { x: 0, y: 30 },
+      ],
+    },
+  ]
+  const notched: CircuitJson = [
+    board,
+    {
+      type: "pcb_cutout",
+      pcb_cutout_id: "edge_notch",
+      shape: "rect",
+      center: { x: 25, y: 0 },
+      width: 10,
+      height: 10,
+      rotation: 0,
+    },
+  ]
+  for (const circuit of [concave, notched]) {
+    for (const exportMode of ["pcb", "assembly"] as const) {
+      const step = await circuitJsonToStep(circuit, { exportMode })
+      expect(readBoardShell(step).inconsistentEdges).toEqual([])
+    }
+  }
+})
