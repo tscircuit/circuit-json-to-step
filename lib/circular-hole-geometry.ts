@@ -53,9 +53,13 @@ interface CircularHoleGeometry {
 }
 
 /** The circular fields of a pcb_hole or pcb_plated_hole, on top of the shared
- * PillHole shape. */
-interface CircularHole extends PillHole {
+ * PillHole shape. The offsets are widened to the same number | { value }
+ * union as x and y, matching how circuit json types `distance`. */
+interface CircularHole
+  extends Omit<PillHole, "hole_offset_x" | "hole_offset_y"> {
   hole_diameter?: number
+  hole_offset_x?: number | { value: number }
+  hole_offset_y?: number | { value: number }
 }
 
 /**
@@ -91,8 +95,8 @@ export function createCircularHoleGeometry({
     return null
   }
 
-  const holeX = coordinateOf(hole.x) + (hole.hole_offset_x ?? 0)
-  const holeY = coordinateOf(hole.y) + (hole.hole_offset_y ?? 0)
+  const holeX = coordinateOf(hole.x) + coordinateOf(hole.hole_offset_x)
+  const holeY = coordinateOf(hole.y) + coordinateOf(hole.hole_offset_y)
   const radius = diameter / 2
 
   const bottomSegments = createCircleBoundary({
