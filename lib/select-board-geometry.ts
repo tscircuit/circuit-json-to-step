@@ -1,4 +1,5 @@
 import type { CircuitJson } from "circuit-json"
+import { isBoardDrill } from "./board-drills"
 
 type Board = Extract<CircuitJson[number], { type: "pcb_board" }>
 
@@ -10,12 +11,7 @@ export function selectBoardGeometry(
   const boards = circuitJson.filter((item) => item.type === "pcb_board")
   return circuitJson.filter((item) => {
     if (item.type === "pcb_board") return item === selected
-    if (
-      item.type !== "pcb_hole" &&
-      item.type !== "pcb_plated_hole" &&
-      item.type !== "pcb_cutout"
-    )
-      return true
+    if (!isBoardDrill(item) && item.type !== "pcb_cutout") return true
     const record = item as unknown as Record<string, unknown>
     let owners = boards.filter((board) => {
       const boardRecord = board as unknown as Record<string, unknown>

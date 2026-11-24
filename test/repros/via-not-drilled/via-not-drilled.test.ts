@@ -11,7 +11,7 @@ import fixture from "./via-not-drilled.json"
 //     holeDiameter="1mm" outerDiameter="1.6mm" />
 // </board>
 for (const route of ["pcb", "assembly", "panel"] as const) {
-  test(`#195: ${route} export leaves the via drill covered`, async () => {
+  test(`#195: ${route} export drills the via through the substrate`, async () => {
     const circuit = fixture as CircuitJson
     const input: CircuitJson =
       route === "panel"
@@ -39,7 +39,7 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
       indices: board.index.array,
       zTop: 0.8,
     }
-    // Current bug: substrate covers the entire 1 mm drill on BOTH faces.
+    // The entire 1 mm drill is open on BOTH faces.
     expectFaceCoverage(
       mesh,
       [
@@ -47,7 +47,7 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
         [0.3, 0],
         [0, 0.3],
       ],
-      true,
+      false,
     )
     // The drill must not remove the surrounding annular pad area.
     expectFaceCoverage(
@@ -59,7 +59,7 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
       true,
     )
     if (route !== "panel") {
-      expect(step.match(/= CYLINDRICAL_SURFACE\(/g) ?? []).toHaveLength(0)
+      expect(step.match(/= CYLINDRICAL_SURFACE\(/g) ?? []).toHaveLength(2)
     }
     if (route === "pcb") {
       await expect(step).toMatchStepSnapshot(
@@ -74,3 +74,57 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
     }
   })
 }
+
+test("via drills honor layer extent and board ownership", async () => {
+  const circuit = fixture as CircuitJson
+  const board = circuit.find((item) => item.type === "pcb_board")!
+  const via = circuit.find((item) => item.type === "pcb_via")!
+  // Cover current drill metadata, legacy from/to metadata, and layer-only JSON.
+  for (const fields of [
+    { from_layer: undefined, to_layer: undefined },
+    { from_layer: "bottom", to_layer: "top" },
+    { topmost_drill_layer: "top", bottommost_drill_layer: "bottom" },
+    { through_hole: true, layers: ["inner1", "inner2"] },
+  ] as Partial<typeof via>[]) {
+    const step = await circuitJsonToStep([board, { ...via, ...fields }], {
+      exportMode: "pcb",
+    })
+    expect(step.match(/= CYLINDRICAL_SURFACE\(/g)).toHaveLength(2)
+  }
+  // A blind/buried via must not become an unintended through-board drill.
+  for (const fields of [
+    { through_hole: false },
+    { topmost_drill_layer: "top", bottommost_drill_layer: "inner1" },
+    { from_layer: "inner1", to_layer: "inner2", layers: ["inner1", "inner2"] },
+  ] as Partial<typeof via>[]) {
+    const step = await circuitJsonToStep([board, { ...via, ...fields }], {
+      exportMode: "pcb",
+    })
+    expect(step.match(/= CYLINDRICAL_SURFACE\(/g) ?? []).toHaveLength(0)
+  }
+  // Overlapping board bounds make ownership observable: only the first is drilled.
+  const boards: CircuitJson = [
+    board,
+    { ...board, pcb_board_id: "other_board", subcircuit_id: "other" },
+    via,
+  ]
+  const result = await importStepWithOcct(await circuitJsonToStep(boards))
+  expect(result.meshes).toHaveLength(2)
+  for (const [index, mesh] of result.meshes.entries()) {
+    expectFaceCoverage(
+      {
+        positions: mesh.attributes.position.array,
+        indices: mesh.index.array,
+        zTop: 0.8,
+      },
+      [[0, 0]],
+      index === 1,
+    )
+  }
+  await expect(
+    circuitJsonToStep([
+      ...boards.slice(0, 2),
+      { ...via, subcircuit_id: undefined },
+    ]),
+  ).rejects.toThrow("Cannot determine which PCB owns a hole")
+})
