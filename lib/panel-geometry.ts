@@ -45,7 +45,9 @@ export function generatePanelSolids({
     ) {
       const hole = item as unknown as Record<string, any>
       const shape =
-        hole.hole_shape ?? hole.shape ?? (item.type === "pcb_via" ? "circle" : undefined)
+        hole.hole_shape ??
+        hole.shape ??
+        (item.type === "pcb_via" ? "circle" : undefined)
       const x = hole.x + (hole.hole_offset_x ?? 0),
         y = hole.y + (hole.hole_offset_y ?? 0)
       if (
