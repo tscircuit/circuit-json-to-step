@@ -61,7 +61,7 @@ import {
 
 type Hole = Extract<
   CircuitJson[number],
-  { type: "pcb_hole" | "pcb_plated_hole" }
+  { type: "pcb_hole" | "pcb_plated_hole" | "pcb_via" }
 >
 type SharedHoleGeometry = {
   bottomLoop: Ref<EdgeLoop>
@@ -172,7 +172,9 @@ export async function circuitJsonToStep(
   const pcbBoard = circuitJson.find((item) => item.type === "pcb_board")
   const holes = circuitJson.filter(
     (item): item is RuntimeHole =>
-      item.type === "pcb_hole" || item.type === "pcb_plated_hole",
+      item.type === "pcb_hole" ||
+      item.type === "pcb_plated_hole" ||
+      item.type === "pcb_via",
   )
   const cutouts = circuitJson.filter((item) => item.type === "pcb_cutout")
 
@@ -382,7 +384,8 @@ export async function circuitJsonToStep(
 
   const sharedHoleGeometries: SharedHoleGeometry[] = []
   for (const hole of holes) {
-    const holeShape = hole.hole_shape ?? hole.shape
+    const holeShape =
+      hole.hole_shape ?? hole.shape ?? (hole.type === "pcb_via" ? "circle" : undefined)
     const isRoundPillDrill =
       (holeShape === "pill" ||
         holeShape === "rotated_pill" ||

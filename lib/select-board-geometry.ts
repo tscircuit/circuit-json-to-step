@@ -13,6 +13,7 @@ export function selectBoardGeometry(
     if (
       item.type !== "pcb_hole" &&
       item.type !== "pcb_plated_hole" &&
+      item.type !== "pcb_via" &&
       item.type !== "pcb_cutout"
     )
       return true

@@ -16,7 +16,7 @@ const SEGMENTS = 64
 type Point = [number, number]
 type Hole = Extract<
   CircuitJson[number],
-  { type: "pcb_hole" | "pcb_plated_hole" }
+  { type: "pcb_hole" | "pcb_plated_hole" | "pcb_via" }
 >
 
 /** Clip the panel in 2D, then extrude closed boundary loops with shared edges. */
@@ -38,9 +38,14 @@ export function generatePanelSolids({
   )
   const cuts: Polygon[] = []
   for (const item of circuitJson) {
-    if (item.type === "pcb_hole" || item.type === "pcb_plated_hole") {
+    if (
+      item.type === "pcb_hole" ||
+      item.type === "pcb_plated_hole" ||
+      item.type === "pcb_via"
+    ) {
       const hole = item as unknown as Record<string, any>
-      const shape = hole.hole_shape ?? hole.shape
+      const shape =
+        hole.hole_shape ?? hole.shape ?? (item.type === "pcb_via" ? "circle" : undefined)
       const x = hole.x + (hole.hole_offset_x ?? 0),
         y = hole.y + (hole.hole_offset_y ?? 0)
       if (
