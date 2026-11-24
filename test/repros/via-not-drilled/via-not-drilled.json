@@ -1,0 +1,28 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_0",
+    "subcircuit_id": "subcircuit_source_group_0",
+    "center": {
+      "x": 0,
+      "y": 0
+    },
+    "thickness": 1.6,
+    "num_layers": 2,
+    "width": 20,
+    "height": 20,
+    "material": "fr4"
+  },
+  {
+    "type": "pcb_via",
+    "pcb_via_id": "pcb_via_0",
+    "x": 0,
+    "y": 0,
+    "hole_diameter": 1,
+    "outer_diameter": 1.6,
+    "layers": ["top", "bottom"],
+    "from_layer": "top",
+    "to_layer": "bottom",
+    "subcircuit_id": "subcircuit_source_group_0"
+  }
+]
