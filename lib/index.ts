@@ -53,14 +53,17 @@ import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
 import { getOvalHolePoints } from "./oval-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
-import { isFullDepthDrill, type DrillCandidate } from "./full-depth-drills"
+import { isThroughVia } from "./through-vias"
 import {
   applyCutoutsToBoardOutline,
   createHoleGeometryFromSegments,
   getCutoutBoundarySegments,
 } from "./cutout-geometry"
 
-type Hole = DrillCandidate
+type Hole = Extract<
+  CircuitJson[number],
+  { type: "pcb_hole" | "pcb_plated_hole" }
+>
 type SharedHoleGeometry = {
   bottomLoop: Ref<EdgeLoop>
   topLoop: Ref<EdgeLoop>
@@ -168,7 +171,11 @@ export async function circuitJsonToStep(
 
   // Extract pcb_board and holes from circuit JSON
   const pcbBoard = circuitJson.find((item) => item.type === "pcb_board")
-  const holes: RuntimeHole[] = circuitJson.filter(isFullDepthDrill)
+  const holes = circuitJson.filter(
+    (item): item is RuntimeHole =>
+      item.type === "pcb_hole" || item.type === "pcb_plated_hole",
+  )
+  const throughVias = circuitJson.filter(isThroughVia)
   const cutouts = circuitJson.filter((item) => item.type === "pcb_cutout")
 
   // Get dimensions from pcb_board or options
@@ -377,8 +384,7 @@ export async function circuitJsonToStep(
 
   const sharedHoleGeometries: SharedHoleGeometry[] = []
   for (const hole of holes) {
-    const holeShape =
-      hole.type === "pcb_via" ? "circle" : (hole.hole_shape ?? hole.shape)
+    const holeShape = hole.hole_shape ?? hole.shape
     const isRoundPillDrill =
       (holeShape === "pill" ||
         holeShape === "rotated_pill" ||
@@ -442,6 +448,20 @@ export async function circuitJsonToStep(
           zDir,
         }),
       )
+    }
+  }
+
+  // Through vias are round drills; blind and buried vias were filtered out.
+  for (const via of throughVias) {
+    const circularGeometry = createCircularHoleGeometry({
+      repo,
+      hole: via,
+      zMin: -halfBoardThickness,
+      zMax: halfBoardThickness,
+      zDir,
+    })
+    if (circularGeometry) {
+      sharedHoleGeometries.push(circularGeometry)
     }
   }
 

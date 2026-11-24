@@ -1,5 +1,5 @@
 import type { CircuitJson } from "circuit-json"
-import { isFullDepthDrill } from "./full-depth-drills"
+import { isThroughVia } from "./through-vias"
 
 type Board = Extract<CircuitJson[number], { type: "pcb_board" }>
 
@@ -11,7 +11,13 @@ export function selectBoardGeometry(
   const boards = circuitJson.filter((item) => item.type === "pcb_board")
   return circuitJson.filter((item) => {
     if (item.type === "pcb_board") return item === selected
-    if (!isFullDepthDrill(item) && item.type !== "pcb_cutout") return true
+    if (
+      item.type !== "pcb_hole" &&
+      item.type !== "pcb_plated_hole" &&
+      item.type !== "pcb_cutout" &&
+      !isThroughVia(item)
+    )
+      return true
     const record = item as unknown as Record<string, unknown>
     let owners = boards.filter((board) => {
       const boardRecord = board as unknown as Record<string, unknown>

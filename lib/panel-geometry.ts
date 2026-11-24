@@ -11,7 +11,7 @@ import type { GeneratedSceneSolid } from "./scene-geometry"
 import { createFaceFromVertices, createVertex } from "./step-brep-utils"
 import { getPillGeometry, rotatePoint } from "./pill-geometry"
 import { getOvalHolePoints } from "./oval-hole-geometry"
-import { isFullDepthDrill } from "./full-depth-drills"
+import { isThroughVia } from "./through-vias"
 
 const SEGMENTS = 64
 type Point = [number, number]
@@ -39,11 +39,11 @@ export function generatePanelSolids({
   )
   const cuts: Polygon[] = []
   for (const item of circuitJson) {
-    if (isFullDepthDrill(item)) {
-      if (item.type === "pcb_via") {
-        cuts.push([circle(item.x, item.y, item.hole_diameter / 2)])
-        continue
-      }
+    if (isThroughVia(item)) {
+      cuts.push([circle(item.x, item.y, item.hole_diameter / 2)])
+      continue
+    }
+    if (item.type === "pcb_hole" || item.type === "pcb_plated_hole") {
       const hole = item as unknown as Record<string, any>
       const shape = hole.hole_shape ?? hole.shape
       const x = hole.x + (hole.hole_offset_x ?? 0),
