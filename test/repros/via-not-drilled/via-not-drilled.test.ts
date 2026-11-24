@@ -75,33 +75,64 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
   })
 }
 
-test("via drills honor layer extent and board ownership", async () => {
+test("only vias spanning top to bottom are drilled; blind and buried are not", async () => {
   const circuit = fixture as CircuitJson
   const board = circuit.find((item) => item.type === "pcb_board")!
   const via = circuit.find((item) => item.type === "pcb_via")!
-  // Cover current drill metadata, legacy from/to metadata, and layer-only JSON.
+  const fourLayerBoard = { ...board, num_layers: 4 }
+  const countDrills = async (fields: Partial<typeof via>) => {
+    const step = await circuitJsonToStep(
+      [fourLayerBoard, { ...via, ...fields }],
+      {
+        exportMode: "pcb",
+      },
+    )
+    return (step.match(/= CYLINDRICAL_SURFACE\(/g) ?? []).length
+  }
+
+  // Through vias: one drill (two cylindrical faces, one per board-face loop).
   for (const fields of [
-    { from_layer: undefined, to_layer: undefined },
-    { from_layer: "bottom", to_layer: "top" },
+    // core writes every layer the barrel crosses
+    { layers: ["top", "inner1", "inner2", "bottom"] },
+    // An autorouted through via whose trace only changes top -> inner1:
+    // the deprecated from/to describe the trace, `layers` the physical barrel.
+    {
+      from_layer: "top",
+      to_layer: "inner1",
+      layers: ["top", "inner1", "inner2", "bottom"],
+    },
+    // older JSON without layer data, and explicit drill metadata
+    { from_layer: "bottom", to_layer: "top", layers: [] },
     { topmost_drill_layer: "top", bottommost_drill_layer: "bottom" },
     { through_hole: true, layers: ["inner1", "inner2"] },
   ] as Partial<typeof via>[]) {
-    const step = await circuitJsonToStep([board, { ...via, ...fields }], {
-      exportMode: "pcb",
-    })
-    expect(step.match(/= CYLINDRICAL_SURFACE\(/g)).toHaveLength(2)
+    expect(await countDrills(fields)).toBe(2)
   }
-  // A blind/buried via must not become an unintended through-board drill.
+
+  // Blind and buried vias stop inside the board, so cutting through it would
+  // add a hole the real board does not have.
   for (const fields of [
-    { through_hole: false },
-    { topmost_drill_layer: "top", bottommost_drill_layer: "inner1" },
+    // blind from the top: <via fromLayer="top" toLayer="inner1" />
+    { from_layer: "top", to_layer: "inner1", layers: ["top", "inner1"] },
+    // blind from the bottom
+    {
+      from_layer: "inner1",
+      to_layer: "bottom",
+      layers: ["inner1", "inner2", "bottom"],
+    },
+    // buried: <via fromLayer="inner1" toLayer="inner2" />
     { from_layer: "inner1", to_layer: "inner2", layers: ["inner1", "inner2"] },
+    { topmost_drill_layer: "top", bottommost_drill_layer: "inner1" },
+    { through_hole: false },
   ] as Partial<typeof via>[]) {
-    const step = await circuitJsonToStep([board, { ...via, ...fields }], {
-      exportMode: "pcb",
-    })
-    expect(step.match(/= CYLINDRICAL_SURFACE\(/g) ?? []).toHaveLength(0)
+    expect(await countDrills(fields)).toBe(0)
   }
+})
+
+test("via drills follow board ownership", async () => {
+  const circuit = fixture as CircuitJson
+  const board = circuit.find((item) => item.type === "pcb_board")!
+  const via = circuit.find((item) => item.type === "pcb_via")!
   // Overlapping board bounds make ownership observable: only the first is drilled.
   const boards: CircuitJson = [
     board,

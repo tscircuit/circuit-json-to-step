@@ -53,14 +53,14 @@ import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
 import { getOvalHolePoints } from "./oval-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
-import { isBoardDrill, type BoardDrill } from "./board-drills"
+import { isFullDepthDrill, type DrillCandidate } from "./full-depth-drills"
 import {
   applyCutoutsToBoardOutline,
   createHoleGeometryFromSegments,
   getCutoutBoundarySegments,
 } from "./cutout-geometry"
 
-type Hole = BoardDrill
+type Hole = DrillCandidate
 type SharedHoleGeometry = {
   bottomLoop: Ref<EdgeLoop>
   topLoop: Ref<EdgeLoop>
@@ -168,7 +168,7 @@ export async function circuitJsonToStep(
 
   // Extract pcb_board and holes from circuit JSON
   const pcbBoard = circuitJson.find((item) => item.type === "pcb_board")
-  const holes: RuntimeHole[] = circuitJson.filter(isBoardDrill)
+  const holes: RuntimeHole[] = circuitJson.filter(isFullDepthDrill)
   const cutouts = circuitJson.filter((item) => item.type === "pcb_cutout")
 
   // Get dimensions from pcb_board or options
