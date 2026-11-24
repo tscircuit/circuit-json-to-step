@@ -418,6 +418,29 @@ export async function circuitJsonToStep(
           zMax: halfBoardThickness,
         }),
       )
+    } else if (
+      hole.type === "pcb_hole" &&
+      hole.hole_shape === "square" &&
+      typeof hole.hole_diameter === "number" &&
+      Number.isFinite(hole.hole_diameter) &&
+      hole.hole_diameter > 0
+    ) {
+      sharedHoleGeometries.push(
+        createRectangularHoleGeometry({
+          repo,
+          hole: {
+            type: "pcb_hole",
+            pcb_hole_id: hole.pcb_hole_id,
+            hole_shape: "rect",
+            x: hole.x,
+            y: hole.y,
+            hole_width: hole.hole_diameter,
+            hole_height: hole.hole_diameter,
+          },
+          zMin: -halfBoardThickness,
+          zMax: halfBoardThickness,
+        }),
+      )
     } else if (hole.type === "pcb_hole" && hole.hole_shape === "oval") {
       sharedHoleGeometries.push(
         createHoleGeometryFromSegments({

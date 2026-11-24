@@ -56,6 +56,11 @@ export function generatePanelSolids({
         cuts.push([circle(x, y, hole.hole_diameter / 2)])
       } else if (shape === "rect" && item.type === "pcb_hole") {
         cuts.push([rectangle(x, y, hole.hole_width, hole.hole_height)])
+      } else if (shape === "square" && item.type === "pcb_hole") {
+        if (!(hole.hole_diameter > 0)) {
+          throw new Error("Panel hole dimensions must be positive")
+        }
+        cuts.push([rectangle(x, y, hole.hole_diameter, hole.hole_diameter)])
       } else if (item.type === "pcb_hole" && item.hole_shape === "oval") {
         cuts.push([getOvalHolePoints(item).map(({ x, y }): Point => [x, y])])
       } else throw new Error(`Unsupported panel hole shape: ${shape}`)
