@@ -4,7 +4,9 @@ import { circuitJsonToStep } from "../../../lib"
 import { expectFaceCoverage } from "../../utils/mesh-coverage"
 import { importStepWithOcct } from "../../utils/occt/importer"
 
-const circuit: CircuitJson = [
+// Includes rectangular-pad pill holes both with omitted hole_shape (as produced
+// by callers specifying only `shape`) and with rotated_pill_hole_with_rect_pad.
+const circuit = [
   {
     type: "pcb_board",
     pcb_board_id: "pcb_board_0",
@@ -13,6 +15,7 @@ const circuit: CircuitJson = [
     height: 16,
     thickness: 1.6,
     num_layers: 2,
+    material: "fr4",
   },
   {
     type: "pcb_plated_hole",
@@ -58,7 +61,7 @@ const circuit: CircuitJson = [
     hole_offset_y: 0,
     layers: ["top", "bottom"],
   },
-]
+] as unknown as CircuitJson
 
 for (const route of ["pcb", "assembly", "panel"] as const) {
   test(`${route} export drills pill_hole_with_rect_pad and rotated_pill_hole_with_rect_pad`, async () => {
