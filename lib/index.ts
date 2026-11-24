@@ -390,7 +390,11 @@ export async function circuitJsonToStep(
       "hole_width" in hole &&
       "hole_height" in hole &&
       hole.hole_width === hole.hole_height
-    if (holeShape === "circle" || isRoundPillDrill) {
+    if (
+      holeShape === "circle" ||
+      holeShape === "circular_hole_with_rect_pad" ||
+      isRoundPillDrill
+    ) {
       const circularGeometry = createCircularHoleGeometry({
         repo,
         hole: isRoundPillDrill
