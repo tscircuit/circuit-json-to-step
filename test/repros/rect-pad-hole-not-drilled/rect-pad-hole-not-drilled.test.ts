@@ -41,7 +41,7 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
       indices: board.index.array,
       zTop: 0.8,
     }
-    // Current bug: the rectangular-pad drill is missing except in panel mode.
+    // Both pad shapes must produce the same 1 mm drill.
     expectFaceCoverage(
       mesh,
       [
@@ -49,7 +49,7 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
         [-2.7, 0],
         [-3, 0.3],
       ],
-      route !== "panel",
+      false,
     )
     expectFaceCoverage(
       mesh,
@@ -70,7 +70,7 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
       true,
     )
     if (route !== "panel") {
-      expect(step.match(/= CYLINDRICAL_SURFACE\(/g) ?? []).toHaveLength(2)
+      expect(step.match(/= CYLINDRICAL_SURFACE\(/g) ?? []).toHaveLength(4)
     }
     if (route === "pcb") {
       await expect(step).toMatchStepSnapshot(
@@ -85,3 +85,46 @@ for (const route of ["pcb", "assembly", "panel"] as const) {
     }
   })
 }
+
+test("rectangular pad dimensions and rotation do not change the offset drill", async () => {
+  const circuit = (fixture as CircuitJson).map((item) =>
+    item.type === "pcb_plated_hole" &&
+    item.shape === "circular_hole_with_rect_pad"
+      ? {
+          ...item,
+          rect_pad_width: 4,
+          rect_pad_height: 2,
+          rect_ccw_rotation: 45,
+          hole_offset_x: 0.4,
+          hole_offset_y: 0.2,
+        }
+      : item,
+  )
+  for (const exportMode of ["pcb", "assembly"] as const) {
+    const result = await importStepWithOcct(
+      await circuitJsonToStep(circuit, { exportMode }),
+    )
+    const board = result.meshes[0]!
+    const mesh = {
+      positions: board.attributes.position.array,
+      indices: board.index.array,
+      zTop: 0.8,
+    }
+    expectFaceCoverage(
+      mesh,
+      [
+        [-2.6, 0.2],
+        [-2.3, 0.2],
+      ],
+      false,
+    )
+    expectFaceCoverage(
+      mesh,
+      [
+        [-1.95, 0.2],
+        [-2.6, 0.85],
+      ],
+      true,
+    )
+  }
+})
