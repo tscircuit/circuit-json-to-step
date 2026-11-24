@@ -22,7 +22,7 @@ for (const exportMode of ["pcb", "assembly"] as const) {
     // OCCT imports the defective topology, so an import/screenshot alone cannot guard this.
     expect((await importStepWithOcct(step)).success).toBe(true)
     if (exportMode === "pcb") {
-      await expect(renderWindingSnapshot(inspection)).toMatchPngSnapshot(
+      await expect(await renderWindingSnapshot(inspection)).toMatchPngSnapshot(
         import.meta.path,
         "bottom-face-winding",
       )

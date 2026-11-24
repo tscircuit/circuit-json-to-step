@@ -1,11 +1,29 @@
-import { Resvg } from "@resvg/resvg-js"
+import { Resvg, initWasm } from "@resvg/resvg-wasm"
+import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import type { inspectBoardCaps } from "./inspect-board-caps"
 
 type Inspection = ReturnType<typeof inspectBoardCaps>
 
+// Use the same renderer and font bytes on macOS and Linux snapshot runners.
+const wasmReady = initWasm(
+  readFileSync(new URL(import.meta.resolve("@resvg/resvg-wasm/index_bg.wasm"))),
+)
+const font = readFileSync(
+  fileURLToPath(
+    new URL(
+      "./TscircuitAlphabet.ttf",
+      import.meta.resolve("@tscircuit/alphabet"),
+    ),
+  ),
+)
+
 /** The arrows come from STEP edge traversal, not a healed/tessellated model. */
-export function renderWindingSnapshot({ caps, inconsistentEdges }: Inspection) {
+export async function renderWindingSnapshot({
+  caps,
+  inconsistentEdges,
+}: Inspection) {
+  await wasmReady
   const panels = caps
     .map((cap, index) => {
       const cx = 200 + index * 400
@@ -39,20 +57,14 @@ export function renderWindingSnapshot({ caps, inconsistentEdges }: Inspection) {
       <text x="400" y="453" text-anchor="middle" font-size="18">Inconsistent shared perimeter edges: ${inconsistentEdges}</text>
     </g>
   </svg>`
-  return new Resvg(svg, {
-    font: {
-      loadSystemFonts: false,
-      fontFiles: [
-        fileURLToPath(
-          new URL(
-            "./TscircuitAlphabet.ttf",
-            import.meta.resolve("@tscircuit/alphabet"),
-          ),
-        ),
-      ],
-      defaultFontFamily: "TscircuitAlphabet",
-    },
+  const renderer = new Resvg(svg, {
+    font: { fontBuffers: [font], defaultFontFamily: "TscircuitAlphabet" },
   })
-    .render()
-    .asPng()
+  const image = renderer.render()
+  try {
+    return image.asPng()
+  } finally {
+    image.free()
+    renderer.free()
+  }
 }
