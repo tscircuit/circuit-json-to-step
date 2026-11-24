@@ -73,10 +73,7 @@
     },
     "x": 5,
     "y": -1,
-    "layers": [
-      "top",
-      "bottom"
-    ],
+    "layers": ["top", "bottom"],
     "subcircuit_id": "subcircuit_source_group_0"
   }
 ]
