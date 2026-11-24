@@ -46,7 +46,8 @@ export function generatePanelSolids({
       if (
         shape === "pill" ||
         shape === "rotated_pill" ||
-        shape === "pill_hole_with_rect_pad"
+        shape === "pill_hole_with_rect_pad" ||
+        shape === "rotated_pill_hole_with_rect_pad"
       ) {
         cuts.push([capsule(item)])
       } else if (
