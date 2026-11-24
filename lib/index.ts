@@ -53,6 +53,7 @@ import { createRectangularHoleGeometry } from "./rectangular-hole-geometry"
 import { getOvalHolePoints } from "./oval-hole-geometry"
 import { circuitJsonToAssemblyStep } from "./assembly"
 import { selectBoardGeometry } from "./select-board-geometry"
+import { isThroughVia } from "./is-through-via"
 import {
   applyCutoutsToBoardOutline,
   createHoleGeometryFromSegments,
@@ -174,6 +175,7 @@ export async function circuitJsonToStep(
     (item): item is RuntimeHole =>
       item.type === "pcb_hole" || item.type === "pcb_plated_hole",
   )
+  const throughVias = circuitJson.filter(isThroughVia)
   const cutouts = circuitJson.filter((item) => item.type === "pcb_cutout")
 
   // Get dimensions from pcb_board or options
@@ -452,6 +454,20 @@ export async function circuitJsonToStep(
           zDir,
         }),
       )
+    }
+  }
+
+  // Through vias are round drills; blind and buried vias were filtered out.
+  for (const via of throughVias) {
+    const circularGeometry = createCircularHoleGeometry({
+      repo,
+      hole: via,
+      zMin: -halfBoardThickness,
+      zMax: halfBoardThickness,
+      zDir,
+    })
+    if (circularGeometry) {
+      sharedHoleGeometries.push(circularGeometry)
     }
   }
 

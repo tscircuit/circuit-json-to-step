@@ -1,4 +1,5 @@
 import type { CircuitJson } from "circuit-json"
+import { isThroughVia } from "./is-through-via"
 
 type Board = Extract<CircuitJson[number], { type: "pcb_board" }>
 
@@ -13,7 +14,8 @@ export function selectBoardGeometry(
     if (
       item.type !== "pcb_hole" &&
       item.type !== "pcb_plated_hole" &&
-      item.type !== "pcb_cutout"
+      item.type !== "pcb_cutout" &&
+      !isThroughVia(item)
     )
       return true
     const record = item as unknown as Record<string, unknown>
