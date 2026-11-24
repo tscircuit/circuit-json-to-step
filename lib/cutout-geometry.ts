@@ -259,10 +259,15 @@ export function createHoleGeometryFromSegments({
       bottomEdges.map((edge) => repo.add(new OrientedEdge("", edge, true))),
     ),
   )
+  // The boundary runs CCW, so the top cap's inner bound must visit it in
+  // reverse (flipped edge orientations) to wind CW seen from +Z, opposite
+  // to the face's outer bound.
   const topLoop = repo.add(
     new EdgeLoop(
       "",
-      topEdges.map((edge) => repo.add(new OrientedEdge("", edge, true))),
+      [...topEdges]
+        .reverse()
+        .map((edge) => repo.add(new OrientedEdge("", edge, false))),
     ),
   )
 
