@@ -1,0 +1,12 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_1",
+    "width": 50,
+    "height": 30,
+    "thickness": 1.6,
+    "num_layers": 2,
+    "material": "fr4",
+    "center": { "x": 0, "y": 0 }
+  }
+]
